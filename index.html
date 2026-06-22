@@ -186,6 +186,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
       <div class="ssep">Ventas / Marketing</div>
       <div class="sitem" data-page="ventas" onclick="navPage('ventas')"><span class="ico">⭐</span>Premios semana</div>
       <div class="sitem" data-page="externos" onclick="navPage('externos')"><span class="ico">👥</span>Vendedores ext.</div>
+<div class="sitem" data-page="ficha-bancaria" onclick="navPage('ficha-bancaria')"><span class="ico">🏦</span>Ficha bancaria</div>
     </div>
 
     <div class="main">
@@ -251,6 +252,50 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
             </tr></thead>
             <tbody id="res-desglose"></tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- FICHA BANCARIA -->
+      <div id="page-ficha-bancaria" class="page">
+        <div class="page-title">Ficha bancaria</div>
+        <div class="page-sub">Datos bancarios del personal y vendedores externos</div>
+
+        <!-- Sección Empleados -->
+        <div style="margin-bottom:24px">
+          <div style="font-size:16px;font-weight:800;color:#1a2332;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #E4EAF0">👤 Empleados</div>
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead>
+                <tr style="background:#F5F7FA">
+                  <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #E4EAF0;color:#6B7E8F;font-weight:700">Nombre</th>
+                  <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #E4EAF0;color:#6B7E8F;font-weight:700">Sector</th>
+                  <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #E4EAF0;color:#6B7E8F;font-weight:700">Banco</th>
+                  <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #E4EAF0;color:#6B7E8F;font-weight:700">CUIL</th>
+                  <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #E4EAF0;color:#6B7E8F;font-weight:700">CBU / Alias</th>
+                </tr>
+              </thead>
+              <tbody id="ficha-emp-tabla"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Sección Externos -->
+        <div>
+          <div style="font-size:16px;font-weight:800;color:#1a2332;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #E4EAF0">👥 Vendedores externos</div>
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead>
+                <tr style="background:#F5F7FA">
+                  <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #E4EAF0;color:#6B7E8F;font-weight:700">Nombre</th>
+                  <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #E4EAF0;color:#6B7E8F;font-weight:700">Rol</th>
+                  <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #E4EAF0;color:#6B7E8F;font-weight:700">Banco</th>
+                  <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #E4EAF0;color:#6B7E8F;font-weight:700">CUIL</th>
+                  <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #E4EAF0;color:#6B7E8F;font-weight:700">CBU / Alias</th>
+                </tr>
+              </thead>
+              <tbody id="ficha-ext-tabla"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -1019,6 +1064,7 @@ function navPage(name){
   if(name==='empleados'){ renderEmpleados(); }
   if(name==='adelantos'){ fillAdEmp(); renderAdelantos(); }
   if(name==='ventas'){ fillPremEmp(); renderPremios(); }
+  if(name==='ficha-bancaria'){ renderFichaBancaria(); }
   if(name==='externos'){ fillExtSelects(); renderExternos(); }
   if(name==='gastos') renderGastos();
   if(name==='ingresos') renderIngresos();
