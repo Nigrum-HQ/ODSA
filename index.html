@@ -1056,6 +1056,10 @@ async function syncFromCloud(){
 }
 function startSync(){ _syncInterval = setInterval(syncFromCloud, 30000); }
 
+function toggleBancario(id){
+  var el = document.getElementById('bancario-'+id);
+  if(el) el.style.display = el.style.display==='none' ? 'block' : 'none';
+}
 function renderFichaBancaria(){
   var SL = {yamaha:'Yamaha',operadoras:'Operadoras Call',turnos:'Turnos Osmedica',administracion:'Administracion',sistemas:'Sistemas',limpieza:'Limpieza',kinebs:'Kinebs',fichas:'Fichas',publicidad:'Publicidad',otro:'Otro'};
   var inp = function(val,fn,id,campo,w){ return '<input value="'+(val||'')+'" placeholder="-" onchange="'+fn+'(this.dataset.id,this.dataset.campo,this.value)" data-id="'+id+'" data-campo="'+campo+'" style="width:'+w+'px;padding:4px 8px;border:1.5px solid #E4EAF0;border-radius:6px;font-size:12px">'; };
@@ -1368,7 +1372,7 @@ function renderEmpleados(){
         const ac = Math.max(0, e.sueldo+hx-adv);
         const sp = e.semPago||1;
         return '<tr>'
-          +'<td><strong>'+e.nombre+'</strong>'+(e.nota?'<div style="font-size:11px;color:#8A9BAB">'+e.nota+'</div>':'')+(e.banco?'<div style="font-size:11px;color:#8A9BAB">'+e.banco+(e.cbu?' — '+e.cbu:'')+'</div>':'')+'</td>'
+          +'<td><strong>'+e.nombre+'</strong>'+(e.nota?'<div style="font-size:11px;color:#8A9BAB">'+e.nota+'</div>':'')+'<div style="margin-top:4px"><button onclick="toggleBancario(\''+e.id+'\')" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid #C8D6E5;background:#F5F8FB;color:#4A6FA5;cursor:pointer;font-weight:600">'+(e.banco?'🏦 '+e.banco:'🏦 Banco')+'</button></div>'+'<div id="bancario-'+e.id+'" style="display:none;margin-top:6px;background:#F5F8FB;border:1px solid #E4EAF0;border-radius:8px;padding:8px 10px;min-width:260px">'+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+'<div><div style="font-size:10px;color:#6B7E8F;font-weight:700;margin-bottom:2px">BANCO</div>'+'<input value="'+(e.banco||'')+'" placeholder="Banco" onchange="updateEmpBanco(\''+e.id+'\',\'banco\',this.value)" style="width:100%;padding:4px 6px;border:1px solid #D8E2EC;border-radius:5px;font-size:12px"></div>'+'<div><div style="font-size:10px;color:#6B7E8F;font-weight:700;margin-bottom:2px">CUIL</div>'+'<input value="'+(e.cuil||'')+'" placeholder="CUIL" onchange="updateEmpBanco(\''+e.id+'\',\'cuil\',this.value)" style="width:100%;padding:4px 6px;border:1px solid #D8E2EC;border-radius:5px;font-size:12px"></div>'+'<div><div style="font-size:10px;color:#6B7E8F;font-weight:700;margin-bottom:2px">CBU</div>'+'<input value="'+(e.cbu||'')+'" placeholder="CBU" onchange="updateEmpBanco(\''+e.id+'\',\'cbu\',this.value)" style="width:100%;padding:4px 6px;border:1px solid #D8E2EC;border-radius:5px;font-size:12px"></div>'+'<div><div style="font-size:10px;color:#6B7E8F;font-weight:700;margin-bottom:2px">ALIAS</div>'+'<input value="'+(e.alias||'')+'" placeholder="Alias" onchange="updateEmpBanco(\''+e.id+'\',\'alias\',this.value)" style="width:100%;padding:4px 6px;border:1px solid #D8E2EC;border-radius:5px;font-size:12px"></div>'+'</div></div>'+'</td>'
           +'<td><input type="number" value="'+(e.sueldo||'')+'" placeholder="0" style="width:130px;padding:5px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;font-family:inherit;font-weight:600;color:#C0392B" onblur="updateSueldo(this.dataset.id,this.value)" data-id="'+e.id+'" step="1" min="0"></td>'
           +'<td><input type="number" value="'+(hx)+'" placeholder="0" style="width:110px;padding:5px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;font-family:inherit" onblur="updateHsExtra(this.dataset.id,this.value)" data-id="'+e.id+'"></td>'
           +'<td style="color:#B8943E;font-weight:600">'+(adv>0?fmt(adv):'—')+'</td>'
