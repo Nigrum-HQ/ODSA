@@ -953,6 +953,14 @@ async function initApp(){
   document.body.appendChild(overlay);
   await load();
   overlay.remove();
+  // Migración: mover hsExtra de empleados al nuevo D.hsExtras por mes
+  if(!D.hsExtras) D.hsExtras = {};
+  D.empleados.forEach(e=>{
+    if(e.hsExtra && e.hsExtra > 0){
+      const key = e.id+'_2026-06';
+      if(!D.hsExtras[key]) D.hsExtras[key] = e.hsExtra;
+    }
+  });
   // Inicializar empleados si vacío
   if(!D.empleados.length){
     EMP_INIT.forEach(e => {
@@ -990,7 +998,7 @@ async function syncFromCloud(){
     const cloudD = JSON.parse(sbData);
     // Only update if cloud data is different
     if(JSON.stringify(cloudD) !== JSON.stringify(D)){
-      D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{}}, cloudD);
+      D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},hsExtras:{}}, cloudD);
       try{ localStorage.setItem(ODSA_KEY, sbData); }catch(e){}
       // Re-render active page silently
       const active = document.querySelector('.sitem.on');
