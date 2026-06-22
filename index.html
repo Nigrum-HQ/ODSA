@@ -1057,38 +1057,6 @@ async function syncFromCloud(){
 }
 function startSync(){ _syncInterval = setInterval(syncFromCloud, 30000); }
 
-function mkBancarioPanel(emp, pid){
-  var banco = emp.banco||'';
-  var cbu   = emp.cbu||'';
-  var alias = emp.alias||'';
-  var cuil  = emp.cuil||'';
-  var lbl   = banco||cbu||alias ? banco : 'Banco';
-  var st    = 'width:100%;padding:4px 6px;border:1px solid #D8E2EC;border-radius:5px;font-size:12px';
-  var fn    = 'updateEmpBancoById';
-  var h = '<div style="margin-top:3px">'
-    +'<button onclick="togglePremBancario(this.dataset.pid)" data-pid="'+pid+'" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid #C8D6E5;background:#F5F8FB;color:#4A6FA5;cursor:pointer;font-weight:600">'
-    +'&#127942; '+lbl+'</button>'
-    +'<div id="pb-'+pid+'" style="display:none;margin-top:4px;background:#F5F8FB;border:1px solid #E4EAF0;border-radius:8px;padding:8px 10px;min-width:260px">'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
-    +'<div><div style="font-size:10px;color:#6B7E8F;font-weight:700;margin-bottom:2px">BANCO</div>'
-    +'<input value="'+banco+'" placeholder="Banco" data-eid="'+emp.id+'" data-campo="banco" onchange="updateEmpBancoById(this)" style="'+st+'"></div>'
-    +'<div><div style="font-size:10px;color:#6B7E8F;font-weight:700;margin-bottom:2px">CUIL</div>'
-    +'<input value="'+cuil+'" placeholder="CUIL" data-eid="'+emp.id+'" data-campo="cuil" onchange="updateEmpBancoById(this)" style="'+st+'"></div>'
-    +'<div><div style="font-size:10px;color:#6B7E8F;font-weight:700;margin-bottom:2px">CBU</div>'
-    +'<input value="'+cbu+'" placeholder="CBU" data-eid="'+emp.id+'" data-campo="cbu" onchange="updateEmpBancoById(this)" style="'+st+'"></div>'
-    +'<div><div style="font-size:10px;color:#6B7E8F;font-weight:700;margin-bottom:2px">ALIAS</div>'
-    +'<input value="'+alias+'" placeholder="Alias" data-eid="'+emp.id+'" data-campo="alias" onchange="updateEmpBancoById(this)" style="'+st+'"></div>'
-    +'</div></div></div>';
-  return h;
-}
-function updateEmpBancoById(el){
-  var e = D.empleados.find(function(x){return x.id===el.dataset.eid;});
-  if(e){ e[el.dataset.campo]=el.value; save(); }
-}
-function togglePremBancario(id){
-  var el = document.getElementById('pb-'+id);
-  if(el) el.style.display = el.style.display==='none' ? 'block' : 'none';
-}
 function toggleGastoBancario(id){
   var el = document.getElementById('gb-'+id);
   if(el) el.style.display = el.style.display==='none' ? 'block' : 'none';
@@ -1632,17 +1600,15 @@ function renderPremios(){
     <span>Total mes</span><span style="color:#C0392B">${fmt(lista.reduce((a,p)=>a+p.monto,0))}</span>
   </div>`;
   if(!lista.length){ g('prem-tabla').innerHTML='<tr><td colspan="5" class="empty">Sin premios este mes</td></tr>'; g('prem-tfoot').innerHTML=''; return; }
-  g('prem-tabla').innerHTML = lista.map(function(p){
-    var emp = D.empleados.find(function(e){return e.id===p.emp_id;});
-    var nombre = emp ? emp.nombre : '-';
-    var panel = emp ? mkBancarioPanel(emp, p.id) : '';
-    return '<tr>'
-      +'<td><span class="badge badge-blue">Sem '+p.sem+'</span></td>'
-      +'<td>'+nombre+panel+'</td>'
-      +'<td style="color:#6B7E8F">'+p.concepto+'</td>'
-      +'<td style="font-weight:700;color:#C0392B">'+fmt(p.monto)+'</td>'
-      +'<td><button class="del-btn" onclick="delPremio(this.dataset.id)" data-id="'+p.id+'">&#128465;</button></td>'
-      +'</tr>';
+  g('prem-tabla').innerHTML = lista.map(p=>{
+    const emp = D.empleados.find(e=>e.id===p.emp_id);
+    return `<tr>
+      <td><span class="badge badge-blue">Sem ${p.sem}</span></td>
+      <td>${emp?emp.nombre:'—'}</td>
+      <td style="color:#6B7E8F">${p.concepto}</td>
+      <td style="font-weight:700;color:#C0392B">${fmt(p.monto)}</td>
+      <td><button class="del-btn" onclick="delPremio('${p.id}')">🗑</button></td>
+    </tr>`;
   }).join('');
   const total = lista.reduce((a,p)=>a+p.monto,0);
   g('prem-tfoot').innerHTML = `<tr><td colspan="3" style="font-weight:700">Total premios</td><td style="font-weight:700;color:#C0392B">${fmt(total)}</td><td></td></tr>`;
