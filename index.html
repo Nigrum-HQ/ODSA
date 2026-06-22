@@ -256,7 +256,10 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
 
       <!-- EMPLEADOS -->
       <div id="page-empleados" class="page">
-        <div class="page-title">Empleados</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px">
+          <div class="page-title" style="margin-bottom:0">Empleados</div>
+          <select id="emp-filtro-mes" onchange="renderEmpleados()" style="padding:7px 14px;border-radius:8px;border:1.5px solid #D8E2EC;font-size:13px;color:#1a2332;background:#fff"></select>
+        </div>
         <div class="page-sub">Nómina mensual — sueldos fijos</div>
         <div class="tabs">
           <button class="tab on" onclick="tabEmp('nomina',this)">Nómina</button>
@@ -1197,7 +1200,28 @@ function renderChart(r){
 if(!window._secCollapsed) window._secCollapsed={};
 function toggleSector(k){ window._secCollapsed[k]=!window._secCollapsed[k]; renderEmpleados(); }
 function renderEmpleados(){
-  const m = mes();
+  // Poblar selector de meses si está vacío
+  const empSel = g('emp-filtro-mes');
+  if(empSel && empSel.options.length === 0){
+    const meses = [...new Set([
+      ...D.adelantos.map(a=>a.mes),
+      mes()
+    ])].sort().reverse();
+    // Agregar últimos 12 meses aunque no haya datos
+    const hoyDate = new Date();
+    for(let i=0;i<12;i++){
+      const d2 = new Date(hoyDate.getFullYear(), hoyDate.getMonth()-i, 1);
+      const val = d2.getFullYear()+'-'+String(d2.getMonth()+1).padStart(2,'0');
+      if(!meses.includes(val)) meses.push(val);
+    }
+    meses.sort().reverse();
+    empSel.innerHTML = meses.map(mv=>{
+      const [y,mo] = mv.split('-');
+      const label = MES[parseInt(mo)-1]+' '+y;
+      return `<option value="${mv}" ${mv===mes()?'selected':''}>${label}</option>`;
+    }).join('');
+  }
+  const m = (empSel && empSel.value) ? empSel.value : mes();
   const d = new Date();
   g('emp-mes-label') && (g('emp-mes-label').textContent = MES[d.getMonth()]+' '+d.getFullYear());
 
