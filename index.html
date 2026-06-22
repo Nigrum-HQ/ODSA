@@ -1200,25 +1200,22 @@ function renderChart(r){
 if(!window._secCollapsed) window._secCollapsed={};
 function toggleSector(k){ window._secCollapsed[k]=!window._secCollapsed[k]; renderEmpleados(); }
 function renderEmpleados(){
-  // Poblar selector de meses si está vacío
+  // Poblar selector de meses
   const empSel = g('emp-filtro-mes');
-  if(empSel && empSel.options.length === 0){
-    const meses = [...new Set([
-      ...D.adelantos.map(a=>a.mes),
-      mes()
-    ])].sort().reverse();
-    // Agregar últimos 12 meses aunque no haya datos
-    const hoyDate = new Date();
-    for(let i=0;i<12;i++){
-      const d2 = new Date(hoyDate.getFullYear(), hoyDate.getMonth()-i, 1);
-      const val = d2.getFullYear()+'-'+String(d2.getMonth()+1).padStart(2,'0');
-      if(!meses.includes(val)) meses.push(val);
+  if(empSel){
+    const meses = [];
+    // Todos los meses de 2026
+    for(let i=1;i<=12;i++){
+      meses.push('2026-'+String(i).padStart(2,'0'));
     }
+    // Agregar meses anteriores con datos
+    D.adelantos.forEach(a=>{ if(a.mes && !meses.includes(a.mes)) meses.push(a.mes); });
     meses.sort().reverse();
+    const currentVal = empSel.value || mes();
     empSel.innerHTML = meses.map(mv=>{
       const [y,mo] = mv.split('-');
       const label = MES[parseInt(mo)-1]+' '+y;
-      return `<option value="${mv}" ${mv===mes()?'selected':''}>${label}</option>`;
+      return `<option value="${mv}" ${mv===currentVal?'selected':''}>${label}</option>`;
     }).join('');
   }
   const m = (empSel && empSel.value) ? empSel.value : mes();
