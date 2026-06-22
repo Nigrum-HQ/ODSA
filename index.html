@@ -535,6 +535,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
           </div>
           <div class="frow frow-3">
             <div class="fg"><label>Nota</label><input id="g-nota" placeholder="Detalle opcional..."></div>
+            <div class="fg"><label>Datos bancarios (CBU / Alias)</label><input id="g-bancario" placeholder="CBU o alias del destinatario..."></div>
             <div class="fg"><label>Medio de pago</label><select id="g-medio">
               <option value="transferencia">Transferencia</option>
               <option value="efectivo">Efectivo</option>
@@ -1056,6 +1057,14 @@ async function syncFromCloud(){
 }
 function startSync(){ _syncInterval = setInterval(syncFromCloud, 30000); }
 
+function toggleGastoBancario(id){
+  var el = document.getElementById('gb-'+id);
+  if(el) el.style.display = el.style.display==='none' ? 'block' : 'none';
+}
+function updateGastoBancario(id,val){
+  var g2 = D.gastos.find(function(x){return x.id===id;});
+  if(g2){ g2.bancario=val; save(); }
+}
 function toggleBancario(id){
   var el = document.getElementById('bancario-'+id);
   if(el) el.style.display = el.style.display==='none' ? 'block' : 'none';
@@ -1764,9 +1773,9 @@ function addGasto(){
   if(!desc||!monto||!fecha){ alert('Completá los campos'); return; }
   const gSemPago = gv('g-sem-pago') ? parseInt(gv('g-sem-pago')) : null;
   const gMedio = gv('g-medio') || 'transferencia';
-  D.gastos.push({id:uid(),desc,cat:gv('g-cat'),monto,fecha,mes:fecha.slice(0,7),nota:gv('g-nota'),pagado:false,semPago:gSemPago,medio:gMedio});
+  D.gastos.push({id:uid(),desc,cat:gv('g-cat'),monto,fecha,mes:fecha.slice(0,7),nota:gv('g-nota'),pagado:false,semPago:gSemPago,medio:gMedio,bancario:gv('g-bancario').trim()});
   save(); renderGastos(); renderResumen(); toast('✓ Gasto registrado');
-  sv('g-desc',''); sv('g-monto',''); sv('g-nota',''); sv('g-medio','transferencia');
+  sv('g-desc',''); sv('g-monto',''); sv('g-nota',''); sv('g-bancario',''); sv('g-medio','transferencia');
 }
 function renderGastos(){
   const m = mes();
@@ -1774,7 +1783,7 @@ function renderGastos(){
   if(!lista.length){ g('g-tabla').innerHTML='<tr><td colspan="5" class="empty">Sin gastos este mes</td></tr>'; g('g-tfoot').innerHTML=''; return; }
   g('g-tabla').innerHTML = [...lista].reverse().map(x=>`<tr>
     <td>${fd(x.fecha)}</td>
-    <td><strong>${x.desc}</strong>${x.nota?`<div style="font-size:11px;color:#8A9BAB">${x.nota}</div>`:''}</td>
+    <td><strong>${x.desc}</strong>${x.nota?`<div style="font-size:11px;color:#8A9BAB">${x.nota}</div>`:''}${x.bancario?`<div style="margin-top:3px"><button onclick="toggleGastoBancario('${x.id}')" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid #C8D6E5;background:#F5F8FB;color:#4A6FA5;cursor:pointer;font-weight:600">🏦 Ver datos</button><div id="gb-${x.id}" style="display:none;margin-top:4px;background:#F5F8FB;border:1px solid #E4EAF0;border-radius:6px;padding:6px 8px;font-size:12px;color:#1a2332"><input value="${x.bancario||''}" onchange="updateGastoBancario('${x.id}',this.value)" style="width:100%;padding:3px 6px;border:1px solid #D8E2EC;border-radius:5px;font-size:12px"></div></div>`':''}</td>
     <td><span class="badge badge-gray">${CATS[x.cat]||x.cat}</span>${x.medio==='efectivo'?'<span style="margin-left:4px;font-size:9px;background:#FEF3C7;color:#B45309;padding:1px 6px;border-radius:4px;font-weight:700">💵 EFECTIVO</span>':''}</td>
     <td style="font-weight:700;color:#C0392B">${fmt(x.monto)}</td>
     <td>
