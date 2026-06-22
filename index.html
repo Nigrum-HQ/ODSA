@@ -1055,31 +1055,35 @@ async function syncFromCloud(){
 function startSync(){ _syncInterval = setInterval(syncFromCloud, 30000); }
 
 function renderFichaBancaria(){
-  const SL = {yamaha:'Yamaha',operadoras:'Operadoras Call',turnos:'Turnos Osmedica',administracion:'Administración',sistemas:'Sistemas',limpieza:'Limpieza',kinebs:'Kinebs',fichas:'Fichas',publicidad:'Publicidad',otro:'Otro'};
-  const emps = [...D.empleados].sort((a,b)=>a.nombre.localeCompare(b.nombre));
-  const makeInput = (val, fn, id, campo, w) =>
-    `<input value="${val||''}" placeholder="—" onchange="${fn}('${id}','${campo}',this.value)" style="width:${w}px;padding:4px 8px;border:1.5px solid #E4EAF0;border-radius:6px;font-size:12px">`;
-  g('ficha-emp-tabla').innerHTML = emps.map(e=>`
-    <tr style="border-bottom:1px solid #F0F4F8">
-      <td style="padding:10px 12px;font-weight:600;color:#1a2332">${e.nombre}</td>
-      <td style="padding:10px 12px;color:#6B7E8F">${SL[e.sector]||e.sector||'—'}</td>
-      <td style="padding:10px 12px">${makeInput(e.banco,'updateEmpBanco',e.id,'banco',130)}</td>
-      <td style="padding:10px 12px">${makeInput(e.cuil,'updateEmpBanco',e.id,'cuil',120)}</td>
-      <td style="padding:10px 12px">${makeInput(e.cbu,'updateEmpBanco',e.id,'cbu',200)}</td>
-    </tr>`).join('') || '<tr><td colspan="5" style="padding:20px;text-align:center;color:#9AAABB">Sin empleados</td></tr>';
+  var SL = {yamaha:'Yamaha',operadoras:'Operadoras Call',turnos:'Turnos Osmedica',administracion:'Administracion',sistemas:'Sistemas',limpieza:'Limpieza',kinebs:'Kinebs',fichas:'Fichas',publicidad:'Publicidad',otro:'Otro'};
+  var inp = function(val,fn,id,campo,w){ return '<input value="'+(val||'')+'" placeholder="-" onchange="'+fn+'(this.dataset.id,this.dataset.campo,this.value)" data-id="'+id+'" data-campo="'+campo+'" style="width:'+w+'px;padding:4px 8px;border:1.5px solid #E4EAF0;border-radius:6px;font-size:12px">'; };
+  var emps = D.empleados.slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre);});
+  g('ficha-emp-tabla').innerHTML = emps.map(function(e){
+    return '<tr style="border-bottom:1px solid #F0F4F8">'
+      +'<td style="padding:10px 12px;font-weight:600;color:#1a2332">'+e.nombre+'</td>'
+      +'<td style="padding:10px 12px;color:#6B7E8F">'+(SL[e.sector]||e.sector||'-')+'</td>'
+      +'<td style="padding:10px 12px">'+inp(e.banco,'updateEmpBanco',e.id,'banco',130)+'</td>'
+      +'<td style="padding:10px 12px">'+inp(e.cuil,'updateEmpBanco',e.id,'cuil',120)+'</td>'
+      +'<td style="padding:10px 12px">'+inp(e.cbu,'updateEmpBanco',e.id,'cbu',200)+'</td>'
+      +'</tr>';
+  }).join('') || '<tr><td colspan="5" style="padding:20px;text-align:center;color:#9AAABB">Sin empleados</td></tr>';
 
-  const exts = [...D.externos].sort((a,b)=>a.nombre.localeCompare(b.nombre));
-  g('ficha-ext-tabla').innerHTML = exts.map(e=>`
-    <tr style="border-bottom:1px solid #F0F4F8">
-      <td style="padding:10px 12px;font-weight:600;color:#1a2332">${e.nombre}</td>
-      <td style="padding:10px 12px"><span style="background:${e.rol==='lider'?'#EBF5FF':'#F0F4F8'};color:${e.rol==='lider'?'#1565C0':'#6B7E8F'};padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700">${e.rol==='lider'?'Líder':'Equipo'}</span></td>
-      <td style="padding:10px 12px">${makeInput(e.banco,'updateExtBanco',e.id,'banco',130)}</td>
-      <td style="padding:10px 12px">${makeInput(e.cuil,'updateExtBanco',e.id,'cuil',120)}</td>
-      <td style="padding:10px 12px">${makeInput(e.cbu,'updateExtBanco',e.id,'cbu',200)}</td>
-    </tr>`).join('') || '<tr><td colspan="5" style="padding:20px;text-align:center;color:#9AAABB">Sin vendedores externos</td></tr>';
+  var exts = D.externos.slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre);});
+  g('ficha-ext-tabla').innerHTML = exts.map(function(e){
+    var rolBg = e.rol==='lider' ? '#EBF5FF' : '#F0F4F8';
+    var rolColor = e.rol==='lider' ? '#1565C0' : '#6B7E8F';
+    var rolLabel = e.rol==='lider' ? 'Lider' : 'Equipo';
+    return '<tr style="border-bottom:1px solid #F0F4F8">'
+      +'<td style="padding:10px 12px;font-weight:600;color:#1a2332">'+e.nombre+'</td>'
+      +'<td style="padding:10px 12px"><span style="background:'+rolBg+';color:'+rolColor+';padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700">'+rolLabel+'</span></td>'
+      +'<td style="padding:10px 12px">'+inp(e.banco,'updateExtBanco',e.id,'banco',130)+'</td>'
+      +'<td style="padding:10px 12px">'+inp(e.cuil,'updateExtBanco',e.id,'cuil',120)+'</td>'
+      +'<td style="padding:10px 12px">'+inp(e.cbu,'updateExtBanco',e.id,'cbu',200)+'</td>'
+      +'</tr>';
+  }).join('') || '<tr><td colspan="5" style="padding:20px;text-align:center;color:#9AAABB">Sin vendedores externos</td></tr>';
 }
-function updateEmpBanco(id,campo,val){ const e=D.empleados.find(x=>x.id===id); if(e){e[campo]=val;save();} }
-function updateExtBanco(id,campo,val){ const e=D.externos.find(x=>x.id===id); if(e){e[campo]=val;save();} }
+function updateEmpBanco(id,campo,val){ var e=D.empleados.find(function(x){return x.id===id;}); if(e){e[campo]=val;save();} }
+function updateExtBanco(id,campo,val){ var e=D.externos.find(function(x){return x.id===id;}); if(e){e[campo]=val;save();} }
 
 function navPage(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
