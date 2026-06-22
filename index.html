@@ -1612,22 +1612,23 @@ function renderPremios(){
     var cuil  = emp ? (emp.cuil||'')  : '';
     var empId = emp ? emp.id : '';
     var tieneBanco = banco||cbu||alias;
-    var bancarioPanel = emp ? (
-      '<div style="margin-top:3px">'
-      +'<button onclick="togglePremBancario(''+p.id+'')" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid #C8D6E5;background:#F5F8FB;color:#4A6FA5;cursor:pointer;font-weight:600">'
-      +'🏦 '+(tieneBanco?banco:'Banco')+'</button>'
-      +'<div id="pb-'+p.id+'" style="display:none;margin-top:4px;background:#F5F8FB;border:1px solid #E4EAF0;border-radius:8px;padding:8px 10px;min-width:260px">'
-      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
-      +'<div><div style="font-size:10px;color:#6B7E8F;font-weight:700;margin-bottom:2px">BANCO</div>'
-      +'<input value="'+banco+'" placeholder="Banco" onchange="updateEmpBanco(''+empId+'','banco',this.value);renderPremios()" style="width:100%;padding:4px 6px;border:1px solid #D8E2EC;border-radius:5px;font-size:12px"></div>'
-      +'<div><div style="font-size:10px;color:#6B7E8F;font-weight:700;margin-bottom:2px">CUIL</div>'
-      +'<input value="'+cuil+'" placeholder="CUIL" onchange="updateEmpBanco(''+empId+'','cuil',this.value)" style="width:100%;padding:4px 6px;border:1px solid #D8E2EC;border-radius:5px;font-size:12px"></div>'
-      +'<div><div style="font-size:10px;color:#6B7E8F;font-weight:700;margin-bottom:2px">CBU</div>'
-      +'<input value="'+cbu+'" placeholder="CBU" onchange="updateEmpBanco(''+empId+'','cbu',this.value)" style="width:100%;padding:4px 6px;border:1px solid #D8E2EC;border-radius:5px;font-size:12px"></div>'
-      +'<div><div style="font-size:10px;color:#6B7E8F;font-weight:700;margin-bottom:2px">ALIAS</div>'
-      +'<input value="'+alias+'" placeholder="Alias" onchange="updateEmpBanco(''+empId+'','alias',this.value)" style="width:100%;padding:4px 6px;border:1px solid #D8E2EC;border-radius:5px;font-size:12px"></div>'
-      +'</div></div></div>'
-    ) : '';
+    var bancarioPanel = '';
+    if(emp){
+      bancarioPanel = '<div style="margin-top:3px">'
+        +'<button onclick="togglePremBancario(\'' + p.id + '\')" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid #C8D6E5;background:#F5F8FB;color:#4A6FA5;cursor:pointer;font-weight:600">'
+        +'\uD83C\uDFE6 '+(tieneBanco?banco:'Banco')+'</button>'
+        +'<div id="pb-'+p.id+'" style="display:none;margin-top:4px;background:#F5F8FB;border:1px solid #E4EAF0;border-radius:8px;padding:8px 10px;min-width:260px">'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
+        +'<div><div style="font-size:10px;color:#6B7E8F;font-weight:700;margin-bottom:2px">BANCO</div>'
+        +'<input value="'+banco+'" placeholder="Banco" onchange="updateEmpBanco(\'' + empId + '\',\'banco\',this.value);renderPremios()" style="width:100%;padding:4px 6px;border:1px solid #D8E2EC;border-radius:5px;font-size:12px"></div>'
+        +'<div><div style="font-size:10px;color:#6B7E8F;font-weight:700;margin-bottom:2px">CUIL</div>'
+        +'<input value="'+cuil+'" placeholder="CUIL" onchange="updateEmpBanco(\'' + empId + '\',\'cuil\',this.value)" style="width:100%;padding:4px 6px;border:1px solid #D8E2EC;border-radius:5px;font-size:12px"></div>'
+        +'<div><div style="font-size:10px;color:#6B7E8F;font-weight:700;margin-bottom:2px">CBU</div>'
+        +'<input value="'+cbu+'" placeholder="CBU" onchange="updateEmpBanco(\'' + empId + '\',\'cbu\',this.value)" style="width:100%;padding:4px 6px;border:1px solid #D8E2EC;border-radius:5px;font-size:12px"></div>'
+        +'<div><div style="font-size:10px;color:#6B7E8F;font-weight:700;margin-bottom:2px">ALIAS</div>'
+        +'<input value="'+alias+'" placeholder="Alias" onchange="updateEmpBanco(\'' + empId + '\',\'alias\',this.value)" style="width:100%;padding:4px 6px;border:1px solid #D8E2EC;border-radius:5px;font-size:12px"></div>'
+        +'</div></div></div>';
+    }
     return '<tr>'
       +'<td><span class="badge badge-blue">Sem '+p.sem+'</span></td>'
       +'<td>'+(emp?emp.nombre:'—')+bancarioPanel+'</td>'
