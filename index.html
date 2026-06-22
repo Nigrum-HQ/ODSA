@@ -1595,10 +1595,7 @@ function renderPremios(){
     const emp = D.empleados.find(e=>e.id===p.emp_id);
     return `<tr>
       <td><span class="badge badge-blue">Sem ${p.sem}</span></td>
-      <td>
-        ${emp?emp.nombre:'—'}
-        ${emp?'<button onclick="abrirModalBancario(this.dataset.eid,this.dataset.nom)" data-eid="'+emp.id+'" data-nom="'+(emp?emp.nombre:'')+'" style="margin-top:3px;display:block;font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid #C8D6E5;background:#F5F8FB;color:#4A6FA5;cursor:pointer;font-weight:600">&#127942; '+(emp&&emp.banco?emp.banco:'Banco')+'</button>':''}
-      </td>
+      <td>${emp?emp.nombre:'—'}</td>
       <td style="color:#6B7E8F">${p.concepto}</td>
       <td style="font-weight:700;color:#C0392B">${fmt(p.monto)}</td>
       <td><button class="del-btn" onclick="delPremio('${p.id}')">🗑</button></td>
@@ -1777,10 +1774,7 @@ function renderGastos(){
   if(!lista.length){ g('g-tabla').innerHTML='<tr><td colspan="5" class="empty">Sin gastos este mes</td></tr>'; g('g-tfoot').innerHTML=''; return; }
   g('g-tabla').innerHTML = [...lista].reverse().map(x=>`<tr>
     <td>${fd(x.fecha)}</td>
-    <td>
-      <strong>${x.desc}</strong>${x.nota?`<div style="font-size:11px;color:#8A9BAB">${x.nota}</div>`:''}
-      <button onclick="abrirModalBancarioGasto(this.dataset.gid,this.dataset.desc)" data-gid="${x.id}" data-desc="${x.desc}" style="margin-top:3px;display:block;font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid #C8D6E5;background:#F5F8FB;color:#4A6FA5;cursor:pointer;font-weight:600">&#127942; ${x.bancario||'Datos bancarios'}</button>
-    </td>
+    <td><strong>${x.desc}</strong>${x.nota?`<div style="font-size:11px;color:#8A9BAB">${x.nota}</div>`:''}</td>
     <td><span class="badge badge-gray">${CATS[x.cat]||x.cat}</span>${x.medio==='efectivo'?'<span style="margin-left:4px;font-size:9px;background:#FEF3C7;color:#B45309;padding:1px 6px;border-radius:4px;font-weight:700">💵 EFECTIVO</span>':''}</td>
     <td style="font-weight:700;color:#C0392B">${fmt(x.monto)}</td>
     <td>
@@ -2342,43 +2336,7 @@ function exportCFPDF(s,msParam){
     +'</div>'
     +'</div>'
     +'<div class="footer">ODSA &mdash; Sistema Administrativo &nbsp;&bull;&nbsp; Generado el '+new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'long',year:'numeric'})+'</div>'
-    +'
-<!-- MODAL DATOS BANCARIOS -->
-<div id="modal-bancario" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:14px;padding:24px;width:340px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.18)">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <div style="font-size:15px;font-weight:800;color:#1a2332">Datos bancarios</div>
-      <button onclick="cerrarModalBancario()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6B7E8F">&times;</button>
-    </div>
-    <div id="modal-bancario-nombre" style="font-size:13px;color:#6B7E8F;margin-bottom:12px"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <div><label style="font-size:10px;color:#6B7E8F;font-weight:700;display:block;margin-bottom:3px">BANCO</label>
-        <input id="mb-banco" placeholder="Banco" oninput="guardarModalBancario()" style="width:100%;padding:6px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
-      <div><label style="font-size:10px;color:#6B7E8F;font-weight:700;display:block;margin-bottom:3px">CUIL</label>
-        <input id="mb-cuil" placeholder="CUIL" oninput="guardarModalBancario()" style="width:100%;padding:6px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
-      <div><label style="font-size:10px;color:#6B7E8F;font-weight:700;display:block;margin-bottom:3px">CBU</label>
-        <input id="mb-cbu" placeholder="CBU" oninput="guardarModalBancario()" style="width:100%;padding:6px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
-      <div><label style="font-size:10px;color:#6B7E8F;font-weight:700;display:block;margin-bottom:3px">ALIAS</label>
-        <input id="mb-alias" placeholder="Alias" oninput="guardarModalBancario()" style="width:100%;padding:6px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
-    </div>
-    <button onclick="cerrarModalBancario()" style="margin-top:16px;width:100%;padding:10px;background:#1B3A6B;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">Listo</button>
-  </div>
-</div>
-
-<!-- MODAL BANCARIO GASTO (campo libre) -->
-<div id="modal-bancario-gasto" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:14px;padding:24px;width:340px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.18)">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <div style="font-size:15px;font-weight:800;color:#1a2332">Datos bancarios</div>
-      <button onclick="cerrarModalBancarioGasto()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6B7E8F">&times;</button>
-    </div>
-    <div id="modal-bancario-gasto-desc" style="font-size:13px;color:#6B7E8F;margin-bottom:12px"></div>
-    <div><label style="font-size:10px;color:#6B7E8F;font-weight:700;display:block;margin-bottom:3px">CBU / Alias / Datos</label>
-      <input id="mbg-bancario" placeholder="CBU, alias o datos del destinatario" oninput="guardarModalBancarioGasto()" style="width:100%;padding:6px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
-    <button onclick="cerrarModalBancarioGasto()" style="margin-top:16px;width:100%;padding:10px;background:#1B3A6B;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">Listo</button>
-  </div>
-</div>
-</body></html>');
+    +'</body></html>');
   win.document.close();
 }
 function renderEgresosSem(items,egTotal){
@@ -2652,62 +2610,6 @@ function toggleAdelantoPagado(id){
   const a = D.adelantos.find(x=>x.id===id);
   if(a){ a.pagado=!a.pagado; save(); renderAdelantos(); renderCashFlow(); }
 }
-
-// ═══════════════════════════════
-// MODAL BANCARIO EMPLEADOS
-// ═══════════════════════════════
-var _modalBancarioEmpId = null;
-function abrirModalBancario(empId, nombre){
-  _modalBancarioEmpId = empId;
-  var emp = D.empleados.find(function(e){return e.id===empId;});
-  if(!emp) return;
-  document.getElementById('modal-bancario-nombre').textContent = nombre;
-  document.getElementById('mb-banco').value = emp.banco||'';
-  document.getElementById('mb-cuil').value = emp.cuil||'';
-  document.getElementById('mb-cbu').value = emp.cbu||'';
-  document.getElementById('mb-alias').value = emp.alias||'';
-  var m = document.getElementById('modal-bancario');
-  m.style.display = 'flex';
-}
-function cerrarModalBancario(){
-  document.getElementById('modal-bancario').style.display = 'none';
-  _modalBancarioEmpId = null;
-}
-function guardarModalBancario(){
-  if(!_modalBancarioEmpId) return;
-  var emp = D.empleados.find(function(e){return e.id===_modalBancarioEmpId;});
-  if(!emp) return;
-  emp.banco = document.getElementById('mb-banco').value;
-  emp.cuil  = document.getElementById('mb-cuil').value;
-  emp.cbu   = document.getElementById('mb-cbu').value;
-  emp.alias = document.getElementById('mb-alias').value;
-  save();
-}
-
-// ═══════════════════════════════
-// MODAL BANCARIO GASTOS
-// ═══════════════════════════════
-var _modalBancarioGastoId = null;
-function abrirModalBancarioGasto(gastoId, desc){
-  _modalBancarioGastoId = gastoId;
-  var g2 = D.gastos.find(function(x){return x.id===gastoId;});
-  if(!g2) return;
-  document.getElementById('modal-bancario-gasto-desc').textContent = desc;
-  document.getElementById('mbg-bancario').value = g2.bancario||'';
-  var m = document.getElementById('modal-bancario-gasto');
-  m.style.display = 'flex';
-}
-function cerrarModalBancarioGasto(){
-  document.getElementById('modal-bancario-gasto').style.display = 'none';
-  _modalBancarioGastoId = null;
-}
-function guardarModalBancarioGasto(){
-  if(!_modalBancarioGastoId) return;
-  var g2 = D.gastos.find(function(x){return x.id===_modalBancarioGastoId;});
-  if(!g2) return;
-  g2.bancario = document.getElementById('mbg-bancario').value;
-  save();
-}
 </script>
 <script>
 // RESTAURACION AUTOMATICA - Agrega lider Evelin si falta
@@ -2739,42 +2641,6 @@ function guardarModalBancarioGasto(){
   } catch(e) { console.error('Error restaurando Evelin:', e); }
 })();
 </script>
-
-<!-- MODAL DATOS BANCARIOS -->
-<div id="modal-bancario" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:14px;padding:24px;width:340px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.18)">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <div style="font-size:15px;font-weight:800;color:#1a2332">Datos bancarios</div>
-      <button onclick="cerrarModalBancario()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6B7E8F">&times;</button>
-    </div>
-    <div id="modal-bancario-nombre" style="font-size:13px;color:#6B7E8F;margin-bottom:12px"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <div><label style="font-size:10px;color:#6B7E8F;font-weight:700;display:block;margin-bottom:3px">BANCO</label>
-        <input id="mb-banco" placeholder="Banco" oninput="guardarModalBancario()" style="width:100%;padding:6px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
-      <div><label style="font-size:10px;color:#6B7E8F;font-weight:700;display:block;margin-bottom:3px">CUIL</label>
-        <input id="mb-cuil" placeholder="CUIL" oninput="guardarModalBancario()" style="width:100%;padding:6px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
-      <div><label style="font-size:10px;color:#6B7E8F;font-weight:700;display:block;margin-bottom:3px">CBU</label>
-        <input id="mb-cbu" placeholder="CBU" oninput="guardarModalBancario()" style="width:100%;padding:6px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
-      <div><label style="font-size:10px;color:#6B7E8F;font-weight:700;display:block;margin-bottom:3px">ALIAS</label>
-        <input id="mb-alias" placeholder="Alias" oninput="guardarModalBancario()" style="width:100%;padding:6px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
-    </div>
-    <button onclick="cerrarModalBancario()" style="margin-top:16px;width:100%;padding:10px;background:#1B3A6B;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">Listo</button>
-  </div>
-</div>
-
-<!-- MODAL BANCARIO GASTO (campo libre) -->
-<div id="modal-bancario-gasto" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:14px;padding:24px;width:340px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.18)">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <div style="font-size:15px;font-weight:800;color:#1a2332">Datos bancarios</div>
-      <button onclick="cerrarModalBancarioGasto()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6B7E8F">&times;</button>
-    </div>
-    <div id="modal-bancario-gasto-desc" style="font-size:13px;color:#6B7E8F;margin-bottom:12px"></div>
-    <div><label style="font-size:10px;color:#6B7E8F;font-weight:700;display:block;margin-bottom:3px">CBU / Alias / Datos</label>
-      <input id="mbg-bancario" placeholder="CBU, alias o datos del destinatario" oninput="guardarModalBancarioGasto()" style="width:100%;padding:6px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
-    <button onclick="cerrarModalBancarioGasto()" style="margin-top:16px;width:100%;padding:10px;background:#1B3A6B;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">Listo</button>
-  </div>
-</div>
 </body>
 </html><style>
 body.privado-mode .num-privado,
