@@ -378,7 +378,16 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
           </div>
         </div>
         <div class="card">
-          <div class="card-title">Historial de premios del mes</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+            <div class="card-title" style="margin-bottom:0">Historial de premios del mes</div>
+            <select id="prem-filtro-sem" onchange="renderPremios()" style="padding:7px 14px;border-radius:8px;border:1.5px solid #D8E2EC;font-size:13px;color:#1a2332;background:#fff">
+              <option value="">— Todas las semanas —</option>
+              <option value="1">Semana 1</option>
+              <option value="2">Semana 2</option>
+              <option value="3">Semana 3</option>
+              <option value="4">Semana 4</option>
+            </select>
+          </div>
           <div class="tw"><table>
             <thead><tr><th>Semana</th><th>Empleado</th><th>Concepto</th><th>Monto</th><th></th></tr></thead>
             <tbody id="prem-tabla"></tbody>
@@ -1452,7 +1461,9 @@ function addPremio(){
 }
 function renderPremios(){
   const m = mes();
-  const lista = D.premios.filter(p=>p.mes===m);
+  const filtroSem = gv('prem-filtro-sem');
+  let lista = D.premios.filter(p=>p.mes===m);
+  if(filtroSem) lista = lista.filter(p=>String(p.sem)===filtroSem);
   // Resumen por semana
   const semanas = [1,2,3,4];
   g('prem-resumen').innerHTML = semanas.map(s=>{
