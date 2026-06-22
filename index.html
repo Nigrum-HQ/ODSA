@@ -651,8 +651,8 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
 // ═══════════════════════════════
 // CREDENCIALES
 // ═══════════════════════════════
-const ODSA_USER = 'administracion@abesa.co';
-const ODSA_PASS = 'odsa2026';
+// credenciales movidas al servidor
+
 const ODSA_KEY  = 'odsa_data_v4';
 
 // ═══════════════════════════════
@@ -898,17 +898,28 @@ async function load(){
 // ═══════════════════════════════
 // LOGIN
 // ═══════════════════════════════
-function doLogin(){
+async function doLogin(){
   const email = gv('login-email').trim().toLowerCase();
   const pass  = gv('login-pass');
   g('login-err').textContent = '';
   if(!email||!pass){ g('login-err').textContent='Completá los campos'; return; }
-  if(email===ODSA_USER && pass===ODSA_PASS){
-    g('LOGIN').style.display='none';
-    g('APP').style.display='flex';
-    initApp().then(()=>{ startSync(); });
-  } else {
-    g('login-err').textContent='Email o contraseña incorrectos';
+  try {
+    const r = await fetch('/api/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email, password: pass})
+    });
+    const d = await r.json();
+    if(d.ok){
+      sessionStorage.setItem('odsa_token', d.token);
+      g('LOGIN').style.display='none';
+      g('APP').style.display='flex';
+      initApp().then(()=>{ startSync(); });
+    } else {
+      g('login-err').textContent = d.error || 'Email o contraseña incorrectos';
+    }
+  } catch(e) {
+    g('login-err').textContent = 'Error de conexión';
   }
 }
 g('login-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
