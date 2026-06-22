@@ -726,7 +726,8 @@ let D = {
   cheques: [],
   proyecciones: [],
   cf_ingresos: [],
-  semPagoSectores: {}
+  semPagoSectores: {},
+  hsExtras: {}
 };
 
 // Empleados iniciales
@@ -1262,7 +1263,7 @@ function renderEmpleados(){
     const emps = D.empleados.filter(e=>e.sector===key);
     if(!emps.length) return;
 
-    const totalSec = emps.reduce((s,e)=>s+(e.sueldo+(e.hsExtra||0)),0);
+    const totalSec = emps.reduce((s,e)=>s+(e.sueldo+((D.hsExtras&&D.hsExtras[e.id+'_'+m])||0)),0);
     const adelantosSec = emps.reduce((s,e)=>{
       return s + D.adelantos.filter(a=>a.emp_id===e.id&&a.mes===m).reduce((sa,a)=>sa+a.monto,0);
     },0);
@@ -1274,7 +1275,7 @@ function renderEmpleados(){
     const _secTable = _sc ? '' : (()=>{
       const rows = emps.map(e=>{
         const adv = D.adelantos.filter(a=>a.emp_id===e.id&&a.mes===m).reduce((s,a)=>s+a.monto,0);
-        const hx = e.hsExtra||0;
+        const hx = (D.hsExtras&&D.hsExtras[e.id+'_'+m])||0;
         const ac = Math.max(0, e.sueldo+hx-adv);
         const sp = e.semPago||1;
         return '<tr>'
@@ -1932,7 +1933,7 @@ function getCFData(mes_sel){
       pagadosSecSemMap[mapKey].emps.push(e);
     });
     Object.values(pagadosSecSemMap).forEach(({sector:sec, sem:semPago, emps})=>{
-      const totalSec = emps.reduce((s,e)=>s+(e.sueldo+(e.hsExtra||0)),0);
+      const totalSec = emps.reduce((s,e)=>s+(e.sueldo+((D.hsExtras&&D.hsExtras[e.id+'_'+m])||0)),0);
       const adelantosGrupo = emps.reduce((s,e)=>{
         return s + D.adelantos.filter(a=>a.emp_id===e.id&&a.mes===mes_sel).reduce((sa,a)=>sa+a.monto,0);
       },0);
@@ -1959,7 +1960,7 @@ function getCFData(mes_sel){
       secSemMap[mapKey].emps.push(e);
     });
     Object.values(secSemMap).forEach(({sector:sec, sem:semPago, emps})=>{
-      const totalSec = emps.reduce((s,e)=>s+(e.sueldo+(e.hsExtra||0)),0);
+      const totalSec = emps.reduce((s,e)=>s+(e.sueldo+((D.hsExtras&&D.hsExtras[e.id+'_'+m])||0)),0);
       const label = (SECTORES[sec]||sec)+(Object.values(secSemMap).filter(x=>x.sector===sec).length>1?' (Sem '+semPago+')':'');
       const adelantosGrupo = emps.reduce((s,e)=>{
         return s + D.adelantos.filter(a=>a.emp_id===e.id&&a.mes===mes_sel).reduce((sa,a)=>sa+a.monto,0);
@@ -2426,14 +2427,14 @@ function delCFIngreso(id){
 }
 
 function updateHsExtra(id, val){
-  const e = D.empleados.find(x=>x.id===id);
-  if(e){
-    e.hsExtra = parseFloat(val)||0;
-    save();
-    renderEmpleados();
-    renderResumen();
-    renderCashFlow();
-  }
+  const empSel = g('emp-filtro-mes');
+  const m = (empSel && empSel.value) ? empSel.value : mes();
+  if(!D.hsExtras) D.hsExtras = {};
+  D.hsExtras[id+'_'+m] = parseFloat(val)||0;
+  save();
+  renderEmpleados();
+  renderResumen();
+  renderCashFlow();
 }
 
 function toggleCFPago(tipo, id){
