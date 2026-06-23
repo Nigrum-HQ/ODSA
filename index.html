@@ -992,6 +992,7 @@ function navPage(name){
   if(name==='ingresos') renderIngresos();
   if(name==='cheques') renderCheques();
   if(name==='cashflow'){ initCFMes(); renderCashFlow(); }
+  if(name==='fichabancaria') renderFichaBancaria();
 }
 function navTab(name){ navPage(name); }
 function tabEmp(tab, btn){
@@ -1237,7 +1238,7 @@ function renderEmpleados(){
         const ac = Math.max(0, e.sueldo+hx-adv);
         const sp = e.semPago||1;
         return '<tr>'
-          +'<td><strong>'+e.nombre+'</strong>'+(e.nota?'<div style="font-size:11px;color:#8A9BAB">'+e.nota+'</div>':'')+(e.banco?'<div style="font-size:11px;color:#8A9BAB">'+e.banco+(e.cbu?' — '+e.cbu:'')+'</div>':'')+'</td>'
+          +'<td><strong>'+e.nombre+'</strong>'+(e.nota?'<div style="font-size:11px;color:#8A9BAB">'+e.nota+'</div>':'')+(e.banco||e.cbu||e.alias?'<div style="font-size:11px;color:#8A9BAB">'+(e.banco?e.banco+' ':'')+( e.cbu?'· '+e.cbu+' ':'')+( e.alias?'· '+e.alias:'')+'</div>':'')+'</td>'
           +'<td><input type="number" value="'+(e.sueldo||'')+'" placeholder="0" style="width:130px;padding:5px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;font-family:inherit;font-weight:600;color:#C0392B" onblur="updateSueldo(this.dataset.id,this.value)" data-id="'+e.id+'" step="1" min="0"></td>'
           +'<td><input type="number" value="'+(hx)+'" placeholder="0" style="width:110px;padding:5px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;font-family:inherit" onblur="updateHsExtra(this.dataset.id,this.value)" data-id="'+e.id+'"></td>'
           +'<td style="color:#B8943E;font-weight:600">'+(adv>0?fmt(adv):'—')+'</td>'
