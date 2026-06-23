@@ -2110,7 +2110,7 @@ function getCFData(mes_sel){
         color: '#B8943E',
         pagado: todoPagado,
         tipo: 'comision_lider',
-        id: lid.id+'-'+s,
+        id: lid.id+'-'+semStr,
         medio: totalEfec>0 && totalTransf===0 ? 'efectivo' : (totalEfec>0 ? 'mixto' : 'transferencia'),
         totalEfec,
         totalTransf
@@ -2543,11 +2543,11 @@ function toggleCFPago(tipo, id){
     // id = liderId-semana
     const dashIdx = id.lastIndexOf('-');
     const liderId = id.substring(0, dashIdx);
-    const sem = parseInt(id.substring(dashIdx+1))||1;
+    const semStr = id.substring(dashIdx+1);
     const lid = D.externos.find(e=>e.id===liderId);
     if(lid){
       const equipoIds = [liderId, ...D.externos.filter(e=>e.lider_id===liderId).map(e=>e.id)];
-      const grupo = D.comisiones.filter(c=>equipoIds.includes(c.quien_id)&&(c.semPago||c.sem||1)===sem);
+      const grupo = D.comisiones.filter(c=>equipoIds.includes(c.quien_id)&&String(c.semPago||c.sem||1)===semStr);
       const estado = !grupo.every(c=>c.pagado||false);
       grupo.forEach(c=>c.pagado=estado);
     }
