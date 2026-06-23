@@ -612,6 +612,34 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
         </div>
       </div>
 
+      <!-- FICHA BANCARIA -->
+      <div id="page-fichabancaria" class="page">
+        <div class="page-title">Ficha bancaria</div>
+        <div class="page-sub">Datos bancarios del personal y vendedores externos</div>
+
+        <div style="background:#fff;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.07);margin-bottom:20px;overflow:hidden">
+          <div style="background:#0F1923;padding:14px 20px;display:flex;align-items:center;gap:10px">
+            <span style="font-size:16px">👤</span>
+            <span style="font-size:14px;font-weight:800;color:#fff">Empleados</span>
+          </div>
+          <div class="tw"><table style="width:100%">
+            <thead><tr><th>Nombre</th><th>Sector</th><th>Banco</th><th>CUIL</th><th>CBU</th><th>Alias</th></tr></thead>
+            <tbody id="ficha-emp-body"></tbody>
+          </table></div>
+        </div>
+
+        <div style="background:#fff;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:hidden">
+          <div style="background:#0F1923;padding:14px 20px;display:flex;align-items:center;gap:10px">
+            <span style="font-size:16px">👥</span>
+            <span style="font-size:14px;font-weight:800;color:#fff">Vendedores externos</span>
+          </div>
+          <div class="tw"><table style="width:100%">
+            <thead><tr><th>Nombre</th><th>Rol</th><th>Banco</th><th>CUIL</th><th>CBU</th><th>Alias</th></tr></thead>
+            <tbody id="ficha-ext-body"></tbody>
+          </table></div>
+        </div>
+      </div>
+
       <!-- CHEQUES -->
       <div id="page-cheques" class="page">
         <div class="page-title">Cheques emitidos</div>
