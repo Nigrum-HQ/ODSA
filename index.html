@@ -704,18 +704,30 @@ async function sbGet(){
 
 async function sbSet(data){
   try{
-    // Upsert: insert or update
-    const r = await fetch(SB_URL+'/rest/v1/'+SB_TABLE, {
+    // Intentar PATCH primero (update)
+    const r = await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID, {
+      method:'PATCH',
+      headers:{
+        'apikey':SB_KEY,
+        'Authorization':'Bearer '+SB_KEY,
+        'Content-Type':'application/json',
+        'Prefer':'return=minimal'
+      },
+      body: JSON.stringify({data: data})
+    });
+    if(r.ok) return true;
+    // Si falla PATCH, intentar POST (insert)
+    const r2 = await fetch(SB_URL+'/rest/v1/'+SB_TABLE, {
       method:'POST',
       headers:{
         'apikey':SB_KEY,
         'Authorization':'Bearer '+SB_KEY,
         'Content-Type':'application/json',
-        'Prefer':'resolution=merge-duplicates'
+        'Prefer':'return=minimal'
       },
       body: JSON.stringify({id:SB_ROW_ID, data: data})
     });
-    return r.ok;
+    return r2.ok;
   }catch(e){ return false; }
 }
 
