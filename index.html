@@ -2782,6 +2782,15 @@ function guardarModalBancGasto() {
 }
 
 // Delegación de eventos para botones generados dinámicamente
+// Listener para change del select de semana de gastos
+document.addEventListener('change', function(e) {
+  var selGasto = e.target.closest('.sel-sem-gasto');
+  if (selGasto) {
+    setSemGasto(selGasto.dataset.gid, selGasto.value);
+    return;
+  }
+});
+
 document.addEventListener('click', function(e) {
   // Botón bancario de empleado en premios/sueldos
   var btnEmp = e.target.closest('.btn-banc-emp');
@@ -2805,12 +2814,6 @@ document.addEventListener('click', function(e) {
   var btnDelGasto = e.target.closest('.btn-del-gasto');
   if (btnDelGasto) {
     delGasto(btnDelGasto.dataset.gid);
-    return;
-  }
-  // Select semana gasto
-  var selGasto = e.target.closest('.sel-sem-gasto');
-  if (selGasto) {
-    setSemGasto(selGasto.dataset.gid, selGasto.value);
     return;
   }
 });
