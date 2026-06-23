@@ -1010,10 +1010,6 @@ function showBancoEmp(e, id){
   e.stopPropagation();
   const emp = D.empleados.find(x=>x.id===id);
   if(!emp) return;
-  const banco = emp.banco||'—';
-  const cuil = emp.cuil||'—';
-  const cbu = emp.cbu||'—';
-  const alias = emp.alias||'—';
   const existing = document.getElementById('banco-popup');
   if(existing) existing.remove();
   const popup = document.createElement('div');
@@ -1022,17 +1018,23 @@ function showBancoEmp(e, id){
   const rect = e.target.getBoundingClientRect();
   popup.style.top = (rect.bottom+8)+'px';
   popup.style.left = Math.min(rect.left, window.innerWidth-300)+'px';
-  popup.innerHTML = '<div style="font-size:13px;font-weight:800;color:#1B3A6B;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #E4EAF0">🏦 '+emp.nombre+'</div>'
+  const banco = emp.banco||'—';
+  const cuil = emp.cuil||'—';
+  const cbu = emp.cbu||'—';
+  const alias = emp.alias||'—';
+  popup.innerHTML = '<div style="font-size:13px;font-weight:800;color:#1B3A6B;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #E4EAF0">&#127974; '+emp.nombre+'</div>'
     +'<div style="display:grid;grid-template-columns:80px 1fr;gap:6px;font-size:13px">'
     +'<span style="color:#9AAABB;font-weight:600">Banco</span><span style="font-weight:700">'+banco+'</span>'
     +'<span style="color:#9AAABB;font-weight:600">CUIL</span><span>'+cuil+'</span>'
     +'<span style="color:#9AAABB;font-weight:600">CBU</span><span style="font-size:11px;word-break:break-all">'+cbu+'</span>'
     +'<span style="color:#9AAABB;font-weight:600">Alias</span><span>'+alias+'</span>'
     +'</div>'
-    +'<button onclick="document.getElementById('banco-popup').remove()" style="margin-top:12px;width:100%;padding:6px;border:none;background:#F5F7FA;border-radius:7px;cursor:pointer;font-weight:600;color:#6B7E8F">Cerrar</button>';
+    +'<button id="banco-popup-cerrar" style="margin-top:12px;width:100%;padding:6px;border:none;background:#F5F7FA;border-radius:7px;cursor:pointer;font-weight:600;color:#6B7E8F">Cerrar</button>';
   document.body.appendChild(popup);
-  setTimeout(()=>document.addEventListener('click', function h(ev){ if(!popup.contains(ev.target)){popup.remove();document.removeEventListener('click',h);} }), 100);
+  document.getElementById('banco-popup-cerrar').addEventListener('click', function(){ popup.remove(); });
+  setTimeout(function(){ document.addEventListener('click', function h(ev){ if(!popup.contains(ev.target)){ popup.remove(); document.removeEventListener('click',h); } }); }, 100);
 }
+
 function navPage(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.sitem').forEach(s=>s.classList.remove('on'));
