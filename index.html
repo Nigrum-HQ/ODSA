@@ -2541,9 +2541,9 @@ function toggleCFPago(tipo, id){
     if(p){ p.pagado=!p.pagado; }
   } else if(tipo==='comision_lider'){
     // id = liderId-semana
-    const parts = id.split('-');
-    const liderId = parts[0];
-    const sem = parseInt(parts[1])||1;
+    const dashIdx = id.lastIndexOf('-');
+    const liderId = id.substring(0, dashIdx);
+    const sem = parseInt(id.substring(dashIdx+1))||1;
     const lid = D.externos.find(e=>e.id===liderId);
     if(lid){
       const equipoIds = [liderId, ...D.externos.filter(e=>e.rol==='equipo'&&e.lider_id===liderId).map(e=>e.id)];
