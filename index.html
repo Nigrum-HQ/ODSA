@@ -1294,7 +1294,7 @@ function renderEmpleados(){
         const ac = Math.max(0, e.sueldo+hx-adv);
         const sp = e.semPago||1;
         return '<tr>'
-          +'<td><strong>'+e.nombre+'</strong>'+(e.nota?'<div style="font-size:11px;color:#8A9BAB">'+e.nota+'</div>':'')+'<div style="margin-top:3px"><button onclick="showBancoEmp(event,\''+e.id+'\'" style="font-size:10px;padding:2px 8px;border-radius:5px;border:1px solid #E4EAF0;background:#F5F7FA;color:#1B3A6B;cursor:pointer;font-weight:600">🏦 Ver datos</button></div>'+'</td>'
+          +'<td><strong>'+e.nombre+'</strong>'+(e.nota?'<div style="font-size:11px;color:#8A9BAB">'+e.nota+'</div>':'')+'<div style="margin-top:3px"><button data-empid="'+e.id+'" onclick="showBancoEmp(event,this.dataset.empid)" style="font-size:10px;padding:2px 8px;border-radius:5px;border:1px solid #E4EAF0;background:#F5F7FA;color:#1B3A6B;cursor:pointer;font-weight:600">&#127974; Ver datos</button></div>'+'</td>'
           +'<td><input type="number" value="'+(e.sueldo||'')+'" placeholder="0" style="width:130px;padding:5px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;font-family:inherit;font-weight:600;color:#C0392B" onblur="updateSueldo(this.dataset.id,this.value)" data-id="'+e.id+'" step="1" min="0"></td>'
           +'<td><input type="number" value="'+(hx)+'" placeholder="0" style="width:110px;padding:5px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;font-family:inherit" onblur="updateHsExtra(this.dataset.id,this.value)" data-id="'+e.id+'"></td>'
           +'<td style="color:#B8943E;font-weight:600">'+(adv>0?fmt(adv):'—')+'</td>'
