@@ -186,7 +186,6 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
       <div class="ssep">Ventas / Marketing</div>
       <div class="sitem" data-page="ventas" onclick="navPage('ventas')"><span class="ico">⭐</span>Premios semana</div>
       <div class="sitem" data-page="externos" onclick="navPage('externos')"><span class="ico">👥</span>Vendedores ext.</div>
-<div class="sitem" data-page="ficha-bancaria" onclick="navPage('ficha-bancaria')"><span class="ico">🏦</span>Ficha bancaria</div>
     </div>
 
     <div class="main">
@@ -255,58 +254,9 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
         </div>
       </div>
 
-      <!-- FICHA BANCARIA -->
-      <div id="page-ficha-bancaria" class="page">
-        <div class="page-title">Ficha bancaria</div>
-        <div class="page-sub">Datos bancarios del personal y vendedores externos</div>
-
-        <!-- Sección Empleados -->
-        <div style="margin-bottom:24px">
-          <div style="font-size:16px;font-weight:800;color:#1a2332;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #E4EAF0">👤 Empleados</div>
-          <div style="overflow-x:auto">
-            <table style="width:100%;border-collapse:collapse;font-size:13px">
-              <thead>
-                <tr style="background:#F5F7FA">
-                  <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #E4EAF0;color:#6B7E8F;font-weight:700">Nombre</th>
-                  <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #E4EAF0;color:#6B7E8F;font-weight:700">Sector</th>
-                  <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #E4EAF0;color:#6B7E8F;font-weight:700">Banco</th>
-                  <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #E4EAF0;color:#6B7E8F;font-weight:700">CUIL</th>
-                  <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #E4EAF0;color:#6B7E8F;font-weight:700">CBU</th>
-                  <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #E4EAF0;color:#6B7E8F;font-weight:700">Alias</th>
-                </tr>
-              </thead>
-              <tbody id="ficha-emp-tabla"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Sección Externos -->
-        <div>
-          <div style="font-size:16px;font-weight:800;color:#1a2332;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #E4EAF0">👥 Vendedores externos</div>
-          <div style="overflow-x:auto">
-            <table style="width:100%;border-collapse:collapse;font-size:13px">
-              <thead>
-                <tr style="background:#F5F7FA">
-                  <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #E4EAF0;color:#6B7E8F;font-weight:700">Nombre</th>
-                  <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #E4EAF0;color:#6B7E8F;font-weight:700">Rol</th>
-                  <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #E4EAF0;color:#6B7E8F;font-weight:700">Banco</th>
-                  <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #E4EAF0;color:#6B7E8F;font-weight:700">CUIL</th>
-                  <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #E4EAF0;color:#6B7E8F;font-weight:700">CBU</th>
-                  <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #E4EAF0;color:#6B7E8F;font-weight:700">Alias</th>
-                </tr>
-              </thead>
-              <tbody id="ficha-ext-tabla"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
       <!-- EMPLEADOS -->
       <div id="page-empleados" class="page">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px">
-          <div class="page-title" style="margin-bottom:0">Empleados</div>
-          <select id="emp-filtro-mes" onchange="renderEmpleados()" style="padding:7px 14px;border-radius:8px;border:1.5px solid #D8E2EC;font-size:13px;color:#1a2332;background:#fff"></select>
-        </div>
+        <div class="page-title">Empleados</div>
         <div class="page-sub">Nómina mensual — sueldos fijos</div>
         <div class="tabs">
           <button class="tab on" onclick="tabEmp('nomina',this)">Nómina</button>
@@ -428,16 +378,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
           </div>
         </div>
         <div class="card">
-          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-            <div class="card-title" style="margin-bottom:0">Historial de premios del mes</div>
-            <select id="prem-filtro-sem" onchange="renderPremios()" style="padding:7px 14px;border-radius:8px;border:1.5px solid #D8E2EC;font-size:13px;color:#1a2332;background:#fff">
-              <option value="">— Todas las semanas —</option>
-              <option value="1">Semana 1</option>
-              <option value="2">Semana 2</option>
-              <option value="3">Semana 3</option>
-              <option value="4">Semana 4</option>
-            </select>
-          </div>
+          <div class="card-title">Historial de premios del mes</div>
           <div class="tw"><table>
             <thead><tr><th>Semana</th><th>Empleado</th><th>Concepto</th><th>Monto</th><th></th></tr></thead>
             <tbody id="prem-tabla"></tbody>
@@ -710,15 +651,15 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
 // ═══════════════════════════════
 // CREDENCIALES
 // ═══════════════════════════════
-// credenciales movidas al servidor
-
+const ODSA_USER = 'administracion@abesa.co';
+const ODSA_PASS = 'odsa2026';
 const ODSA_KEY  = 'odsa_data_v4';
 
 // ═══════════════════════════════
 // SUPABASE CONFIG
 // ═══════════════════════════════
 const SB_URL = 'https://timsqagonuavwtcbpere.supabase.co';
-const SB_KEY = 'sb_publishable_ZFVaKje4T6_ynT1N_9u8zw_RVVH7TOV';
+const SB_KEY = 'sb_publishable_j44yGFO4gIYFy7geRlCaCw_rKmzHjYQ';
 const SB_TABLE = 'odsa_data';
 const SB_ROW_ID = 1;
 
@@ -773,8 +714,7 @@ let D = {
   cheques: [],
   proyecciones: [],
   cf_ingresos: [],
-  semPagoSectores: {},
-  hsExtras: {}
+  semPagoSectores: {}
 };
 
 // Empleados iniciales
@@ -958,28 +898,17 @@ async function load(){
 // ═══════════════════════════════
 // LOGIN
 // ═══════════════════════════════
-async function doLogin(){
+function doLogin(){
   const email = gv('login-email').trim().toLowerCase();
   const pass  = gv('login-pass');
   g('login-err').textContent = '';
   if(!email||!pass){ g('login-err').textContent='Completá los campos'; return; }
-  try {
-    const r = await fetch('/api/login', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({email, password: pass})
-    });
-    const d = await r.json();
-    if(d.ok){
-      sessionStorage.setItem('odsa_token', d.token);
-      g('LOGIN').style.display='none';
-      g('APP').style.display='flex';
-      initApp().then(()=>{ startSync(); });
-    } else {
-      g('login-err').textContent = d.error || 'Email o contraseña incorrectos';
-    }
-  } catch(e) {
-    g('login-err').textContent = 'Error de conexión';
+  if(email===ODSA_USER && pass===ODSA_PASS){
+    g('LOGIN').style.display='none';
+    g('APP').style.display='flex';
+    initApp().then(()=>{ startSync(); });
+  } else {
+    g('login-err').textContent='Email o contraseña incorrectos';
   }
 }
 g('login-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
@@ -1000,14 +929,6 @@ async function initApp(){
   document.body.appendChild(overlay);
   await load();
   overlay.remove();
-  // Migración: mover hsExtra de empleados al nuevo D.hsExtras por mes
-  if(!D.hsExtras) D.hsExtras = {};
-  D.empleados.forEach(e=>{
-    if(e.hsExtra && e.hsExtra > 0){
-      const key = e.id+'_2026-06';
-      if(!D.hsExtras[key]) D.hsExtras[key] = e.hsExtra;
-    }
-  });
   // Inicializar empleados si vacío
   if(!D.empleados.length){
     EMP_INIT.forEach(e => {
@@ -1045,7 +966,7 @@ async function syncFromCloud(){
     const cloudD = JSON.parse(sbData);
     // Only update if cloud data is different
     if(JSON.stringify(cloudD) !== JSON.stringify(D)){
-      D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},hsExtras:{}}, cloudD);
+      D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{}}, cloudD);
       try{ localStorage.setItem(ODSA_KEY, sbData); }catch(e){}
       // Re-render active page silently
       const active = document.querySelector('.sitem.on');
@@ -1055,43 +976,6 @@ async function syncFromCloud(){
   }catch(e){}
 }
 function startSync(){ _syncInterval = setInterval(syncFromCloud, 30000); }
-
-function toggleBancario(id){
-  var el = document.getElementById('bancario-'+id);
-  if(el) el.style.display = el.style.display==='none' ? 'block' : 'none';
-}
-function renderFichaBancaria(){
-  var SL = {yamaha:'Yamaha',operadoras:'Operadoras Call',turnos:'Turnos Osmedica',administracion:'Administracion',sistemas:'Sistemas',limpieza:'Limpieza',kinebs:'Kinebs',fichas:'Fichas',publicidad:'Publicidad',otro:'Otro'};
-  var inp = function(val,fn,id,campo,w){ return '<input value="'+(val||'')+'" placeholder="-" onchange="'+fn+'(this.dataset.id,this.dataset.campo,this.value)" data-id="'+id+'" data-campo="'+campo+'" style="width:'+w+'px;padding:4px 8px;border:1.5px solid #E4EAF0;border-radius:6px;font-size:12px">'; };
-  var emps = D.empleados.slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre);});
-  g('ficha-emp-tabla').innerHTML = emps.map(function(e){
-    return '<tr style="border-bottom:1px solid #F0F4F8">'
-      +'<td style="padding:10px 12px;font-weight:600;color:#1a2332">'+e.nombre+'</td>'
-      +'<td style="padding:10px 12px;color:#6B7E8F">'+(SL[e.sector]||e.sector||'-')+'</td>'
-      +'<td style="padding:10px 12px">'+inp(e.banco,'updateEmpBanco',e.id,'banco',130)+'</td>'
-      +'<td style="padding:10px 12px">'+inp(e.cuil,'updateEmpBanco',e.id,'cuil',120)+'</td>'
-      +'<td style="padding:10px 12px">'+inp(e.cbu,'updateEmpBanco',e.id,'cbu',160)+'</td>'
-      +'<td style="padding:10px 12px">'+inp(e.alias,'updateEmpBanco',e.id,'alias',130)+'</td>'
-      +'</tr>';
-  }).join('') || '<tr><td colspan="6" style="padding:20px;text-align:center;color:#9AAABB">Sin empleados</td></tr>';
-
-  var exts = D.externos.slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre);});
-  g('ficha-ext-tabla').innerHTML = exts.map(function(e){
-    var rolBg = e.rol==='lider' ? '#EBF5FF' : '#F0F4F8';
-    var rolColor = e.rol==='lider' ? '#1565C0' : '#6B7E8F';
-    var rolLabel = e.rol==='lider' ? 'Lider' : 'Equipo';
-    return '<tr style="border-bottom:1px solid #F0F4F8">'
-      +'<td style="padding:10px 12px;font-weight:600;color:#1a2332">'+e.nombre+'</td>'
-      +'<td style="padding:10px 12px"><span style="background:'+rolBg+';color:'+rolColor+';padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700">'+rolLabel+'</span></td>'
-      +'<td style="padding:10px 12px">'+inp(e.banco,'updateExtBanco',e.id,'banco',130)+'</td>'
-      +'<td style="padding:10px 12px">'+inp(e.cuil,'updateExtBanco',e.id,'cuil',120)+'</td>'
-      +'<td style="padding:10px 12px">'+inp(e.cbu,'updateExtBanco',e.id,'cbu',160)+'</td>'
-      +'<td style="padding:10px 12px">'+inp(e.alias,'updateExtBanco',e.id,'alias',130)+'</td>'
-      +'</tr>';
-  }).join('') || '<tr><td colspan="6" style="padding:20px;text-align:center;color:#9AAABB">Sin vendedores externos</td></tr>';
-}
-function updateEmpBanco(id,campo,val){ var e=D.empleados.find(function(x){return x.id===id;}); if(e){e[campo]=val;save();} }
-function updateExtBanco(id,campo,val){ var e=D.externos.find(function(x){return x.id===id;}); if(e){e[campo]=val;save();} }
 
 function navPage(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
@@ -1103,7 +987,6 @@ function navPage(name){
   if(name==='empleados'){ renderEmpleados(); }
   if(name==='adelantos'){ fillAdEmp(); renderAdelantos(); }
   if(name==='ventas'){ fillPremEmp(); renderPremios(); }
-  if(name==='ficha-bancaria'){ renderFichaBancaria(); }
   if(name==='externos'){ fillExtSelects(); renderExternos(); }
   if(name==='gastos') renderGastos();
   if(name==='ingresos') renderIngresos();
@@ -1294,25 +1177,7 @@ function renderChart(r){
 if(!window._secCollapsed) window._secCollapsed={};
 function toggleSector(k){ window._secCollapsed[k]=!window._secCollapsed[k]; renderEmpleados(); }
 function renderEmpleados(){
-  // Poblar selector de meses
-  const empSel = g('emp-filtro-mes');
-  if(empSel){
-    const meses = [];
-    // Todos los meses de 2026
-    for(let i=1;i<=12;i++){
-      meses.push('2026-'+String(i).padStart(2,'0'));
-    }
-    // Agregar meses anteriores con datos
-    D.adelantos.forEach(a=>{ if(a.mes && !meses.includes(a.mes)) meses.push(a.mes); });
-    meses.sort().reverse();
-    const currentVal = empSel.value || mes();
-    empSel.innerHTML = meses.map(mv=>{
-      const [y,mo] = mv.split('-');
-      const label = MES[parseInt(mo)-1]+' '+y;
-      return `<option value="${mv}" ${mv===currentVal?'selected':''}>${label}</option>`;
-    }).join('');
-  }
-  const m = (empSel && empSel.value) ? empSel.value : mes();
+  const m = mes();
   const d = new Date();
   g('emp-mes-label') && (g('emp-mes-label').textContent = MES[d.getMonth()]+' '+d.getFullYear());
 
@@ -1356,7 +1221,7 @@ function renderEmpleados(){
     const emps = D.empleados.filter(e=>e.sector===key);
     if(!emps.length) return;
 
-    const totalSec = emps.reduce((s,e)=>s+(e.sueldo+((D.hsExtras&&D.hsExtras[e.id+'_'+mes_sel])||0)),0);
+    const totalSec = emps.reduce((s,e)=>s+(e.sueldo+(e.hsExtra||0)),0);
     const adelantosSec = emps.reduce((s,e)=>{
       return s + D.adelantos.filter(a=>a.emp_id===e.id&&a.mes===m).reduce((sa,a)=>sa+a.monto,0);
     },0);
@@ -1368,11 +1233,11 @@ function renderEmpleados(){
     const _secTable = _sc ? '' : (()=>{
       const rows = emps.map(e=>{
         const adv = D.adelantos.filter(a=>a.emp_id===e.id&&a.mes===m).reduce((s,a)=>s+a.monto,0);
-        const hx = (D.hsExtras&&D.hsExtras[e.id+'_'+mes_sel])||0;
+        const hx = e.hsExtra||0;
         const ac = Math.max(0, e.sueldo+hx-adv);
         const sp = e.semPago||1;
         return '<tr>'
-          +'<td><strong>'+e.nombre+'</strong>'+(e.nota?'<div style="font-size:11px;color:#8A9BAB">'+e.nota+'</div>':'')+'<div style="margin-top:4px"><button onclick="toggleBancario(\''+e.id+'\')" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid #C8D6E5;background:#F5F8FB;color:#4A6FA5;cursor:pointer;font-weight:600">'+(e.banco?'🏦 '+e.banco:'🏦 Banco')+'</button></div>'+'<div id="bancario-'+e.id+'" style="display:none;margin-top:6px;background:#F5F8FB;border:1px solid #E4EAF0;border-radius:8px;padding:8px 10px;min-width:260px">'+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+'<div><div style="font-size:10px;color:#6B7E8F;font-weight:700;margin-bottom:2px">BANCO</div>'+'<input value="'+(e.banco||'')+'" placeholder="Banco" onchange="updateEmpBanco(\''+e.id+'\',\'banco\',this.value)" style="width:100%;padding:4px 6px;border:1px solid #D8E2EC;border-radius:5px;font-size:12px"></div>'+'<div><div style="font-size:10px;color:#6B7E8F;font-weight:700;margin-bottom:2px">CUIL</div>'+'<input value="'+(e.cuil||'')+'" placeholder="CUIL" onchange="updateEmpBanco(\''+e.id+'\',\'cuil\',this.value)" style="width:100%;padding:4px 6px;border:1px solid #D8E2EC;border-radius:5px;font-size:12px"></div>'+'<div><div style="font-size:10px;color:#6B7E8F;font-weight:700;margin-bottom:2px">CBU</div>'+'<input value="'+(e.cbu||'')+'" placeholder="CBU" onchange="updateEmpBanco(\''+e.id+'\',\'cbu\',this.value)" style="width:100%;padding:4px 6px;border:1px solid #D8E2EC;border-radius:5px;font-size:12px"></div>'+'<div><div style="font-size:10px;color:#6B7E8F;font-weight:700;margin-bottom:2px">ALIAS</div>'+'<input value="'+(e.alias||'')+'" placeholder="Alias" onchange="updateEmpBanco(\''+e.id+'\',\'alias\',this.value)" style="width:100%;padding:4px 6px;border:1px solid #D8E2EC;border-radius:5px;font-size:12px"></div>'+'</div></div>'+'</td>'
+          +'<td><strong>'+e.nombre+'</strong>'+(e.nota?'<div style="font-size:11px;color:#8A9BAB">'+e.nota+'</div>':'')+(e.banco?'<div style="font-size:11px;color:#8A9BAB">'+e.banco+(e.cbu?' — '+e.cbu:'')+'</div>':'')+'</td>'
           +'<td><input type="number" value="'+(e.sueldo||'')+'" placeholder="0" style="width:130px;padding:5px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;font-family:inherit;font-weight:600;color:#C0392B" onblur="updateSueldo(this.dataset.id,this.value)" data-id="'+e.id+'" step="1" min="0"></td>'
           +'<td><input type="number" value="'+(hx)+'" placeholder="0" style="width:110px;padding:5px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;font-family:inherit" onblur="updateHsExtra(this.dataset.id,this.value)" data-id="'+e.id+'"></td>'
           +'<td style="color:#B8943E;font-weight:600">'+(adv>0?fmt(adv):'—')+'</td>'
@@ -1576,9 +1441,7 @@ function addPremio(){
 }
 function renderPremios(){
   const m = mes();
-  const filtroSem = gv('prem-filtro-sem');
-  let lista = D.premios.filter(p=>p.mes===m);
-  if(filtroSem) lista = lista.filter(p=>String(p.sem)===filtroSem);
+  const lista = D.premios.filter(p=>p.mes===m);
   // Resumen por semana
   const semanas = [1,2,3,4];
   g('prem-resumen').innerHTML = semanas.map(s=>{
@@ -1593,18 +1456,13 @@ function renderPremios(){
   if(!lista.length){ g('prem-tabla').innerHTML='<tr><td colspan="5" class="empty">Sin premios este mes</td></tr>'; g('prem-tfoot').innerHTML=''; return; }
   g('prem-tabla').innerHTML = lista.map(p=>{
     const emp = D.empleados.find(e=>e.id===p.emp_id);
-    const eid = emp ? emp.id : '';
-    const enombre = emp ? emp.nombre : '-';
-    const ebanco = emp ? (emp.banco||'') : '';
-    const btnLabel = ebanco ? ebanco : 'Banco';
-    const btnBanc = eid ? ('<button class="btn-banc-emp" data-eid="'+eid+'" data-nombre="'+enombre+'" style="margin-top:3px;display:block;font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid #C8D6E5;background:#F5F8FB;color:#4A6FA5;cursor:pointer;font-weight:600">&#127942; '+btnLabel+'</button>') : '';
-    return '<tr>'
-      +'<td><span class="badge badge-blue">Sem '+p.sem+'</span></td>'
-      +'<td>'+enombre+btnBanc+'</td>'
-      +'<td style="color:#6B7E8F">'+p.concepto+'</td>'
-      +'<td style="font-weight:700;color:#C0392B">'+fmt(p.monto)+'</td>'
-      +'<td><button class="del-btn btn-del-prem" data-pid="'+p.id+'">&#128465;</button></td>'
-      +'</tr>';
+    return `<tr>
+      <td><span class="badge badge-blue">Sem ${p.sem}</span></td>
+      <td>${emp?emp.nombre:'—'}</td>
+      <td style="color:#6B7E8F">${p.concepto}</td>
+      <td style="font-weight:700;color:#C0392B">${fmt(p.monto)}</td>
+      <td><button class="del-btn" onclick="delPremio('${p.id}')">🗑</button></td>
+    </tr>`;
   }).join('');
   const total = lista.reduce((a,p)=>a+p.monto,0);
   g('prem-tfoot').innerHTML = `<tr><td colspan="3" style="font-weight:700">Total premios</td><td style="font-weight:700;color:#C0392B">${fmt(total)}</td><td></td></tr>`;
@@ -1777,27 +1635,21 @@ function renderGastos(){
   const m = mes();
   const lista = D.gastos.filter(g=>g.mes===m);
   if(!lista.length){ g('g-tabla').innerHTML='<tr><td colspan="5" class="empty">Sin gastos este mes</td></tr>'; g('g-tfoot').innerHTML=''; return; }
-  g('g-tabla').innerHTML = [...lista].reverse().map(x=>{
-    const efectivoBadge = x.medio==='efectivo' ? '<span style="margin-left:4px;font-size:9px;background:#FEF3C7;color:#B45309;padding:1px 6px;border-radius:4px;font-weight:700">EFECTIVO</span>' : '';
-    const notaDiv = x.nota ? '<div style="font-size:11px;color:#8A9BAB">'+x.nota+'</div>' : '';
-    const bancLabel = x.bancario ? x.bancario : 'Datos bancarios';
-    const btnBancGasto = '<button class="btn-banc-gasto" data-gid="'+x.id+'" data-desc="'+x.desc+'" style="margin-top:3px;display:block;font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid #C8D6E5;background:#F5F8FB;color:#4A6FA5;cursor:pointer;font-weight:600">&#127942; '+bancLabel+'</button>';
-    const sem = x.semPago||estimarSemana(x.fecha);
-    return '<tr>'
-      +'<td>'+fd(x.fecha)+'</td>'
-      +'<td><strong>'+x.desc+'</strong>'+notaDiv+btnBancGasto+'</td>'
-      +'<td><span class="badge badge-gray">'+(CATS[x.cat]||x.cat)+'</span>'+efectivoBadge+'</td>'
-      +'<td style="font-weight:700;color:#C0392B">'+fmt(x.monto)+'</td>'
-      +'<td>'
-      +'<select class="sel-sem-gasto" data-gid="'+x.id+'" style="padding:3px 6px;border-radius:5px;border:1px solid #E4EAF0;font-size:11px;font-family:inherit;color:#1B3A6B;font-weight:600">'
-      +'<option value="1"'+(sem===1?' selected':'')+'>Sem 1</option>'
-      +'<option value="2"'+(sem===2?' selected':'')+'>Sem 2</option>'
-      +'<option value="3"'+(sem===3?' selected':'')+'>Sem 3</option>'
-      +'<option value="4"'+(sem===4?' selected':'')+'>Sem 4</option>'
-      +'</select></td>'
-      +'<td><button class="del-btn btn-del-gasto" data-gid="'+x.id+'">&#128465;</button></td>'
-      +'</tr>';
-  }).join('');
+  g('g-tabla').innerHTML = [...lista].reverse().map(x=>`<tr>
+    <td>${fd(x.fecha)}</td>
+    <td><strong>${x.desc}</strong>${x.nota?`<div style="font-size:11px;color:#8A9BAB">${x.nota}</div>`:''}</td>
+    <td><span class="badge badge-gray">${CATS[x.cat]||x.cat}</span>${x.medio==='efectivo'?'<span style="margin-left:4px;font-size:9px;background:#FEF3C7;color:#B45309;padding:1px 6px;border-radius:4px;font-weight:700">💵 EFECTIVO</span>':''}</td>
+    <td style="font-weight:700;color:#C0392B">${fmt(x.monto)}</td>
+    <td>
+      <select onchange="setSemGasto('${x.id}',this.value)" style="padding:3px 6px;border-radius:5px;border:1px solid #E4EAF0;font-size:11px;font-family:inherit;color:#1B3A6B;font-weight:600">
+        <option value="1" ${(x.semPago||estimarSemana(x.fecha))===1?'selected':''}>Sem 1</option>
+        <option value="2" ${(x.semPago||estimarSemana(x.fecha))===2?'selected':''}>Sem 2</option>
+        <option value="3" ${(x.semPago||estimarSemana(x.fecha))===3?'selected':''}>Sem 3</option>
+        <option value="4" ${(x.semPago||estimarSemana(x.fecha))===4?'selected':''}>Sem 4</option>
+      </select>
+    </td>
+    <td><button class="del-btn" onclick="delGasto('${x.id}')">🗑</button></td>
+  </tr>`).join('');
   const total = lista.reduce((s,x)=>s+x.monto,0);
   const totalEfectivo = lista.filter(x=>x.medio==='efectivo').reduce((s,x)=>s+x.monto,0);
   const totalTransf = total - totalEfectivo;
@@ -2037,7 +1889,7 @@ function getCFData(mes_sel){
       pagadosSecSemMap[mapKey].emps.push(e);
     });
     Object.values(pagadosSecSemMap).forEach(({sector:sec, sem:semPago, emps})=>{
-      const totalSec = emps.reduce((s,e)=>s+(e.sueldo+((D.hsExtras&&D.hsExtras[e.id+'_'+mes_sel])||0)),0);
+      const totalSec = emps.reduce((s,e)=>s+(e.sueldo+(e.hsExtra||0)),0);
       const adelantosGrupo = emps.reduce((s,e)=>{
         return s + D.adelantos.filter(a=>a.emp_id===e.id&&a.mes===mes_sel).reduce((sa,a)=>sa+a.monto,0);
       },0);
@@ -2064,7 +1916,7 @@ function getCFData(mes_sel){
       secSemMap[mapKey].emps.push(e);
     });
     Object.values(secSemMap).forEach(({sector:sec, sem:semPago, emps})=>{
-      const totalSec = emps.reduce((s,e)=>s+(e.sueldo+((D.hsExtras&&D.hsExtras[e.id+'_'+mes_sel])||0)),0);
+      const totalSec = emps.reduce((s,e)=>s+(e.sueldo+(e.hsExtra||0)),0);
       const label = (SECTORES[sec]||sec)+(Object.values(secSemMap).filter(x=>x.sector===sec).length>1?' (Sem '+semPago+')':'');
       const adelantosGrupo = emps.reduce((s,e)=>{
         return s + D.adelantos.filter(a=>a.emp_id===e.id&&a.mes===mes_sel).reduce((sa,a)=>sa+a.monto,0);
@@ -2253,19 +2105,31 @@ function updateCFMonto(tipo,id,monto){
   else if(tipo==='adelanto'){const a=D.adelantos.find(x=>x.id===id); if(a) a.monto=monto;}
   else if(tipo==='comision'){const c=D.comisiones.find(x=>x.id===id); if(c) c.total=monto;}
   else if(tipo==='comision_lider'){
-    // id = liderId-semana → buscar todas las comisiones del lider y actualizar el total proporcionalmente
-    const lidId = id.split('-')[0];
-    const lider = D.externos.find(x=>x.id===lidId);
-    if(lider){
-      const coms = D.comisiones.filter(c=>c.lider_id===lidId || (lider.nombre && c.lider===lider.nombre));
-      if(coms.length===1){ coms[0].total=monto; }
-      else {
-        // Guardar como ajuste manual en cf_ingresos no aplica — guardamos en el primer registro
-        if(coms.length>0){ const totalActual=coms.reduce((a,c)=>a+c.total,0); const factor=totalActual>0?monto/totalActual:1; coms.forEach(c=>c.total=Math.round(c.total*factor)); }
+    // id = "liderId-semana" → distribuir el nuevo monto proporcionalmente entre las comisiones del equipo
+    const dashIdx=id.lastIndexOf('-');
+    const liderId=id.substring(0,dashIdx);
+    const sem=parseInt(id.substring(dashIdx+1))||1;
+    const lid=D.externos.find(e=>e.id===liderId);
+    if(lid){
+      const equipoIds=[liderId,...D.externos.filter(e=>e.lider_id===liderId).map(e=>e.id)];
+      const grupo=D.comisiones.filter(c=>equipoIds.includes(c.quien_id)&&(c.semPago||c.sem||1)===sem);
+      const totalActual=grupo.reduce((a,c)=>a+(c.total||0),0);
+      if(grupo.length>0){
+        if(totalActual>0){
+          // Distribuir proporcionalmente
+          grupo.forEach(c=>{ c.total=Math.round((c.total/totalActual)*monto); });
+          // Ajuste de redondeo en el primero
+          const diff=monto-grupo.reduce((a,c)=>a+(c.total||0),0);
+          if(diff!==0) grupo[0].total=(grupo[0].total||0)+diff;
+        } else {
+          // Si todas eran 0, repartir en partes iguales
+          const part=Math.floor(monto/grupo.length);
+          grupo.forEach(c=>c.total=part);
+          grupo[0].total+=monto-(part*grupo.length);
+        }
       }
     }
   }
-  else if(tipo==='premio_sector'){ /* premios se editan desde la sección premios */ }
   save(); renderCashFlow();
   const p=document.querySelector('.page.on');
   if(p&&p.id==='page-empleados') renderEmpleados();
@@ -2545,14 +2409,14 @@ function delCFIngreso(id){
 }
 
 function updateHsExtra(id, val){
-  const empSel = g('emp-filtro-mes');
-  const m = (empSel && empSel.value) ? empSel.value : mes();
-  if(!D.hsExtras) D.hsExtras = {};
-  D.hsExtras[id+'_'+m] = parseFloat(val)||0;
-  save();
-  renderEmpleados();
-  renderResumen();
-  renderCashFlow();
+  const e = D.empleados.find(x=>x.id===id);
+  if(e){
+    e.hsExtra = parseFloat(val)||0;
+    save();
+    renderEmpleados();
+    renderResumen();
+    renderCashFlow();
+  }
 }
 
 function toggleCFPago(tipo, id){
@@ -2666,43 +2530,6 @@ function toggleAdelantoPagado(id){
   } catch(e) { console.error('Error restaurando Evelin:', e); }
 })();
 </script>
-<!-- MODAL BANCARIO EMPLEADO -->
-<div id="modal-banc" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:14px;padding:24px;width:360px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.2)">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-      <div style="font-size:15px;font-weight:800;color:#1a2332">Datos bancarios</div>
-      <button onclick="document.getElementById('modal-banc').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6B7E8F;line-height:1">&times;</button>
-    </div>
-    <div id="modal-banc-nombre" style="font-size:12px;color:#6B7E8F;margin-bottom:14px"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-      <div><label style="font-size:10px;color:#6B7E8F;font-weight:700;display:block;margin-bottom:3px">BANCO</label>
-        <input id="mbanc-banco" placeholder="Banco" oninput="guardarModalBanc()" style="width:100%;padding:6px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
-      <div><label style="font-size:10px;color:#6B7E8F;font-weight:700;display:block;margin-bottom:3px">CUIL</label>
-        <input id="mbanc-cuil" placeholder="CUIL" oninput="guardarModalBanc()" style="width:100%;padding:6px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
-      <div><label style="font-size:10px;color:#6B7E8F;font-weight:700;display:block;margin-bottom:3px">CBU</label>
-        <input id="mbanc-cbu" placeholder="CBU" oninput="guardarModalBanc()" style="width:100%;padding:6px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
-      <div><label style="font-size:10px;color:#6B7E8F;font-weight:700;display:block;margin-bottom:3px">ALIAS</label>
-        <input id="mbanc-alias" placeholder="Alias" oninput="guardarModalBanc()" style="width:100%;padding:6px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
-    </div>
-    <button onclick="document.getElementById('modal-banc').style.display='none'" style="width:100%;padding:10px;background:#1B3A6B;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">Listo</button>
-  </div>
-</div>
-
-<!-- MODAL BANCARIO GASTO -->
-<div id="modal-banc-gasto" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:14px;padding:24px;width:360px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.2)">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-      <div style="font-size:15px;font-weight:800;color:#1a2332">Datos bancarios</div>
-      <button onclick="document.getElementById('modal-banc-gasto').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6B7E8F;line-height:1">&times;</button>
-    </div>
-    <div id="modal-banc-gasto-desc" style="font-size:12px;color:#6B7E8F;margin-bottom:14px"></div>
-    <div style="margin-bottom:16px">
-      <label style="font-size:10px;color:#6B7E8F;font-weight:700;display:block;margin-bottom:3px">CBU / ALIAS / DATOS</label>
-      <input id="mbanc-gasto-val" placeholder="CBU, alias o datos del destinatario" oninput="guardarModalBancGasto()" style="width:100%;padding:6px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;box-sizing:border-box">
-    </div>
-    <button onclick="document.getElementById('modal-banc-gasto').style.display='none'" style="width:100%;padding:10px;background:#1B3A6B;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">Listo</button>
-  </div>
-</div>
 </body>
 </html><style>
 body.privado-mode .num-privado,
@@ -2749,86 +2576,5 @@ function marcarNumerosPrivados(){
 // Atajo de teclado: Alt + H
 document.addEventListener('keydown', e => {
   if(e.altKey && e.key.toLowerCase() === 'h') togglePrivado();
-});
-
-// ═══════════════════════════════
-// MODAL BANCARIO
-// ═══════════════════════════════
-var _mbEmpId = null;
-var _mbGastoId = null;
-
-function abrirModalBanc(eid, nombre) {
-  _mbEmpId = eid;
-  var emp = D.empleados.find(function(e){ return e.id === eid; });
-  if (!emp) return;
-  document.getElementById('modal-banc-nombre').textContent = nombre;
-  document.getElementById('mbanc-banco').value = emp.banco || '';
-  document.getElementById('mbanc-cuil').value  = emp.cuil  || '';
-  document.getElementById('mbanc-cbu').value   = emp.cbu   || '';
-  document.getElementById('mbanc-alias').value  = emp.alias || '';
-  document.getElementById('modal-banc').style.display = 'flex';
-}
-function guardarModalBanc() {
-  if (!_mbEmpId) return;
-  var emp = D.empleados.find(function(e){ return e.id === _mbEmpId; });
-  if (!emp) return;
-  emp.banco = document.getElementById('mbanc-banco').value;
-  emp.cuil  = document.getElementById('mbanc-cuil').value;
-  emp.cbu   = document.getElementById('mbanc-cbu').value;
-  emp.alias = document.getElementById('mbanc-alias').value;
-  save();
-}
-
-function abrirModalBancGasto(gid, desc) {
-  _mbGastoId = gid;
-  var gasto = D.gastos.find(function(x){ return x.id === gid; });
-  if (!gasto) return;
-  document.getElementById('modal-banc-gasto-desc').textContent = desc;
-  document.getElementById('mbanc-gasto-val').value = gasto.bancario || '';
-  document.getElementById('modal-banc-gasto').style.display = 'flex';
-}
-function guardarModalBancGasto() {
-  if (!_mbGastoId) return;
-  var gasto = D.gastos.find(function(x){ return x.id === _mbGastoId; });
-  if (!gasto) return;
-  gasto.bancario = document.getElementById('mbanc-gasto-val').value;
-  save();
-}
-
-// Delegación de eventos para botones generados dinámicamente
-// Listener para change del select de semana de gastos
-document.addEventListener('change', function(e) {
-  var selGasto = e.target.closest('.sel-sem-gasto');
-  if (selGasto) {
-    setSemGasto(selGasto.dataset.gid, selGasto.value);
-    return;
-  }
-});
-
-document.addEventListener('click', function(e) {
-  // Botón bancario de empleado en premios/sueldos
-  var btnEmp = e.target.closest('.btn-banc-emp');
-  if (btnEmp) {
-    abrirModalBanc(btnEmp.dataset.eid, btnEmp.dataset.nombre);
-    return;
-  }
-  // Botón bancario de gasto
-  var btnGasto = e.target.closest('.btn-banc-gasto');
-  if (btnGasto) {
-    abrirModalBancGasto(btnGasto.dataset.gid, btnGasto.dataset.desc);
-    return;
-  }
-  // Borrar premio
-  var btnDelPrem = e.target.closest('.btn-del-prem');
-  if (btnDelPrem) {
-    delPremio(btnDelPrem.dataset.pid);
-    return;
-  }
-  // Borrar gasto
-  var btnDelGasto = e.target.closest('.btn-del-gasto');
-  if (btnDelGasto) {
-    delGasto(btnDelGasto.dataset.gid);
-    return;
-  }
 });
 </script>
