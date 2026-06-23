@@ -2546,7 +2546,7 @@ function toggleCFPago(tipo, id){
     const sem = parseInt(id.substring(dashIdx+1))||1;
     const lid = D.externos.find(e=>e.id===liderId);
     if(lid){
-      const equipoIds = [liderId, ...D.externos.filter(e=>e.rol==='equipo'&&e.lider_id===liderId).map(e=>e.id)];
+      const equipoIds = [liderId, ...D.externos.filter(e=>e.lider_id===liderId).map(e=>e.id)];
       const grupo = D.comisiones.filter(c=>equipoIds.includes(c.quien_id)&&(c.semPago||c.sem||1)===sem);
       const estado = !grupo.every(c=>c.pagado||false);
       grupo.forEach(c=>c.pagado=estado);
