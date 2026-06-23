@@ -1035,6 +1035,43 @@ function showBancoEmp(e, id){
   setTimeout(function(){ document.addEventListener('click', function h(ev){ if(!popup.contains(ev.target)){ popup.remove(); document.removeEventListener('click',h); } }); }, 100);
 }
 
+function renderFichaBancaria(){
+  const SECTORES = {operadoras:'Operadoras',turnos:'Turnos',administracion:'Administración',sistemas:'Sistemas',limpieza:'Limpieza',kinebs:'Kinebs',fichas:'Fichas',publicidad:'Publicidad',simple_speed:'Simple Speed',otro:'Otro'};
+  function inp(val, fn, id, campo, w){
+    return '<input value="'+(val||'')+'" placeholder="—" onchange="'+fn+'(''+id+'',''+campo+'',this.value)" style="width:'+w+'px;padding:4px 8px;border:1.5px solid #E4EAF0;border-radius:6px;font-size:12px;font-family:inherit">';
+  }
+  const empBody = document.getElementById('ficha-emp-body');
+  const extBody = document.getElementById('ficha-ext-body');
+  if(!empBody) return;
+  const emps = [...D.empleados].sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  empBody.innerHTML = emps.map(e=>{
+    const sec = SECTORES[e.sector]||e.sector||'—';
+    return '<tr>'
+      +'<td style="padding:10px 12px;font-weight:600">'+e.nombre+'</td>'
+      +'<td style="padding:10px 12px;font-size:12px;color:#6B7E8F">'+sec+'</td>'
+      +'<td style="padding:10px 12px">'+inp(e.banco,'updateEmpBanco',e.id,'banco',130)+'</td>'
+      +'<td style="padding:10px 12px">'+inp(e.cuil,'updateEmpBanco',e.id,'cuil',120)+'</td>'
+      +'<td style="padding:10px 12px">'+inp(e.cbu,'updateEmpBanco',e.id,'cbu',160)+'</td>'
+      +'<td style="padding:10px 12px">'+inp(e.alias,'updateEmpBanco',e.id,'alias',130)+'</td>'
+      +'</tr>';
+  }).join('') || '<tr><td colspan="6" class="empty">Sin empleados</td></tr>';
+  if(!extBody) return;
+  const exts = [...D.externos].sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  extBody.innerHTML = exts.map(e=>{
+    const rolLabel = e.rol==='lider'?'Líder':'Equipo';
+    const rolColor = e.rol==='lider'?'#1565C0':'#6B7E8F';
+    return '<tr>'
+      +'<td style="padding:10px 12px;font-weight:600">'+e.nombre+'</td>'
+      +'<td style="padding:10px 12px"><span style="background:'+(e.rol==='lider'?'#E3F0FB':'#F5F7FA')+';color:'+rolColor+';padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700">'+rolLabel+'</span></td>'
+      +'<td style="padding:10px 12px">'+inp(e.banco,'updateExtBanco',e.id,'banco',130)+'</td>'
+      +'<td style="padding:10px 12px">'+inp(e.cuil,'updateExtBanco',e.id,'cuil',120)+'</td>'
+      +'<td style="padding:10px 12px">'+inp(e.cbu,'updateExtBanco',e.id,'cbu',160)+'</td>'
+      +'<td style="padding:10px 12px">'+inp(e.alias,'updateExtBanco',e.id,'alias',130)+'</td>'
+      +'</tr>';
+  }).join('') || '<tr><td colspan="6" class="empty">Sin vendedores externos</td></tr>';
+}
+function updateEmpBanco(id,campo,val){ const e=D.empleados.find(x=>x.id===id); if(e){e[campo]=val;save();} }
+function updateExtBanco(id,campo,val){ const e=D.externos.find(x=>x.id===id); if(e){e[campo]=val;save();} }
 function navPage(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.sitem').forEach(s=>s.classList.remove('on'));
