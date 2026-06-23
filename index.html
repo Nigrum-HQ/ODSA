@@ -1048,6 +1048,30 @@ function showBancoEmp(e,id){
   document.getElementById('bp-cerrar').addEventListener('click',function(){popup.remove();});
   setTimeout(function(){document.addEventListener('click',function h(ev){if(!popup.contains(ev.target)){popup.remove();document.removeEventListener('click',h);}});},100);
 }
+function showBancoExt(e,id){
+  e.stopPropagation();
+  const ext=D.externos.find(x=>x.id===id);
+  if(!ext) return;
+  const existing=document.getElementById('banco-popup');
+  if(existing) existing.remove();
+  const popup=document.createElement('div');
+  popup.id='banco-popup';
+  popup.style.cssText='position:fixed;z-index:9999;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.18);padding:20px 24px;min-width:280px;border:1.5px solid #E4EAF0';
+  const rect=e.target.getBoundingClientRect();
+  popup.style.top=(rect.bottom+8)+'px';
+  popup.style.left=Math.min(rect.left,window.innerWidth-300)+'px';
+  popup.innerHTML='<div style="font-size:13px;font-weight:800;color:#1B3A6B;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #E4EAF0">&#127974; '+ext.nombre+'</div>'
+    +'<div style="display:grid;grid-template-columns:80px 1fr;gap:6px;font-size:13px">'
+    +'<span style="color:#9AAABB;font-weight:600">Banco</span><span style="font-weight:700">'+(ext.banco||'&#8212;')+'</span>'
+    +'<span style="color:#9AAABB;font-weight:600">CUIL</span><span>'+(ext.cuil||'&#8212;')+'</span>'
+    +'<span style="color:#9AAABB;font-weight:600">CBU</span><span style="font-size:11px;word-break:break-all">'+(ext.cbu||'&#8212;')+'</span>'
+    +'<span style="color:#9AAABB;font-weight:600">Alias</span><span>'+(ext.alias||'&#8212;')+'</span>'
+    +'</div>'
+    +'<button id="bp-cerrar" style="margin-top:12px;width:100%;padding:6px;border:none;background:#F5F7FA;border-radius:7px;cursor:pointer;font-weight:600;color:#6B7E8F">Cerrar</button>';
+  document.body.appendChild(popup);
+  document.getElementById('bp-cerrar').addEventListener('click',function(){popup.remove();});
+  setTimeout(function(){document.addEventListener('click',function h(ev){if(!popup.contains(ev.target)){popup.remove();document.removeEventListener('click',h);}});},100);
+}
 function navPage(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.sitem').forEach(s=>s.classList.remove('on'));
@@ -1630,7 +1654,7 @@ function renderExternos(){
       }).join('');
       const totalP = coms.reduce((a,c)=>a+c.total,0);
       return `<tr>
-        <td><strong>${p.nombre}</strong></td>
+        <td><strong>${p.nombre}</strong><div style="margin-top:2px"><button data-eid="${p.id}" onclick="showBancoExt(event,this.dataset.eid)" style="font-size:10px;padding:1px 7px;border-radius:5px;border:1px solid #E4EAF0;background:#F5F7FA;color:#1B3A6B;cursor:pointer;font-weight:600">&#127974; Ver datos</button></div></td>
         <td><span class="badge ${p.rol==='lider'?'badge-blue':'badge-gray'}">${p.rol==='lider'?'líder':'equipo'}</span></td>
         <td style="font-weight:700">${fmt(totalP)}</td>
         ${sems}
