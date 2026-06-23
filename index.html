@@ -2252,6 +2252,20 @@ function updateCFMonto(tipo,id,monto){
   else if(tipo==='sueldo'){const e=D.empleados.find(x=>x.id===id); if(e){e.sueldo=monto;}}
   else if(tipo==='adelanto'){const a=D.adelantos.find(x=>x.id===id); if(a) a.monto=monto;}
   else if(tipo==='comision'){const c=D.comisiones.find(x=>x.id===id); if(c) c.total=monto;}
+  else if(tipo==='comision_lider'){
+    // id = liderId-semana → buscar todas las comisiones del lider y actualizar el total proporcionalmente
+    const lidId = id.split('-')[0];
+    const lider = D.externos.find(x=>x.id===lidId);
+    if(lider){
+      const coms = D.comisiones.filter(c=>c.lider_id===lidId || (lider.nombre && c.lider===lider.nombre));
+      if(coms.length===1){ coms[0].total=monto; }
+      else {
+        // Guardar como ajuste manual en cf_ingresos no aplica — guardamos en el primer registro
+        if(coms.length>0){ const totalActual=coms.reduce((a,c)=>a+c.total,0); const factor=totalActual>0?monto/totalActual:1; coms.forEach(c=>c.total=Math.round(c.total*factor)); }
+      }
+    }
+  }
+  else if(tipo==='premio_sector'){ /* premios se editan desde la sección premios */ }
   save(); renderCashFlow();
   const p=document.querySelector('.page.on');
   if(p&&p.id==='page-empleados') renderEmpleados();
