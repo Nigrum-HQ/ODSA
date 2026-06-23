@@ -1530,7 +1530,7 @@ function renderPremios(){
     const emp = D.empleados.find(e=>e.id===p.emp_id);
     return `<tr>
       <td><span class="badge badge-blue">Sem ${p.sem}</span></td>
-      <td>${emp?emp.nombre:'—'}</td>
+      <td>${emp?emp.nombre+'<div style="margin-top:2px"><button data-eid="'+(emp?emp.id:'')+'" onclick="showBancoEmp(event,this.dataset.eid)" style="font-size:10px;padding:1px 7px;border-radius:5px;border:1px solid #E4EAF0;background:#F5F7FA;color:#1B3A6B;cursor:pointer;font-weight:600">&#127974; Ver datos</button></div>':'—'}</td>
       <td style="color:#6B7E8F">${p.concepto}</td>
       <td style="font-weight:700;color:#C0392B">${fmt(p.monto)}</td>
       <td><button class="del-btn" onclick="delPremio('${p.id}')">🗑</button></td>
