@@ -157,6 +157,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
       <button class="topbar-tab" onclick="navTab('empleados')">Sueldos</button>
       <button class="topbar-tab" onclick="navTab('ventas')">Ventas</button>
       <button class="topbar-tab" onclick="navTab('externos')">Externos</button>
+      <button class="topbar-tab" onclick="navTab('fichabancaria')">&#127974; Fichas</button>
       <button class="topbar-tab" onclick="navTab('gastos')">Gastos</button>
       <button class="topbar-tab" onclick="navTab('ingresos')">Ingresos</button>
       <button class="topbar-tab" onclick="navTab('cheques')">Cheques</button>
@@ -617,10 +618,9 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
       <div id="page-fichabancaria" class="page">
         <div class="page-title">Ficha bancaria</div>
         <div class="page-sub">Datos bancarios del personal y vendedores externos</div>
-
         <div style="background:#fff;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.07);margin-bottom:20px;overflow:hidden">
           <div style="background:#0F1923;padding:14px 20px;display:flex;align-items:center;gap:10px">
-            <span style="font-size:16px">👤</span>
+            <span style="font-size:16px">&#128100;</span>
             <span style="font-size:14px;font-weight:800;color:#fff">Empleados</span>
           </div>
           <div class="tw"><table style="width:100%">
@@ -628,10 +628,9 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
             <tbody id="ficha-emp-body"></tbody>
           </table></div>
         </div>
-
         <div style="background:#fff;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:hidden">
           <div style="background:#0F1923;padding:14px 20px;display:flex;align-items:center;gap:10px">
-            <span style="font-size:16px">👥</span>
+            <span style="font-size:16px">&#128101;</span>
             <span style="font-size:14px;font-weight:800;color:#fff">Vendedores externos</span>
           </div>
           <div class="tw"><table style="width:100%">
@@ -1006,72 +1005,49 @@ async function syncFromCloud(){
 }
 function startSync(){ _syncInterval = setInterval(syncFromCloud, 30000); }
 
-function showBancoEmp(e, id){
-  e.stopPropagation();
-  const emp = D.empleados.find(x=>x.id===id);
-  if(!emp) return;
-  const existing = document.getElementById('banco-popup');
-  if(existing) existing.remove();
-  const popup = document.createElement('div');
-  popup.id = 'banco-popup';
-  popup.style.cssText = 'position:fixed;z-index:9999;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.18);padding:20px 24px;min-width:280px;border:1.5px solid #E4EAF0';
-  const rect = e.target.getBoundingClientRect();
-  popup.style.top = (rect.bottom+8)+'px';
-  popup.style.left = Math.min(rect.left, window.innerWidth-300)+'px';
-  const banco = emp.banco||'—';
-  const cuil = emp.cuil||'—';
-  const cbu = emp.cbu||'—';
-  const alias = emp.alias||'—';
-  popup.innerHTML = '<div style="font-size:13px;font-weight:800;color:#1B3A6B;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #E4EAF0">&#127974; '+emp.nombre+'</div>'
-    +'<div style="display:grid;grid-template-columns:80px 1fr;gap:6px;font-size:13px">'
-    +'<span style="color:#9AAABB;font-weight:600">Banco</span><span style="font-weight:700">'+banco+'</span>'
-    +'<span style="color:#9AAABB;font-weight:600">CUIL</span><span>'+cuil+'</span>'
-    +'<span style="color:#9AAABB;font-weight:600">CBU</span><span style="font-size:11px;word-break:break-all">'+cbu+'</span>'
-    +'<span style="color:#9AAABB;font-weight:600">Alias</span><span>'+alias+'</span>'
-    +'</div>'
-    +'<button id="banco-popup-cerrar" style="margin-top:12px;width:100%;padding:6px;border:none;background:#F5F7FA;border-radius:7px;cursor:pointer;font-weight:600;color:#6B7E8F">Cerrar</button>';
-  document.body.appendChild(popup);
-  document.getElementById('banco-popup-cerrar').addEventListener('click', function(){ popup.remove(); });
-  setTimeout(function(){ document.addEventListener('click', function h(ev){ if(!popup.contains(ev.target)){ popup.remove(); document.removeEventListener('click',h); } }); }, 100);
-}
-
 function renderFichaBancaria(){
-  const SECTORES = {operadoras:'Operadoras',turnos:'Turnos',administracion:'Administración',sistemas:'Sistemas',limpieza:'Limpieza',kinebs:'Kinebs',fichas:'Fichas',publicidad:'Publicidad',simple_speed:'Simple Speed',otro:'Otro'};
-  function inp(val, fn, id, campo, w){
-    return '<input value="'+(val||'')+'" placeholder="—" onchange="'+fn+'(''+id+'',''+campo+'',this.value)" style="width:'+w+'px;padding:4px 8px;border:1.5px solid #E4EAF0;border-radius:6px;font-size:12px;font-family:inherit">';
-  }
-  const empBody = document.getElementById('ficha-emp-body');
-  const extBody = document.getElementById('ficha-ext-body');
-  if(!empBody) return;
-  const emps = [...D.empleados].sort((a,b)=>a.nombre.localeCompare(b.nombre));
-  empBody.innerHTML = emps.map(e=>{
-    const sec = SECTORES[e.sector]||e.sector||'—';
-    return '<tr>'
-      +'<td style="padding:10px 12px;font-weight:600">'+e.nombre+'</td>'
-      +'<td style="padding:10px 12px;font-size:12px;color:#6B7E8F">'+sec+'</td>'
-      +'<td style="padding:10px 12px">'+inp(e.banco,'updateEmpBanco',e.id,'banco',130)+'</td>'
-      +'<td style="padding:10px 12px">'+inp(e.cuil,'updateEmpBanco',e.id,'cuil',120)+'</td>'
-      +'<td style="padding:10px 12px">'+inp(e.cbu,'updateEmpBanco',e.id,'cbu',160)+'</td>'
-      +'<td style="padding:10px 12px">'+inp(e.alias,'updateEmpBanco',e.id,'alias',130)+'</td>'
-      +'</tr>';
-  }).join('') || '<tr><td colspan="6" class="empty">Sin empleados</td></tr>';
-  if(!extBody) return;
-  const exts = [...D.externos].sort((a,b)=>a.nombre.localeCompare(b.nombre));
-  extBody.innerHTML = exts.map(e=>{
-    const rolLabel = e.rol==='lider'?'Líder':'Equipo';
-    const rolColor = e.rol==='lider'?'#1565C0':'#6B7E8F';
-    return '<tr>'
-      +'<td style="padding:10px 12px;font-weight:600">'+e.nombre+'</td>'
-      +'<td style="padding:10px 12px"><span style="background:'+(e.rol==='lider'?'#E3F0FB':'#F5F7FA')+';color:'+rolColor+';padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700">'+rolLabel+'</span></td>'
-      +'<td style="padding:10px 12px">'+inp(e.banco,'updateExtBanco',e.id,'banco',130)+'</td>'
-      +'<td style="padding:10px 12px">'+inp(e.cuil,'updateExtBanco',e.id,'cuil',120)+'</td>'
-      +'<td style="padding:10px 12px">'+inp(e.cbu,'updateExtBanco',e.id,'cbu',160)+'</td>'
-      +'<td style="padding:10px 12px">'+inp(e.alias,'updateExtBanco',e.id,'alias',130)+'</td>'
-      +'</tr>';
-  }).join('') || '<tr><td colspan="6" class="empty">Sin vendedores externos</td></tr>';
+  const SECTORES={operadoras:'Operadoras',turnos:'Turnos',administracion:'Administracion',sistemas:'Sistemas',limpieza:'Limpieza',kinebs:'Kinebs',fichas:'Fichas',publicidad:'Publicidad',otro:'Otro'};
+  const empBody=document.getElementById('ficha-emp-body');
+  const extBody=document.getElementById('ficha-ext-body');
+  if(!empBody||!extBody) return;
+  function inp(val,fn,eid,campo,w){ return '<input value="'+(val||'')+'" placeholder="' + String.fromCharCode(8212)+'" onchange="'+fn+'(this.dataset.id,this.dataset.campo,this.value)" data-id="'+eid+'" data-campo="'+campo+'" style="width:'+w+'px;padding:4px 8px;border:1.5px solid #E4EAF0;border-radius:6px;font-size:12px;font-family:inherit">'; }
+  const emps=[...D.empleados].sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  empBody.innerHTML=emps.map(e=>{
+    const sec=SECTORES[e.sector]||e.sector||'';
+    return '<tr><td style="padding:10px 12px;font-weight:600">'+e.nombre+'</td><td style="padding:10px 12px;font-size:12px;color:#6B7E8F">'+sec+'</td><td style="padding:10px 12px">'+inp(e.banco,'updateEmpBanco',e.id,'banco',130)+'</td><td style="padding:10px 12px">'+inp(e.cuil,'updateEmpBanco',e.id,'cuil',120)+'</td><td style="padding:10px 12px">'+inp(e.cbu,'updateEmpBanco',e.id,'cbu',160)+'</td><td style="padding:10px 12px">'+inp(e.alias,'updateEmpBanco',e.id,'alias',130)+'</td></tr>';
+  }).join('')||'<tr><td colspan="6" class="empty">Sin empleados</td></tr>';
+  const exts=[...D.externos].sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  extBody.innerHTML=exts.map(e=>{
+    const rc=e.rol==='lider'?'#1565C0':'#6B7E8F';const rb=e.rol==='lider'?'#E3F0FB':'#F5F7FA';
+    return '<tr><td style="padding:10px 12px;font-weight:600">'+e.nombre+'</td><td style="padding:10px 12px"><span style="background:'+rb+';color:'+rc+';padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700">'+(e.rol==='lider'?'Lider':'Equipo')+'</span></td><td style="padding:10px 12px">'+inp(e.banco,'updateExtBanco',e.id,'banco',130)+'</td><td style="padding:10px 12px">'+inp(e.cuil,'updateExtBanco',e.id,'cuil',120)+'</td><td style="padding:10px 12px">'+inp(e.cbu,'updateExtBanco',e.id,'cbu',160)+'</td><td style="padding:10px 12px">'+inp(e.alias,'updateExtBanco',e.id,'alias',130)+'</td></tr>';
+  }).join('')||'<tr><td colspan="6" class="empty">Sin vendedores externos</td></tr>';
 }
-function updateEmpBanco(id,campo,val){ const e=D.empleados.find(x=>x.id===id); if(e){e[campo]=val;save();} }
-function updateExtBanco(id,campo,val){ const e=D.externos.find(x=>x.id===id); if(e){e[campo]=val;save();} }
+function updateEmpBanco(id,campo,val){const e=D.empleados.find(x=>x.id===id);if(e){e[campo]=val;save();}}
+function updateExtBanco(id,campo,val){const e=D.externos.find(x=>x.id===id);if(e){e[campo]=val;save();}}
+function showBancoEmp(e,id){
+  e.stopPropagation();
+  const emp=D.empleados.find(x=>x.id===id);
+  if(!emp) return;
+  const existing=document.getElementById('banco-popup');
+  if(existing) existing.remove();
+  const popup=document.createElement('div');
+  popup.id='banco-popup';
+  popup.style.cssText='position:fixed;z-index:9999;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.18);padding:20px 24px;min-width:280px;border:1.5px solid #E4EAF0';
+  const rect=e.target.getBoundingClientRect();
+  popup.style.top=(rect.bottom+8)+'px';
+  popup.style.left=Math.min(rect.left,window.innerWidth-300)+'px';
+  popup.innerHTML='<div style="font-size:13px;font-weight:800;color:#1B3A6B;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #E4EAF0">&#127974; '+emp.nombre+'</div>'
+    +'<div style="display:grid;grid-template-columns:80px 1fr;gap:6px;font-size:13px">'
+    +'<span style="color:#9AAABB;font-weight:600">Banco</span><span style="font-weight:700">'+(emp.banco||'&#8212;')+'</span>'
+    +'<span style="color:#9AAABB;font-weight:600">CUIL</span><span>'+(emp.cuil||'&#8212;')+'</span>'
+    +'<span style="color:#9AAABB;font-weight:600">CBU</span><span style="font-size:11px;word-break:break-all">'+(emp.cbu||'&#8212;')+'</span>'
+    +'<span style="color:#9AAABB;font-weight:600">Alias</span><span>'+(emp.alias||'&#8212;')+'</span>'
+    +'</div>'
+    +'<button id="bp-cerrar" style="margin-top:12px;width:100%;padding:6px;border:none;background:#F5F7FA;border-radius:7px;cursor:pointer;font-weight:600;color:#6B7E8F">Cerrar</button>';
+  document.body.appendChild(popup);
+  document.getElementById('bp-cerrar').addEventListener('click',function(){popup.remove();});
+  setTimeout(function(){document.addEventListener('click',function h(ev){if(!popup.contains(ev.target)){popup.remove();document.removeEventListener('click',h);}});},100);
+}
 function navPage(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.sitem').forEach(s=>s.classList.remove('on'));
@@ -1083,17 +1059,11 @@ function navPage(name){
   if(name==='adelantos'){ fillAdEmp(); renderAdelantos(); }
   if(name==='ventas'){ fillPremEmp(); renderPremios(); }
   if(name==='externos'){ fillExtSelects(); renderExternos(); }
+  if(name==='fichabancaria'){ const tryR=(n)=>{ if(D.empleados.length>0||n>=20){renderFichaBancaria();}else{setTimeout(()=>tryR(n+1),300);} }; tryR(0); }
   if(name==='gastos') renderGastos();
   if(name==='ingresos') renderIngresos();
   if(name==='cheques') renderCheques();
   if(name==='cashflow'){ initCFMes(); renderCashFlow(); }
-  if(name==='fichabancaria'){
-    const tryRender = (attempts) => {
-      if(D.empleados.length > 0 || attempts >= 20){ renderFichaBancaria(); }
-      else { setTimeout(()=>tryRender(attempts+1), 300); }
-    };
-    tryRender(0);
-  }
 }
 function navTab(name){ navPage(name); }
 function tabEmp(tab, btn){
@@ -1339,7 +1309,7 @@ function renderEmpleados(){
         const ac = Math.max(0, e.sueldo+hx-adv);
         const sp = e.semPago||1;
         return '<tr>'
-          +'<td><strong>'+e.nombre+'</strong>'+(e.nota?'<div style="font-size:11px;color:#8A9BAB">'+e.nota+'</div>':'')+'<div style="margin-top:3px"><button data-empid="'+e.id+'" onclick="showBancoEmp(event,this.dataset.empid)" style="font-size:10px;padding:2px 8px;border-radius:5px;border:1px solid #E4EAF0;background:#F5F7FA;color:#1B3A6B;cursor:pointer;font-weight:600">&#127974; Ver datos</button></div>'+'</td>'
+          +'<td><strong>'+e.nombre+'</strong>'+(e.nota?'<div style="font-size:11px;color:#8A9BAB">'+e.nota+'</div>':'')+'<div style="margin-top:3px"><button data-eid="'+e.id+'" onclick="showBancoEmp(event,this.dataset.eid)" style="font-size:10px;padding:2px 8px;border-radius:5px;border:1px solid #E4EAF0;background:#F5F7FA;color:#1B3A6B;cursor:pointer;font-weight:600">&#127974; Ver datos</button></div>'+'</td>'
           +'<td><input type="number" value="'+(e.sueldo||'')+'" placeholder="0" style="width:130px;padding:5px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;font-family:inherit;font-weight:600;color:#C0392B" onblur="updateSueldo(this.dataset.id,this.value)" data-id="'+e.id+'" step="1" min="0"></td>'
           +'<td><input type="number" value="'+(hx)+'" placeholder="0" style="width:110px;padding:5px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;font-family:inherit" onblur="updateHsExtra(this.dataset.id,this.value)" data-id="'+e.id+'"></td>'
           +'<td style="color:#B8943E;font-weight:600">'+(adv>0?fmt(adv):'—')+'</td>'
@@ -2207,29 +2177,15 @@ function updateCFMonto(tipo,id,monto){
   else if(tipo==='adelanto'){const a=D.adelantos.find(x=>x.id===id); if(a) a.monto=monto;}
   else if(tipo==='comision'){const c=D.comisiones.find(x=>x.id===id); if(c) c.total=monto;}
   else if(tipo==='comision_lider'){
-    // id = "liderId-semana" → distribuir el nuevo monto proporcionalmente entre las comisiones del equipo
     const dashIdx=id.lastIndexOf('-');
     const liderId=id.substring(0,dashIdx);
     const sem=parseInt(id.substring(dashIdx+1))||1;
-    const lid=D.externos.find(e=>e.id===liderId);
-    if(lid){
-      const equipoIds=[liderId,...D.externos.filter(e=>e.lider_id===liderId).map(e=>e.id)];
-      const grupo=D.comisiones.filter(c=>equipoIds.includes(c.quien_id)&&(c.semPago||c.sem||1)===sem);
-      const totalActual=grupo.reduce((a,c)=>a+(c.total||0),0);
-      if(grupo.length>0){
-        if(totalActual>0){
-          // Distribuir proporcionalmente
-          grupo.forEach(c=>{ c.total=Math.round((c.total/totalActual)*monto); });
-          // Ajuste de redondeo en el primero
-          const diff=monto-grupo.reduce((a,c)=>a+(c.total||0),0);
-          if(diff!==0) grupo[0].total=(grupo[0].total||0)+diff;
-        } else {
-          // Si todas eran 0, repartir en partes iguales
-          const part=Math.floor(monto/grupo.length);
-          grupo.forEach(c=>c.total=part);
-          grupo[0].total+=monto-(part*grupo.length);
-        }
-      }
+    const equipoIds=[liderId,...D.externos.filter(e=>e.lider_id===liderId).map(e=>e.id)];
+    const grupo=D.comisiones.filter(c=>equipoIds.includes(c.quien_id)&&(c.semPago||c.sem||1)===sem);
+    const totalActual=grupo.reduce((a,c)=>a+(c.total||0),0);
+    if(grupo.length>0){
+      if(totalActual>0){ grupo.forEach(c=>{ c.total=Math.round((c.total/totalActual)*monto); }); const diff=monto-grupo.reduce((a,c)=>a+(c.total||0),0); if(diff!==0) grupo[0].total=(grupo[0].total||0)+diff; }
+      else { const part=Math.floor(monto/grupo.length); grupo.forEach(c=>c.total=part); grupo[0].total+=monto-(part*grupo.length); }
     }
   }
   save(); renderCashFlow();
