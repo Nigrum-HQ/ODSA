@@ -1021,7 +1021,7 @@ function navPage(name){
   if(name==='ingresos') renderIngresos();
   if(name==='cheques') renderCheques();
   if(name==='cashflow'){ initCFMes(); renderCashFlow(); }
-  if(name==='fichabancaria') renderFichaBancaria();
+  if(name==='fichabancaria'){ if(D.empleados.length>0){ renderFichaBancaria(); } else { setTimeout(renderFichaBancaria, 800); } }
 }
 function navTab(name){ navPage(name); }
 function tabEmp(tab, btn){
