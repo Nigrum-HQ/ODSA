@@ -1006,6 +1006,33 @@ async function syncFromCloud(){
 }
 function startSync(){ _syncInterval = setInterval(syncFromCloud, 30000); }
 
+function showBancoEmp(e, id){
+  e.stopPropagation();
+  const emp = D.empleados.find(x=>x.id===id);
+  if(!emp) return;
+  const banco = emp.banco||'—';
+  const cuil = emp.cuil||'—';
+  const cbu = emp.cbu||'—';
+  const alias = emp.alias||'—';
+  const existing = document.getElementById('banco-popup');
+  if(existing) existing.remove();
+  const popup = document.createElement('div');
+  popup.id = 'banco-popup';
+  popup.style.cssText = 'position:fixed;z-index:9999;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.18);padding:20px 24px;min-width:280px;border:1.5px solid #E4EAF0';
+  const rect = e.target.getBoundingClientRect();
+  popup.style.top = (rect.bottom+8)+'px';
+  popup.style.left = Math.min(rect.left, window.innerWidth-300)+'px';
+  popup.innerHTML = '<div style="font-size:13px;font-weight:800;color:#1B3A6B;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #E4EAF0">🏦 '+emp.nombre+'</div>'
+    +'<div style="display:grid;grid-template-columns:80px 1fr;gap:6px;font-size:13px">'
+    +'<span style="color:#9AAABB;font-weight:600">Banco</span><span style="font-weight:700">'+banco+'</span>'
+    +'<span style="color:#9AAABB;font-weight:600">CUIL</span><span>'+cuil+'</span>'
+    +'<span style="color:#9AAABB;font-weight:600">CBU</span><span style="font-size:11px;word-break:break-all">'+cbu+'</span>'
+    +'<span style="color:#9AAABB;font-weight:600">Alias</span><span>'+alias+'</span>'
+    +'</div>'
+    +'<button onclick="document.getElementById('banco-popup').remove()" style="margin-top:12px;width:100%;padding:6px;border:none;background:#F5F7FA;border-radius:7px;cursor:pointer;font-weight:600;color:#6B7E8F">Cerrar</button>';
+  document.body.appendChild(popup);
+  setTimeout(()=>document.addEventListener('click', function h(ev){ if(!popup.contains(ev.target)){popup.remove();document.removeEventListener('click',h);} }), 100);
+}
 function navPage(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.sitem').forEach(s=>s.classList.remove('on'));
@@ -1267,7 +1294,7 @@ function renderEmpleados(){
         const ac = Math.max(0, e.sueldo+hx-adv);
         const sp = e.semPago||1;
         return '<tr>'
-          +'<td><strong>'+e.nombre+'</strong>'+(e.nota?'<div style="font-size:11px;color:#8A9BAB">'+e.nota+'</div>':'')+(e.banco||e.cbu||e.alias?'<div style="font-size:11px;color:#8A9BAB">'+(e.banco?e.banco+' ':'')+( e.cbu?'· '+e.cbu+' ':'')+( e.alias?'· '+e.alias:'')+'</div>':'')+'</td>'
+          +'<td><strong>'+e.nombre+'</strong>'+(e.nota?'<div style="font-size:11px;color:#8A9BAB">'+e.nota+'</div>':'')+'<div style="margin-top:3px"><button onclick="showBancoEmp(event,\''+e.id+'\'" style="font-size:10px;padding:2px 8px;border-radius:5px;border:1px solid #E4EAF0;background:#F5F7FA;color:#1B3A6B;cursor:pointer;font-weight:600">🏦 Ver datos</button></div>'+'</td>'
           +'<td><input type="number" value="'+(e.sueldo||'')+'" placeholder="0" style="width:130px;padding:5px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;font-family:inherit;font-weight:600;color:#C0392B" onblur="updateSueldo(this.dataset.id,this.value)" data-id="'+e.id+'" step="1" min="0"></td>'
           +'<td><input type="number" value="'+(hx)+'" placeholder="0" style="width:110px;padding:5px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;font-family:inherit" onblur="updateHsExtra(this.dataset.id,this.value)" data-id="'+e.id+'"></td>'
           +'<td style="color:#B8943E;font-weight:600">'+(adv>0?fmt(adv):'—')+'</td>'
