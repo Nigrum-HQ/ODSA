@@ -2078,7 +2078,7 @@ function getCFData(mes_sel){
   const lideres = D.externos.filter(e=>e.rol==='lider');
   lideres.forEach(lid=>{
     // IDs del líder + su equipo
-    const equipoIds = [lid.id, ...D.externos.filter(e=>e.rol==='equipo'&&e.lider_id===lid.id).map(e=>e.id)];
+    const equipoIds = [lid.id, ...D.externos.filter(e=>e.lider_id===lid.id).map(e=>e.id)];
     const comsLider = comMes.filter(c=>equipoIds.includes(c.quien_id));
     if(!comsLider.length) return;
     // Agrupar por semana de pago
