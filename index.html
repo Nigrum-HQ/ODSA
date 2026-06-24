@@ -2085,7 +2085,7 @@ function getCFData(mes_sel){
     // Agrupar por semana de pago
     const semMap = {};
     comsLider.forEach(c=>{
-      const s = c.sem||c.semPago||1;
+      const s = c.semPago||c.sem||1;
       if(!semMap[s]) semMap[s] = [];
       semMap[s].push(c);
     });
@@ -2104,6 +2104,7 @@ function getCFData(mes_sel){
       let subcat = cant+' comisión'+(cant!==1?'es':'')+' · equipo '+lid.nombre;
       if(totalEfec>0 && totalTransf>0) subcat += ' · 💵 Ef: '+fmt(totalEfec)+' / 🏦 Transf: '+fmt(totalTransf);
       else if(totalEfec>0) subcat += ' · 💵 Todo en efectivo';
+      if(!eg_sem[s]) eg_sem[s] = {items:[]};
       eg_sem[s].items.push({
         concepto: 'Comisiones — '+lid.nombre,
         cat: subcat,
