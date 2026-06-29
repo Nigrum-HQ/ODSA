@@ -1673,7 +1673,7 @@ function renderExternos(){
     },0);
     const rows = miembros.map(p=>{
       const coms = D.comisiones.filter(c=>c.quien_id===p.id&&c.mes===m);
-      const sems = [1,2,3,4].map(s=>{
+      const sems = [1,2,3,4,5].map(s=>{
         const c = coms.find(x=>(x.sem||x.semPago)===s);
         return c?`<td style="font-size:12px;cursor:pointer" title="Click para editar" onclick="editComision('${c.id}')">
           <span style="text-decoration:underline dotted;color:#1B3A6B">${fmt(c.total)}</span>
@@ -1701,7 +1701,7 @@ function renderExternos(){
       ${(()=>{
         if(_ec) return '';
         // Totales por semana
-        const semTotals = [1,2,3,4].map(s=>{
+        const semTotals = [1,2,3,4,5].map(s=>{
           return miembros.reduce((a,p)=>{
             const c = D.comisiones.find(x=>x.quien_id===p.id&&x.mes===m&&(x.sem||x.semPago)===s);
             return a+(c?c.total:0);
@@ -1712,7 +1712,7 @@ function renderExternos(){
           +'<td style="font-weight:800;color:#C0392B">'+fmt(totalLid)+'</td>'
           +semTotals.map(t=>'<td style="font-weight:800;color:#1B3A6B">'+(t>0?fmt(t):'—')+'</td>').join('')
           +'<td></td></tr>';
-        return '<div class="tw" style="padding:0 4px"><table><thead><tr><th>Persona</th><th>Rol</th><th>Total mes</th><th>Sem 1</th><th>Sem 2</th><th>Sem 3</th><th>Sem 4</th><th></th></tr></thead><tbody>'+rows+totalRow+'</tbody></table></div>';
+        return '<div class="tw" style="padding:0 4px"><table><thead><tr><th>Persona</th><th>Rol</th><th>Total mes</th><th>Sem 1</th><th>Sem 2</th><th>Sem 3</th><th>Sem 4</th><th>Sem 5</th><th></th></tr></thead><tbody>'+rows+totalRow+'</tbody></table></div>';
       })()}
     </div>`;
   }).join('');
