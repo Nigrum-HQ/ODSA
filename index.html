@@ -365,6 +365,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
               <div class="fg"><label>Semana</label><select id="prem-sem">
                 <option value="1">Semana 1</option><option value="2">Semana 2</option>
                 <option value="3">Semana 3</option><option value="4">Semana 4</option>
+                <option value="5">Semana 5</option>
               </select></div>
             </div>
             <div class="frow frow-2">
@@ -1652,7 +1653,7 @@ function renderPremios(){
   const m = mesSel;
   const lista = D.premios.filter(p=>p.mes===m);
   // Resumen por semana
-  const semanas = [1,2,3,4];
+  const semanas = [1,2,3,4,5];
   g('prem-resumen').innerHTML = semanas.map(s=>{
     const total = lista.filter(p=>p.sem===s).reduce((a,p)=>a+p.monto,0);
     return `<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #F0F4F8">
@@ -2558,7 +2559,7 @@ function renderCashFlow(){
     </div>
     <div class="kpi-card" style="border-left:4px solid #1B3A6B">
       <div class="kpi-label">Mayor egreso sem.</div>
-      <div class="kpi-val blue">${fmt(Math.max(...[1,2,3,4].map(s=>eg_sem[s].items.reduce((a,i)=>a+i.monto,0))))}</div>
+      <div class="kpi-val blue">${fmt(Math.max(...[1,2,3,4,5].map(s=>eg_sem[s].items.reduce((a,i)=>a+i.monto,0))))}</div>
     </div>
   `;
 
