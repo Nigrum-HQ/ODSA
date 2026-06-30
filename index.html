@@ -259,7 +259,10 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
 
       <!-- EMPLEADOS -->
       <div id="page-empleados" class="page">
-        <div class="page-title">Empleados</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div class="page-title" style="margin-bottom:0">Empleados</div>
+          <div id="emp-periodo-wrap"></div>
+        </div>
         <div class="page-sub">Nómina mensual — sueldos fijos</div>
         <div class="tabs">
           <button class="tab on" onclick="tabEmp('nomina',this)">Nómina</button>
@@ -349,7 +352,10 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
 
       <!-- VENTAS / PREMIOS -->
       <div id="page-ventas" class="page">
-        <div class="page-title">Premios semanales de ventas</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div class="page-title" style="margin-bottom:0">Premios semanales de ventas</div>
+          <div id="prem-periodo-wrap"></div>
+        </div>
         <div class="page-sub">Operadoras y personal de ventas — premios por metas alcanzadas</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
           <div class="card">
@@ -453,7 +459,10 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
 
       <!-- GASTOS -->
       <div id="page-gastos" class="page">
-        <div class="page-title">Gastos</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div class="page-title" style="margin-bottom:0">Gastos</div>
+          <div id="gas-periodo-wrap"></div>
+        </div>
         <div class="page-sub">Gastos operativos del mes</div>
         <div class="tabs">
           <button class="tab on" onclick="tabGastos('reales',this)">Gastos del mes</button>
@@ -813,6 +822,46 @@ const EXT_INIT = [
 // ═══════════════════════════════
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
 const mes = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); };
+
+// ═══════════════════════════════
+// SELECTOR DE PERÍODO (mes a mes) — Sueldos, Gastos, Premios
+// ═══════════════════════════════
+let mesSel = mes();
+function mesLabel(m){
+  const d = new Date(m+'-01T00:00:00');
+  return MES[d.getMonth()]+' '+d.getFullYear();
+}
+function shiftMes(m, delta){
+  const d = new Date(m+'-01T00:00:00');
+  d.setMonth(d.getMonth()+delta);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+function periodoSelectorHTML(prefix){
+  return `<div style="display:flex;align-items:center;gap:4px;background:#fff;border:1.5px solid #D8E2EC;border-radius:8px;padding:3px 4px">
+    <button onclick="cambiarMesSel(-1)" style="border:none;background:#F0F4F8;color:#1B3A6B;width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700">‹</button>
+    <span id="${prefix}-periodo-label" style="font-size:13px;font-weight:700;color:#1B3A6B;min-width:130px;text-align:center">${mesLabel(mesSel)}</span>
+    <button onclick="cambiarMesSel(1)" style="border:none;background:#F0F4F8;color:#1B3A6B;width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700">›</button>
+    ${m_actual_btn()}
+  </div>`;
+}
+function m_actual_btn(){
+  return mesSel===mes() ? '' : `<button onclick="irAMesActual()" style="border:none;background:#E8F0FE;color:#1B3A6B;font-size:11px;font-weight:700;border-radius:6px;padding:0 8px;cursor:pointer;margin-left:2px">Hoy</button>`;
+}
+function actualizarLabelsMes(){
+  const empWrap = g('emp-periodo-wrap'); if(empWrap) empWrap.innerHTML = periodoSelectorHTML('emp');
+  const gasWrap = g('gas-periodo-wrap'); if(gasWrap) gasWrap.innerHTML = periodoSelectorHTML('gas');
+  const premWrap = g('prem-periodo-wrap'); if(premWrap) premWrap.innerHTML = periodoSelectorHTML('prem');
+}
+function cambiarMesSel(delta){
+  mesSel = shiftMes(mesSel, delta);
+  actualizarLabelsMes();
+  renderEmpleados(); renderGastos(); renderPremios();
+}
+function irAMesActual(){
+  mesSel = mes();
+  actualizarLabelsMes();
+  renderEmpleados(); renderGastos(); renderPremios();
+}
 const fmt = n => n==null?'—':'$'+Math.round(n).toLocaleString('es-AR');
 const fd  = d => { if(!d)return'—'; const p=d.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; };
 const hoy = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
@@ -1299,13 +1348,39 @@ function renderChart(r){
 // ═══════════════════════════════
 if(!window._secCollapsed) window._secCollapsed={};
 function toggleSector(k){ window._secCollapsed[k]=!window._secCollapsed[k]; renderEmpleados(); }
+// Historiza sueldo/hs.extra/pagado/sem.pago por mes para cada empleado.
+// El mes actual sigue usando los campos en vivo del empleado (sin cambios de comportamiento).
+// Meses distintos al actual se guardan/leen de D.nomina.
+function getNominaEmp(emp, m){
+  if(m===mes()){
+    return {sueldo:emp.sueldo||0, hsExtra:emp.hsExtra||0, pagado:!!emp.pagado, semPago:emp.semPago||1};
+  }
+  if(!D.nomina) D.nomina=[];
+  const rec = D.nomina.find(n=>n.emp_id===emp.id&&n.mes===m);
+  if(rec) return {sueldo:rec.sueldo||0, hsExtra:rec.hsExtra||0, pagado:!!rec.pagado, semPago:rec.semPago||1};
+  // Sin historial guardado para ese mes: usamos el sueldo base como referencia (sin pagar)
+  return {sueldo:emp.sueldo||0, hsExtra:0, pagado:false, semPago:emp.semPago||1};
+}
+function setNominaEmp(empId, m, campo, valor){
+  const emp = D.empleados.find(e=>e.id===empId);
+  if(!emp) return;
+  if(m===mes()){
+    emp[campo]=valor;
+    return;
+  }
+  if(!D.nomina) D.nomina=[];
+  let rec = D.nomina.find(n=>n.emp_id===empId&&n.mes===m);
+  if(!rec){
+    rec = {id:uid(), emp_id:empId, mes:m, sueldo:emp.sueldo||0, hsExtra:0, pagado:false, semPago:emp.semPago||1};
+    D.nomina.push(rec);
+  }
+  rec[campo]=valor;
+}
 function renderEmpleados(){
-  const m = mes();
-  const d = new Date();
-  g('emp-mes-label') && (g('emp-mes-label').textContent = MES[d.getMonth()]+' '+d.getFullYear());
-
-  const totalSueldos = D.empleados.reduce((s,e)=>s+e.sueldo,0);
-  const pagados = D.empleados.filter(e=>e.pagado).length;
+  const _wrap = g('emp-periodo-wrap'); if(_wrap && !_wrap.innerHTML) _wrap.innerHTML = periodoSelectorHTML('emp');
+  const m = mesSel;
+  const totalSueldos = D.empleados.reduce((s,e)=>s+getNominaEmp(e,m).sueldo,0);
+  const pagados = D.empleados.filter(e=>getNominaEmp(e,m).pagado).length;
   const totalAdelantos = D.adelantos.filter(a=>a.mes===m).reduce((s,a)=>s+a.monto,0);
 
   g('emp-kpis').innerHTML = `
@@ -1344,7 +1419,7 @@ function renderEmpleados(){
     const emps = D.empleados.filter(e=>e.sector===key);
     if(!emps.length) return;
 
-    const totalSec = emps.reduce((s,e)=>s+(e.sueldo+(e.hsExtra||0)),0);
+    const totalSec = emps.reduce((s,e)=>{ const n=getNominaEmp(e,m); return s+(n.sueldo+(n.hsExtra||0)); },0);
     const adelantosSec = emps.reduce((s,e)=>{
       return s + D.adelantos.filter(a=>a.emp_id===e.id&&a.mes===m).reduce((sa,a)=>sa+a.monto,0);
     },0);
@@ -1356,12 +1431,13 @@ function renderEmpleados(){
     const _secTable = _sc ? '' : (()=>{
       const rows = emps.map(e=>{
         const adv = D.adelantos.filter(a=>a.emp_id===e.id&&a.mes===m).reduce((s,a)=>s+a.monto,0);
-        const hx = e.hsExtra||0;
-        const ac = Math.max(0, e.sueldo+hx-adv);
-        const sp = e.semPago||1;
+        const n = getNominaEmp(e,m);
+        const hx = n.hsExtra||0;
+        const ac = Math.max(0, n.sueldo+hx-adv);
+        const sp = n.semPago||1;
         return '<tr>'
           +'<td><strong>'+e.nombre+'</strong>'+(e.nota?'<div style="font-size:11px;color:#8A9BAB">'+e.nota+'</div>':'')+'<div style="margin-top:3px"><button data-eid="'+e.id+'" onclick="showBancoEmp(event,this.dataset.eid)" style="font-size:10px;padding:2px 8px;border-radius:5px;border:1px solid #E4EAF0;background:#F5F7FA;color:#1B3A6B;cursor:pointer;font-weight:600">&#127974; Ver datos</button></div>'+'</td>'
-          +'<td><input type="number" value="'+(e.sueldo||'')+'" placeholder="0" style="width:130px;padding:5px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;font-family:inherit;font-weight:600;color:#C0392B" onblur="updateSueldo(this.dataset.id,this.value)" data-id="'+e.id+'" step="1" min="0"></td>'
+          +'<td><input type="number" value="'+(n.sueldo||'')+'" placeholder="0" style="width:130px;padding:5px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;font-family:inherit;font-weight:600;color:#C0392B" onblur="updateSueldo(this.dataset.id,this.value)" data-id="'+e.id+'" step="1" min="0"></td>'
           +'<td><input type="number" value="'+(hx)+'" placeholder="0" style="width:110px;padding:5px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;font-family:inherit" onblur="updateHsExtra(this.dataset.id,this.value)" data-id="'+e.id+'"></td>'
           +'<td style="color:#B8943E;font-weight:600">'+(adv>0?fmt(adv):'—')+'</td>'
           +'<td style="font-weight:700;color:#1A7A52;font-size:14px">'+fmt(ac)+'</td>'
@@ -1371,7 +1447,7 @@ function renderEmpleados(){
 
 
 
-          +'<td><span class="badge '+(e.pagado?'badge-green':'badge-gold')+'" style="cursor:pointer" onclick="togglePagado(this.dataset.id)" data-id="'+e.id+'">'+(e.pagado?'✓ Pagado':'Pendiente')+'</span></td>'
+          +'<td><span class="badge '+(n.pagado?'badge-green':'badge-gold')+'" style="cursor:pointer" onclick="togglePagado(this.dataset.id)" data-id="'+e.id+'">'+(n.pagado?'✓ Pagado':'Pendiente')+'</span></td>'
           +'<td><button class="del-btn" onclick="delEmpleado(\''+e.id+'\')">🗑</button></td>'
           +'</tr>';
       }).join('');
@@ -1442,7 +1518,7 @@ function updateSueldo(id, val){
   if(e){
     // limpiar puntos de miles y convertir coma a punto
     const clean = String(val).replace(/\./g,'').replace(',','.');
-    e.sueldo = parseFloat(clean)||0;
+    setNominaEmp(id, mesSel, 'sueldo', parseFloat(clean)||0);
     save();
     renderEmpleados();
     renderResumen();
@@ -1450,8 +1526,8 @@ function updateSueldo(id, val){
   }
 }
 function togglePagado(id){
-  const e = D.empleados.find(x=>x.id===id);
-  if(e){ e.pagado=!e.pagado; save(); renderEmpleados(); toast(e.pagado?'✓ Marcado como pagado':'Marcado como pendiente'); }
+  const n = D.empleados.find(x=>x.id===id) ? getNominaEmp(D.empleados.find(x=>x.id===id), mesSel) : null;
+  if(n){ setNominaEmp(id, mesSel, 'pagado', !n.pagado); save(); renderEmpleados(); toast(!n.pagado?'✓ Marcado como pagado':'Marcado como pendiente'); }
 }
 function delEmpleado(id){
   if(!confirm('¿Eliminar empleado?')) return;
@@ -1559,12 +1635,13 @@ function addPremio(){
   const sem = parseInt(gv('prem-sem'));
   if(!emp_id||!monto){ alert('Completá los campos'); return; }
   const premSemPago = gv('prem-sem-pago') ? parseInt(gv('prem-sem-pago')) : sem;
-  D.premios.push({id:uid(),emp_id,monto,sem,semPago:premSemPago,concepto:gv('prem-concepto')||'Premio semanal',mes:mes()});
+  D.premios.push({id:uid(),emp_id,monto,sem,semPago:premSemPago,concepto:gv('prem-concepto')||'Premio semanal',mes:mesSel});
   save(); renderPremios(); toast('✓ Premio registrado');
   sv('prem-monto',''); sv('prem-concepto','');
 }
 function renderPremios(){
-  const m = mes();
+  const _wrap = g('prem-periodo-wrap'); if(_wrap && !_wrap.innerHTML) _wrap.innerHTML = periodoSelectorHTML('prem');
+  const m = mesSel;
   const lista = D.premios.filter(p=>p.mes===m);
   // Resumen por semana
   const semanas = [1,2,3,4];
@@ -1756,7 +1833,8 @@ function addGasto(){
   sv('g-desc',''); sv('g-monto',''); sv('g-nota',''); sv('g-medio','transferencia');
 }
 function renderGastos(){
-  const m = mes();
+  const _wrap = g('gas-periodo-wrap'); if(_wrap && !_wrap.innerHTML) _wrap.innerHTML = periodoSelectorHTML('gas');
+  const m = mesSel;
   const lista = D.gastos.filter(g=>g.mes===m);
   if(!lista.length){ g('g-tabla').innerHTML='<tr><td colspan="5" class="empty">Sin gastos este mes</td></tr>'; g('g-tfoot').innerHTML=''; return; }
   g('g-tabla').innerHTML = [...lista].reverse().map(x=>`<tr>
@@ -2524,7 +2602,7 @@ function delCFIngreso(id){
 function updateHsExtra(id, val){
   const e = D.empleados.find(x=>x.id===id);
   if(e){
-    e.hsExtra = parseFloat(val)||0;
+    setNominaEmp(id, mesSel, 'hsExtra', parseFloat(val)||0);
     save();
     renderEmpleados();
     renderResumen();
@@ -2596,7 +2674,7 @@ function setSemPagoSector(sector, sem){
 
 function setSemPagoEmp(id, sem){
   const e = D.empleados.find(x=>x.id===id);
-  if(e){ e.semPago = parseInt(sem); save(); renderCashFlow(); }
+  if(e){ setNominaEmp(id, mesSel, 'semPago', parseInt(sem)); save(); renderEmpleados(); renderCashFlow(); }
 }
 
 function setSemGasto(id, sem){
