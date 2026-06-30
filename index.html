@@ -401,7 +401,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
       <div id="page-externos" class="page">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px">
           <div class="page-title" style="margin-bottom:0">Vendedores externos</div>
-          <select id="ext-filtro-mes" onchange="renderExternos()" style="padding:7px 14px;border-radius:8px;border:1.5px solid #D8E2EC;font-size:13px;font-family:inherit;background:#fff;color:#1a2332;cursor:pointer">
+          <select id="ext-filtro-mes" onchange="setMesGlobal(this.value)" style="padding:7px 14px;border-radius:8px;border:1.5px solid #D8E2EC;font-size:13px;font-family:inherit;background:#fff;color:#1a2332;cursor:pointer">
             <option value="">— Todos los meses —</option>
           </select>
         </div>
@@ -577,7 +577,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
           </div>
           <div style="display:flex;gap:8px;align-items:center">
             <label style="font-size:12px;color:#6B7E8F;font-weight:600">Mes:</label>
-<select id="cf-mes" onchange="renderCashFlow()" style="padding:7px 14px;border-radius:8px;border:1.5px solid #D8E2EC;font-size:13px;font-family:inherit;background:#fff"></select>
+<select id="cf-mes" onchange="setMesGlobal(this.value)" style="padding:7px 14px;border-radius:8px;border:1.5px solid #D8E2EC;font-size:13px;font-family:inherit;background:#fff"></select>
           </div>
         </div>
 
@@ -860,16 +860,30 @@ function actualizarLabelsMes(){
   const premWrap = g('prem-periodo-wrap'); if(premWrap) premWrap.innerHTML = periodoSelectorHTML('prem');
   const ingWrap = g('ing-periodo-wrap'); if(ingWrap) ingWrap.innerHTML = periodoSelectorHTML('ing');
   const cheWrap = g('che-periodo-wrap'); if(cheWrap) cheWrap.innerHTML = periodoSelectorHTML('che');
+  const cfSel = g('cf-mes'); if(cfSel && [...cfSel.options].some(o=>o.value===mesSel)) cfSel.value = mesSel;
+  const extSel = g('ext-filtro-mes'); if(extSel && [...extSel.options].some(o=>o.value===mesSel)) extSel.value = mesSel;
+}
+function renderTodoElPeriodo(){
+  renderEmpleados(); renderGastos(); renderPremios(); renderIngresos(); renderCheques();
+  renderCashFlow(); renderExternos();
 }
 function cambiarMesSel(delta){
   mesSel = shiftMes(mesSel, delta);
   actualizarLabelsMes();
-  renderEmpleados(); renderGastos(); renderPremios(); renderIngresos(); renderCheques();
+  renderTodoElPeriodo();
 }
 function irAMesActual(){
   mesSel = mes();
   actualizarLabelsMes();
-  renderEmpleados(); renderGastos(); renderPremios(); renderIngresos(); renderCheques();
+  renderTodoElPeriodo();
+}
+// Cambia el mes global desde un <select> (Cash Flow o Vendedores externos).
+// Si llega vacío (ej: "Todos los meses" en Externos) no toca el mes global.
+function setMesGlobal(nuevoMes){
+  if(!nuevoMes) { renderExternos(); return; }
+  mesSel = nuevoMes;
+  actualizarLabelsMes();
+  renderTodoElPeriodo();
 }
 const fmt = n => n==null?'—':'$'+Math.round(n).toLocaleString('es-AR');
 const fd  = d => { if(!d)return'—'; const p=d.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; };
@@ -1715,7 +1729,7 @@ function addComision(){
   if(!quien_id||!total){ alert('Completá los campos'); return; }
   const semPago = parseInt(gv('com-sem-pago'))||sem;
   const selMesEl = g('ext-filtro-mes');
-  const mesActual = (selMesEl && selMesEl.value) ? selMesEl.value : mes();
+  const mesActual = (selMesEl && selMesEl.value) ? selMesEl.value : mesSel;
   // Si ya existe comision para esta persona/sem/mes, avisamos
   const yaExiste = D.comisiones.find(c=>c.quien_id===quien_id&&c.sem===sem&&c.mes===mesActual);
   if(yaExiste){
@@ -1748,11 +1762,11 @@ function renderExternos(){
       meses.map(m=>{
         const d = new Date(m+'-01T00:00:00');
         const label = MES[d.getMonth()]+' '+d.getFullYear();
-        return `<option value="${m}" ${m===mesActual?'selected':''}>${label}</option>`;
+        return `<option value="${m}" ${m===mesSel?'selected':''}>${label}</option>`;
       }).join('');
   }
   const filtroMes = selMes ? selMes.value : mes();
-  const m = filtroMes || mes();
+  const m = filtroMes || mesSel;
   const lideres = D.externos.filter(e=>e.rol==='lider');
   if(!lideres.length){ g('ext-lista').innerHTML='<div class="empty">Sin vendedores externos</div>'; return; }
   g('ext-lista').innerHTML = lideres.map(lid=>{
@@ -2057,24 +2071,26 @@ function delProyeccion(id){
 function initCFMes(){
   const sel = g('cf-mes');
   if(!sel) return;
-  // Solo inicializar si aún no tiene opciones cargadas
-  if(sel.options.length > 0) return;
-  const d = new Date();
-  const m = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-  const meses = [];
-  for(let i=-3; i<=12; i++){
-    const dd = new Date(d.getFullYear(), d.getMonth()+i, 1);
-    meses.push({val:dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0'),
-      label:MES[dd.getMonth()]+' '+dd.getFullYear()});
+  // Solo construir la lista de opciones una vez
+  if(sel.options.length === 0){
+    const d = new Date();
+    const meses = [];
+    for(let i=-3; i<=12; i++){
+      const dd = new Date(d.getFullYear(), d.getMonth()+i, 1);
+      meses.push({val:dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0'),
+        label:MES[dd.getMonth()]+' '+dd.getFullYear()});
+    }
+    sel.innerHTML = meses.map(x=>`<option value="${x.val}">${x.label}</option>`).join('');
   }
-  sel.innerHTML = meses.map(x=>`<option value="${x.val}" ${x.val===m?'selected':''}>${x.label}</option>`).join('');
+  // Siempre reflejar el mes global seleccionado (sincronizado con el resto del sistema)
+  if([...sel.options].some(o=>o.value===mesSel)) sel.value = mesSel;
 }
 
 function addCFIngreso(){
   const desc = gv('cfi-desc').trim() || 'Obra social — transferencia';
   const monto = parseFloat(gv('cfi-monto'))||0;
   const sem = parseInt(gv('cfi-sem'));
-  const mes_sel = gv('cf-mes') || mes();
+  const mes_sel = mesSel;
   if(!monto){ alert('Ingresá el monto'); return; }
   if(!D.cf_ingresos) D.cf_ingresos = [];
   D.cf_ingresos.push({id:uid(), desc, monto, sem, mes:mes_sel});
@@ -2533,7 +2549,7 @@ function toggleDetalle(id){
 }
 function renderCashFlow(){
   initCFMes();
-  const mes_sel = gv('cf-mes') || mes();
+  const mes_sel = mesSel;
   const {ing_sem, eg_sem} = getCFData(mes_sel);
 
   let totalIng=0, totalEg=0;
