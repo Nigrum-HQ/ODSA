@@ -707,8 +707,9 @@ function clearToken(){ sessionStorage.removeItem('odsa_jwt'); localStorage.remov
 
 async function sbGet(){
   try{
-    const r = await fetch('/api/getData', {
-      headers:{ 'Authorization': 'Bearer ' + getToken() }
+    const r = await fetch('/api/getData?t=' + Date.now(), {
+      headers:{ 'Authorization': 'Bearer ' + getToken() },
+      cache: 'no-store'
     });
     if(r.status === 401){ clearToken(); location.reload(); return null; }
     if(!r.ok) return null;
@@ -733,11 +734,18 @@ async function sbSet(data){
 }
 
 let _sbSaveTimeout = null;
+let _sbSaveFails = 0;
 function sbSaveDebounced(){
   clearTimeout(_sbSaveTimeout);
   _sbSaveTimeout = setTimeout(async ()=>{
     const ok = await sbSet(JSON.stringify(D));
-    if(!ok) console.warn('Supabase save failed, data is in localStorage as backup');
+    if(!ok){
+      _sbSaveFails++;
+      console.warn('Supabase save failed, data is in localStorage as backup');
+      toast('⚠ No se pudo guardar en la nube — revisá tu conexión. Tus cambios siguen solo en esta computadora.');
+    } else {
+      _sbSaveFails = 0;
+    }
   }, 800);
 }
 
