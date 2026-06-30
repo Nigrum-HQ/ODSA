@@ -604,7 +604,10 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
 
       <!-- INGRESOS -->
       <div id="page-ingresos" class="page">
-        <div class="page-title">Ingresos</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div class="page-title" style="margin-bottom:0">Ingresos</div>
+          <div id="ing-periodo-wrap"></div>
+        </div>
         <div class="page-sub">Transferencias de la obra social</div>
         <div class="card">
           <div class="card-title">Registrar ingreso</div>
@@ -652,7 +655,10 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
 
       <!-- CHEQUES -->
       <div id="page-cheques" class="page">
-        <div class="page-title">Cheques emitidos</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div class="page-title" style="margin-bottom:0">Cheques emitidos</div>
+          <div id="che-periodo-wrap"></div>
+        </div>
         <div class="page-sub">Registro de cheques de pago</div>
         <div class="card">
           <div class="card-title">Registrar cheque</div>
@@ -851,16 +857,18 @@ function actualizarLabelsMes(){
   const empWrap = g('emp-periodo-wrap'); if(empWrap) empWrap.innerHTML = periodoSelectorHTML('emp');
   const gasWrap = g('gas-periodo-wrap'); if(gasWrap) gasWrap.innerHTML = periodoSelectorHTML('gas');
   const premWrap = g('prem-periodo-wrap'); if(premWrap) premWrap.innerHTML = periodoSelectorHTML('prem');
+  const ingWrap = g('ing-periodo-wrap'); if(ingWrap) ingWrap.innerHTML = periodoSelectorHTML('ing');
+  const cheWrap = g('che-periodo-wrap'); if(cheWrap) cheWrap.innerHTML = periodoSelectorHTML('che');
 }
 function cambiarMesSel(delta){
   mesSel = shiftMes(mesSel, delta);
   actualizarLabelsMes();
-  renderEmpleados(); renderGastos(); renderPremios();
+  renderEmpleados(); renderGastos(); renderPremios(); renderIngresos(); renderCheques();
 }
 function irAMesActual(){
   mesSel = mes();
   actualizarLabelsMes();
-  renderEmpleados(); renderGastos(); renderPremios();
+  renderEmpleados(); renderGastos(); renderPremios(); renderIngresos(); renderCheques();
 }
 const fmt = n => n==null?'—':'$'+Math.round(n).toLocaleString('es-AR');
 const fd  = d => { if(!d)return'—'; const p=d.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; };
@@ -1884,7 +1892,8 @@ function addIngreso(){
   sv('i-monto',''); sv('i-desc','');
 }
 function renderIngresos(){
-  const m = mes();
+  const _wrap = g('ing-periodo-wrap'); if(_wrap && !_wrap.innerHTML) _wrap.innerHTML = periodoSelectorHTML('ing');
+  const m = mesSel;
   const lista = D.ingresos.filter(i=>i.mes===m);
   if(!lista.length){ g('i-tabla').innerHTML='<tr><td colspan="4" class="empty">Sin ingresos este mes</td></tr>'; g('i-tfoot').innerHTML=''; return; }
   g('i-tabla').innerHTML = [...lista].reverse().map(x=>`<tr>
@@ -1911,7 +1920,8 @@ function addCheque(){
   sv('ch-dest',''); sv('ch-monto',''); sv('ch-nro',''); sv('ch-nota','');
 }
 function renderCheques(){
-  const m = mes();
+  const _wrap = g('che-periodo-wrap'); if(_wrap && !_wrap.innerHTML) _wrap.innerHTML = periodoSelectorHTML('che');
+  const m = mesSel;
   const lista = D.cheques.filter(c=>c.mes===m);
   if(!lista.length){ g('ch-tabla').innerHTML='<tr><td colspan="6" class="empty">Sin cheques este mes</td></tr>'; g('ch-tfoot').innerHTML=''; return; }
   g('ch-tabla').innerHTML = [...lista].reverse().map(x=>`<tr>
