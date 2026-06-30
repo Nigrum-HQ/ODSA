@@ -1733,7 +1733,7 @@ function renderExternos(){
     if(!meses.includes(mesActual)) meses.unshift(mesActual);
     selMes.innerHTML = '<option value="">— Todos los meses —</option>' +
       meses.map(m=>{
-        const d = new Date(m+'-01');
+        const d = new Date(m+'-01T00:00:00');
         const label = MES[d.getMonth()]+' '+d.getFullYear();
         return `<option value="${m}" ${m===mesActual?'selected':''}>${label}</option>`;
       }).join('');
@@ -2333,7 +2333,7 @@ function exportCFPDF(s,msParam){
   const cfSel=g('cf-mes');
   const ml=cfSel&&cfSel.selectedOptions&&cfSel.selectedOptions[0]
     ?cfSel.selectedOptions[0].text
-    :(ms?(()=>{const d=new Date(ms+'-01');return MES[d.getMonth()]+' '+d.getFullYear();})():'');
+    :(ms?(()=>{const d=new Date(ms+'-01T00:00:00');return MES[d.getMonth()]+' '+d.getFullYear();})():'');
   const cfData=getCFData(ms);
   const items=cfData.eg_sem[s].items;
   const egTotal=items.reduce((a,x)=>a+x.monto,0);
