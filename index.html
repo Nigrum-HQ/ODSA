@@ -1705,7 +1705,8 @@ function addComision(){
   else { efec=total; }
   if(!quien_id||!total){ alert('Completá los campos'); return; }
   const semPago = parseInt(gv('com-sem-pago'))||sem;
-  const mesActual = mes();
+  const selMesEl = g('ext-filtro-mes');
+  const mesActual = (selMesEl && selMesEl.value) ? selMesEl.value : mes();
   // Si ya existe comision para esta persona/sem/mes, avisamos
   const yaExiste = D.comisiones.find(c=>c.quien_id===quien_id&&c.sem===sem&&c.mes===mesActual);
   if(yaExiste){
@@ -1728,9 +1729,12 @@ function renderExternos(){
   // Llenar opciones del selector de mes
   const selMes = g('ext-filtro-mes');
   if(selMes && selMes.options.length <= 1){
-    const meses = [...new Set(D.comisiones.map(c=>c.mes))].sort().reverse();
     const mesActual = mes();
-    if(!meses.includes(mesActual)) meses.unshift(mesActual);
+    const mesesConDatos = [...new Set(D.comisiones.map(c=>c.mes))];
+    const mesesFuturos = [];
+    let cursor = mesActual;
+    while(cursor <= '2027-12'){ mesesFuturos.push(cursor); cursor = shiftMes(cursor, 1); }
+    const meses = [...new Set([...mesesConDatos, ...mesesFuturos])].sort().reverse();
     selMes.innerHTML = '<option value="">— Todos los meses —</option>' +
       meses.map(m=>{
         const d = new Date(m+'-01T00:00:00');
