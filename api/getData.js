@@ -1,11 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { jwtVerify } from 'jose';
 
-const supabase = createClient(
-  process.env.SUPA_URL,
-  process.env.SUPA_KEY
-);
-
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
   res.setHeader('Pragma', 'no-cache');
@@ -17,10 +12,7 @@ export default async function handler(req, res) {
 
   const auth = req.headers.authorization || '';
   const token = auth.replace('Bearer ', '');
-
-  if (!token) {
-    return res.status(401).json({ error: 'No token' });
-  }
+  if (!token) return res.status(401).json({ error: 'No token' });
 
   try {
     const secret = new TextEncoder().encode(process.env.JWT_SECRET);
@@ -28,6 +20,13 @@ export default async function handler(req, res) {
   } catch {
     return res.status(401).json({ error: 'Token inválido o expirado' });
   }
+
+  // Cliente sin auth/realtime para evitar llamadas extras de inicialización
+  const supabase = createClient(process.env.SUPA_URL, process.env.SUPA_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    realtime: { params: { eventsPerSecond: 0 } },
+    global: { headers: { 'x-my-custom-header': 'odsa' } }
+  });
 
   try {
     const { data, error } = await supabase
@@ -37,7 +36,6 @@ export default async function handler(req, res) {
       .single();
 
     if (error) return res.status(500).json({ error: error.message });
-
     return res.status(200).json({ ok: true, data: data?.data || null });
   } catch (err) {
     return res.status(500).json({ error: err.message });
