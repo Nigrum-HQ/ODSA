@@ -963,6 +963,7 @@ function undoLast(){
   toast('↩ Deshecho');
 }
 function save(){
+  pushUndo();
   const json = JSON.stringify(D);
   try{ localStorage.setItem(ODSA_KEY, json); }catch(e){}
   try{ sessionStorage.setItem(ODSA_KEY, json); }catch(e){}
