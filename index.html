@@ -2661,7 +2661,7 @@ function toggleCFPago(tipo, id){
     const sector = parts[0];
     const sem = parseInt(parts[1])||1;
     const empsDelSector = D.empleados.filter(e=>e.sector===sector).map(e=>e.id);
-    const premiosGrupo = D.premios.filter(p=>empsDelSector.includes(p.emp_id)&&(p.semPago||p.sem)===sem&&p.mes===mes());
+    const premiosGrupo = D.premios.filter(p=>empsDelSector.includes(p.emp_id)&&(p.semPago||p.sem)===sem&&p.mes===mesSel);
     const estado = !premiosGrupo.every(p=>p.pagado);
     premiosGrupo.forEach(p=>p.pagado=estado);
   } else if(tipo==='premio'){
