@@ -28,21 +28,17 @@ export default async function handler(req, res) {
 
     if (error) throw error;
 
-    const d = data?.data || {};
+    const raw = data?.data;
+    const d = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : {};
     const mesActual = new Date().toISOString().substring(0, 7);
 
     const gastos = (d.gastos || []).filter(g => (g.fecha || '').startsWith(mesActual));
     const totalGastos = gastos.reduce((s, g) => s + (g.monto || 0), 0);
-    const gastosPagados = gastos.filter(g => g.estado === 'pagado').reduce((s, g) => s + (g.monto || 0), 0);
-    const gastosPendientes = gastos.filter(g => g.estado !== 'pagado').reduce((s, g) => s + (g.monto || 0), 0);
+    const gastosPagados = gastos.filter(g => g.estado === 'Pagada' || g.estado === 'pagado').reduce((s, g) => s + (g.monto || 0), 0);
+    const gastosPendientes = totalGastos - gastosPagados;
 
-    const ingresos = [
-      ...(d.facturas || []),
-      ...(d.cobranzas || []),
-      ...(d.ingresos || []),
-      ...(d.ventas || []),
-    ].filter(f => (f.fecha || f.fechaEmision || '').startsWith(mesActual));
-    const totalIngresos = ingresos.reduce((s, f) => s + (f.monto || f.total || 0), 0);
+    const ingresosMes = (d.ingresos || []).filter(i => (i.fecha || '').startsWith(mesActual));
+    const totalIngresos = ingresosMes.reduce((s, i) => s + (i.monto || 0), 0);
 
     return res.status(200).json({
       ok: true,
