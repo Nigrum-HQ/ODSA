@@ -372,14 +372,6 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
               <div class="fg"><label>Monto premio ($)</label><input id="prem-monto" type="number" placeholder="0"></div>
               <div class="fg"><label>Concepto</label><input id="prem-concepto" placeholder="Premio por meta, etc."></div>
             </div>
-            <div class="frow frow-2" style="margin-bottom:10px">
-            <div class="fg"><label>Sem. de pago en Cash Flow</label><select id="prem-sem-pago">
-              <option value="">Igual a la semana del premio</option>
-              <option value="1">Semana 1</option><option value="2">Semana 2</option>
-              <option value="3">Semana 3</option><option value="4">Semana 4</option>
-              <option value="5">Semana 5</option>
-            </select></div>
-          </div>
           <button class="btn btn-primary" onclick="addPremio()">+ Registrar premio</button>
           </div>
           <div class="card">
@@ -1665,7 +1657,7 @@ function addPremio(){
   const monto = parseFloat(gv('prem-monto'))||0;
   const sem = parseInt(gv('prem-sem'));
   if(!emp_id||!monto){ alert('Completá los campos'); return; }
-  const premSemPago = gv('prem-sem-pago') ? parseInt(gv('prem-sem-pago')) : sem;
+  const premSemPago = sem;
   D.premios.push({id:uid(),emp_id,monto,sem,semPago:premSemPago,concepto:gv('prem-concepto')||'Premio semanal',mes:mesSel});
   save(); renderPremios(); toast('✓ Premio registrado');
   sv('prem-monto',''); sv('prem-concepto','');
