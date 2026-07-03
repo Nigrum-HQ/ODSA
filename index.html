@@ -873,7 +873,7 @@ function actualizarLabelsMes(){
 }
 function renderTodoElPeriodo(){
   renderEmpleados(); renderGastos(); renderPremios(); renderIngresos(); renderCheques();
-  renderCashFlow(); renderExternos();
+  renderCashFlow(); renderExternos(); renderResumen();
 }
 function cambiarMesSel(delta){
   mesSel = shiftMes(mesSel, delta);
@@ -1248,8 +1248,8 @@ g('ex-rol')&&g('ex-rol').addEventListener('change',()=>{
 // RESUMEN
 // ═══════════════════════════════
 function calcResumen(){
-  const m = mes();
-  const totalSueldos = D.empleados.reduce((s,e)=>s+e.sueldo,0);
+  const m = mesSel;
+  const totalSueldos = D.empleados.reduce((s,e)=>{ const n=getNominaEmp(e,m); return s+(n.sueldo+(n.hsExtra||0)); },0);
   const totalPremios = D.premios.filter(p=>p.mes===m).reduce((s,p)=>s+p.monto,0);
   const totalComisiones = D.comisiones.filter(c=>c.mes===m).reduce((s,c)=>s+c.total,0);
   const totalGastos = D.gastos.filter(g=>g.mes===m).reduce((s,g)=>s+g.monto,0);
@@ -1260,8 +1260,8 @@ function calcResumen(){
 }
 
 function renderResumen(){
-  const d = new Date();
-  const m = mes();
+  const d = new Date(mesSel+'-01T00:00:00');
+  const m = mesSel;
   g('res-sub').textContent = 'Resumen de '+MES[d.getMonth()]+' '+d.getFullYear();
 
   const r = calcResumen();
