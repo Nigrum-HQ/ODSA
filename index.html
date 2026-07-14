@@ -2110,22 +2110,24 @@ function getCFData(mes_sel){
 
   const eg_sem = {1:{items:[]}, 2:{items:[]}, 3:{items:[]}, 4:{items:[]}, 5:{items:[]}};
 
-  // Sueldos — solo se muestran en el mes actual.
-  // En cualquier otro mes (pasado o futuro) no se incluyen en el cash flow.
+  // Sueldos — usan el historial mensual (getNominaEmp) para reflejar
+  // correctamente el sueldo/pagado/semana de CUALQUIER mes, no solo el actual.
   if(!D.semPagoSectores) D.semPagoSectores = {};
-
-  if(mes_sel === mes()){
+  {
     // Empleados pagados → agrupar por sector+semana
     const pagadosSecSemMap = {};
-    D.empleados.filter(e=>(e.sueldo+(e.hsExtra||0))>0 && e.pagado).forEach(e=>{
-      const sem = e.semPago || D.semPagoSectores[e.sector] || 1;
-      const mapKey = e.sector+'-'+sem;
-      if(!pagadosSecSemMap[mapKey]) pagadosSecSemMap[mapKey] = {sector:e.sector, sem, emps:[]};
-      pagadosSecSemMap[mapKey].emps.push(e);
+    D.empleados.forEach(e=>{
+      const n = getNominaEmp(e, mes_sel);
+      if((n.sueldo+(n.hsExtra||0))>0 && n.pagado){
+        const sem = n.semPago || D.semPagoSectores[e.sector] || 1;
+        const mapKey = e.sector+'-'+sem;
+        if(!pagadosSecSemMap[mapKey]) pagadosSecSemMap[mapKey] = {sector:e.sector, sem, emps:[]};
+        pagadosSecSemMap[mapKey].emps.push({emp:e, n});
+      }
     });
     Object.values(pagadosSecSemMap).forEach(({sector:sec, sem:semPago, emps})=>{
-      const totalSec = emps.reduce((s,e)=>s+(e.sueldo+(e.hsExtra||0)),0);
-      const adelantosGrupo = emps.reduce((s,e)=>{
+      const totalSec = emps.reduce((s,{n})=>s+(n.sueldo+(n.hsExtra||0)),0);
+      const adelantosGrupo = emps.reduce((s,{emp:e})=>{
         return s + D.adelantos.filter(a=>a.emp_id===e.id&&a.mes===mes_sel).reduce((sa,a)=>sa+a.monto,0);
       },0);
       const netoSec = Math.max(0, totalSec - adelantosGrupo);
@@ -2138,22 +2140,25 @@ function getCFData(mes_sel){
         pagado: true,
         tipo: 'sueldo_sector',
         id: sec+'-'+semPago+'-pagado',
-        emps: emps.map(e=>({nombre:e.nombre, neto: Math.max(0,(e.sueldo+(e.hsExtra||0)) - D.adelantos.filter(a=>a.emp_id===e.id&&a.mes===mes_sel).reduce((sa,a)=>sa+a.monto,0))}))
+        emps: emps.map(({emp:e,n})=>({nombre:e.nombre, neto: Math.max(0,(n.sueldo+(n.hsExtra||0)) - D.adelantos.filter(a=>a.emp_id===e.id&&a.mes===mes_sel).reduce((sa,a)=>sa+a.monto,0))}))
       });
     });
 
     // Pendientes → agrupar por sector+semana
     const secSemMap = {};
-    D.empleados.filter(e=>(e.sueldo+(e.hsExtra||0))>0 && !e.pagado).forEach(e=>{
-      const sem = e.semPago || D.semPagoSectores[e.sector] || 1;
-      const mapKey = e.sector+'-'+sem;
-      if(!secSemMap[mapKey]) secSemMap[mapKey] = {sector:e.sector, sem, emps:[]};
-      secSemMap[mapKey].emps.push(e);
+    D.empleados.forEach(e=>{
+      const n = getNominaEmp(e, mes_sel);
+      if((n.sueldo+(n.hsExtra||0))>0 && !n.pagado){
+        const sem = n.semPago || D.semPagoSectores[e.sector] || 1;
+        const mapKey = e.sector+'-'+sem;
+        if(!secSemMap[mapKey]) secSemMap[mapKey] = {sector:e.sector, sem, emps:[]};
+        secSemMap[mapKey].emps.push({emp:e, n});
+      }
     });
     Object.values(secSemMap).forEach(({sector:sec, sem:semPago, emps})=>{
-      const totalSec = emps.reduce((s,e)=>s+(e.sueldo+(e.hsExtra||0)),0);
+      const totalSec = emps.reduce((s,{n})=>s+(n.sueldo+(n.hsExtra||0)),0);
       const label = (SECTORES[sec]||sec)+(Object.values(secSemMap).filter(x=>x.sector===sec).length>1?' (Sem '+semPago+')':'');
-      const adelantosGrupo = emps.reduce((s,e)=>{
+      const adelantosGrupo = emps.reduce((s,{emp:e})=>{
         return s + D.adelantos.filter(a=>a.emp_id===e.id&&a.mes===mes_sel).reduce((sa,a)=>sa+a.monto,0);
       },0);
       const netoSec = Math.max(0, totalSec - adelantosGrupo);
@@ -2166,12 +2171,10 @@ function getCFData(mes_sel){
         pagado: false,
         tipo: 'sueldo_sector',
         id: sec+'-'+semPago,
-        emps: emps.map(e=>({nombre:e.nombre, neto: Math.max(0,(e.sueldo+(e.hsExtra||0)) - D.adelantos.filter(a=>a.emp_id===e.id&&a.mes===mes_sel).reduce((sa,a)=>sa+a.monto,0))}))
+        emps: emps.map(({emp:e,n})=>({nombre:e.nombre, neto: Math.max(0,(n.sueldo+(n.hsExtra||0)) - D.adelantos.filter(a=>a.emp_id===e.id&&a.mes===mes_sel).reduce((sa,a)=>sa+a.monto,0))}))
       });
     });
   }
-
-  // Premios semanales — agrupados por sector
   const premiosMes = D.premios.filter(p=>p.mes===mes_sel);
   const premioMap = {}; // sector-sem -> {total, pagados, ids}
   premiosMes.forEach(p=>{
