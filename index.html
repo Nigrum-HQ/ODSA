@@ -894,7 +894,7 @@ const g   = id => document.getElementById(id);
 const gv  = id => g(id)?g(id).value:'';
 const sv  = (id,v) => { if(g(id)) g(id).value=v; };
 const MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-const SECTORES = {operadoras:'Operadoras',turnos:'Turnos',administracion:'Administración',sistemas:'Sistemas',limpieza:'Limpieza',kinebs:'Kinebs',fichas:'Fichas',publicidad:'Publicidad',simple_speed:'Simple Speed',otro:'Otro'};
+const SECTORES = {yamaha:'Yamaha',operadoras:'Operadoras',turnos:'Turnos',administracion:'Administración',sistemas:'Sistemas',limpieza:'Limpieza',kinebs:'Kinebs',fichas:'Fichas',publicidad:'Publicidad',simple_speed:'Simple Speed',otro:'Otro'};
 const CATS = {alquiler:'Alquiler',servicios:'Servicios',arca:'ARCA/Impuestos',publicidad:'Publicidad',sistemas:'Sistemas',insumos:'Insumos',otro:'Otro'};
 
 function toast(msg){
@@ -1114,7 +1114,7 @@ async function syncFromCloud(){
 function startSync(){ _syncInterval = setInterval(syncFromCloud, 30000); }
 
 function renderFichaBancaria(){
-  const SECTORES={operadoras:'Operadoras',turnos:'Turnos',administracion:'Administracion',sistemas:'Sistemas',limpieza:'Limpieza',kinebs:'Kinebs',fichas:'Fichas',publicidad:'Publicidad',otro:'Otro'};
+  const SECTORES={yamaha:'Yamaha',operadoras:'Operadoras',turnos:'Turnos',administracion:'Administracion',sistemas:'Sistemas',limpieza:'Limpieza',kinebs:'Kinebs',fichas:'Fichas',publicidad:'Publicidad',otro:'Otro'};
   const empBody=document.getElementById('ficha-emp-body');
   const extBody=document.getElementById('ficha-ext-body');
   if(!empBody||!extBody) return;
