@@ -726,11 +726,39 @@ async function sbSet(data){
   }catch(e){ return false; }
 }
 
+// Fusiona dos listas de D.nomina registro por registro (por empleado+mes),
+// quedandose con la version mas nueva de CADA registro individual en vez de
+// reemplazar la lista entera. Asi un cambio en un empleado no borra el cambio
+// que otra persona guardo casi al mismo tiempo en otro empleado/mes.
+function mergeNominaArrays(localArr, cloudArr){
+  const byKey = {};
+  const put = (r) => {
+    if(!r || !r.emp_id || !r.mes) return;
+    const k = r.emp_id+'|'+r.mes;
+    const existing = byKey[k];
+    if(!existing || (r._ts||0) > (existing._ts||0)) byKey[k] = r;
+  };
+  (localArr||[]).forEach(put);
+  (cloudArr||[]).forEach(put);
+  return Object.values(byKey);
+}
+
 let _sbSaveTimeout = null;
 let _sbSaveFails = 0;
 function sbSaveDebounced(){
   clearTimeout(_sbSaveTimeout);
   _sbSaveTimeout = setTimeout(async ()=>{
+    // Antes de subir, traemos la nube y fusionamos la nomina registro por
+    // registro para no pisar el cambio de otro empleado que alguien mas
+    // haya guardado en estos ultimos segundos.
+    try{
+      const cloudRaw = await sbGet();
+      if(cloudRaw){
+        const cloudD = JSON.parse(cloudRaw);
+        D.nomina = mergeNominaArrays(D.nomina, cloudD.nomina);
+      }
+    }catch(e){}
+    D._ts = Date.now();
     const ok = await sbSet(JSON.stringify(D));
     if(!ok){
       _sbSaveFails++;
@@ -1095,15 +1123,22 @@ async function syncFromCloud(){
     const sbData = await sbGet();
     if(!sbData) return;
     const cloudD = JSON.parse(sbData);
-    // Solo adoptar los datos de la nube si son mas nuevos que los locales.
-    // Esto evita que un guardado viejo de otra persona (que todavia no vio
-    // nuestro cambio reciente) pise silenciosamente lo que acabamos de editar.
+    // La nomina (sueldos por mes) se fusiona SIEMPRE registro por registro,
+    // sin importar cual copia es mas nueva en general, para no perder el
+    // cambio de un empleado puntual aunque el resto de la nube este mas viejo.
+    const mergedNomina = mergeNominaArrays(D.nomina, cloudD.nomina);
+    // El resto de los datos (gastos, ingresos, etc.) se adoptan enteros solo
+    // si la nube es mas nueva en general que lo que ya tenemos.
     const cloudTs = cloudD._ts || 0;
     const localTs = D._ts || 0;
-    if(cloudTs <= localTs) return; // la nube esta igual o mas vieja que lo que ya tenemos: no hacer nada
-    if(JSON.stringify(cloudD) !== JSON.stringify(D)){
+    const nominaCambio = JSON.stringify(mergedNomina) !== JSON.stringify(D.nomina||[]);
+    if(cloudTs <= localTs && !nominaCambio) return; // nada nuevo que adoptar
+    if(cloudTs > localTs && JSON.stringify(cloudD) !== JSON.stringify(D)){
       D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{}}, cloudD);
-      try{ localStorage.setItem(ODSA_KEY, sbData); }catch(e){}
+    }
+    D.nomina = mergedNomina;
+    if(nominaCambio || cloudTs > localTs){
+      try{ localStorage.setItem(ODSA_KEY, JSON.stringify(D)); }catch(e){}
       // Re-render active page silently
       const active = document.querySelector('.sitem.on');
       if(active){ const page = active.getAttribute('data-page'); if(page) navPage(page); }
@@ -1408,6 +1443,7 @@ function setNominaEmp(empId, m, campo, valor){
     D.nomina.push(rec);
   }
   rec[campo]=valor;
+  rec._ts = Date.now(); // marca de tiempo por registro, para poder fusionar sin perder cambios de otra persona
 }
 function renderEmpleados(){
   const _wrap = g('emp-periodo-wrap'); if(_wrap && !_wrap.innerHTML) _wrap.innerHTML = periodoSelectorHTML('emp');
