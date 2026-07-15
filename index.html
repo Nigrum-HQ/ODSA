@@ -966,6 +966,7 @@ function undoLast(){
 }
 function save(){
   pushUndo();
+  D._ts = Date.now(); // marca de tiempo del ultimo cambio local, para evitar que un sync viejo pise un cambio nuevo
   const json = JSON.stringify(D);
   try{ localStorage.setItem(ODSA_KEY, json); }catch(e){}
   try{ sessionStorage.setItem(ODSA_KEY, json); }catch(e){}
@@ -1094,7 +1095,12 @@ async function syncFromCloud(){
     const sbData = await sbGet();
     if(!sbData) return;
     const cloudD = JSON.parse(sbData);
-    // Only update if cloud data is different
+    // Solo adoptar los datos de la nube si son mas nuevos que los locales.
+    // Esto evita que un guardado viejo de otra persona (que todavia no vio
+    // nuestro cambio reciente) pise silenciosamente lo que acabamos de editar.
+    const cloudTs = cloudD._ts || 0;
+    const localTs = D._ts || 0;
+    if(cloudTs <= localTs) return; // la nube esta igual o mas vieja que lo que ya tenemos: no hacer nada
     if(JSON.stringify(cloudD) !== JSON.stringify(D)){
       D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{}}, cloudD);
       try{ localStorage.setItem(ODSA_KEY, sbData); }catch(e){}
