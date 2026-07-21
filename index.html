@@ -3502,14 +3502,35 @@ function delProyeccion(id){
 // CASH FLOW SEMANAL
 // ═══════════════════════════════════════════════
 
+// Busca el mes con datos mas antiguo en todo el sistema (gastos, ingresos,
+// comisiones, adelantos, premios, cheques, nomina), para que el selector de
+// mes nunca deje afuera un mes historico ya cargado (ej: al importar datos viejos).
+function mesMasAntiguoConDatos(){
+  const arrays = [D.gastos, D.ingresos, D.adelantos, D.premios, D.comisiones, D.cheques, D.nomina, D.cf_ingresos];
+  let min = null;
+  arrays.forEach(arr=>{
+    (arr||[]).forEach(r=>{
+      if(r && r.mes && (!min || r.mes < min)) min = r.mes;
+    });
+  });
+  return min;
+}
+
 function initCFMes(){
   const sel = g('cf-mes');
   if(!sel) return;
   // Solo construir la lista de opciones una vez
   if(sel.options.length === 0){
     const d = new Date();
+    let iDesde = -3;
+    const masAntiguo = mesMasAntiguoConDatos();
+    if(masAntiguo){
+      const [ay,am] = masAntiguo.split('-').map(Number);
+      const diffMeses = (ay - d.getFullYear())*12 + (am - (d.getMonth()+1));
+      if(diffMeses < iDesde) iDesde = diffMeses;
+    }
     const meses = [];
-    for(let i=-3; i<=12; i++){
+    for(let i=iDesde; i<=12; i++){
       const dd = new Date(d.getFullYear(), d.getMonth()+i, 1);
       meses.push({val:dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0'),
         label:MES[dd.getMonth()]+' '+dd.getFullYear()});
