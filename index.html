@@ -329,10 +329,11 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
 
       <!-- ASISTENTE IA -->
       <div id="page-asistente" class="page">
-        <div style="background:linear-gradient(135deg,#0F1923 0%,#1B2D42 60%,#0F1923 100%);border-radius:16px;padding:32px 36px;margin-bottom:24px">
+        <div style="background:linear-gradient(135deg,#0F1923 0%,#1B2D42 60%,#0F1923 100%);border-radius:16px;padding:32px 36px;margin-bottom:24px;position:relative">
+          <button onclick="aiBorrarHistorial()" style="position:absolute;right:28px;top:28px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.7);font-size:12px;border-radius:8px;padding:6px 12px;cursor:pointer">🗑 Borrar historial</button>
           <div style="font-size:11px;font-weight:800;letter-spacing:2px;color:#C9A84C;text-transform:uppercase;margin-bottom:8px">Consultá tu situación</div>
           <div style="font-size:28px;font-weight:800;color:#fff;margin-bottom:6px;letter-spacing:-.5px">🤖 Asistente Financiero</div>
-          <div style="font-size:14px;color:rgba(255,255,255,.5)">Preguntale lo que quieras sobre tus números — usa los datos reales del sistema.</div>
+          <div style="font-size:14px;color:rgba(255,255,255,.5)">Preguntale lo que quieras sobre tus números — usa los datos reales del sistema, incluyendo empleados.</div>
         </div>
 
         <div style="background:#fff;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.06);display:flex;flex-direction:column;height:60vh;min-height:420px">
@@ -343,7 +344,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
           </div>
         </div>
         <div style="font-size:12px;color:#8A9BAB;margin-top:10px">
-          El asistente responde en base a los datos cargados en el sistema. No reemplaza a un contador o asesor financiero para decisiones grandes.
+          El asistente responde en base a los datos cargados en el sistema (incluye sueldos, CBU y bancos de empleados) y a tu historial de conversación en este navegador. No reemplaza a un contador o asesor financiero para decisiones grandes.
         </div>
       </div>
 
@@ -1767,13 +1768,37 @@ function renderChartTendencia(historicos){
 // ═══════════════════════════════
 // ASISTENTE IA
 // ═══════════════════════════════
+const AI_CHAT_KEY = 'odsa_ai_historial'; // se guarda en este navegador, entre sesiones
 let _aiHistorial = []; // [{role:'user'|'assistant', content:'...'}]
+
+function aiCargarHistorial(){
+  try{
+    const raw = localStorage.getItem(AI_CHAT_KEY);
+    return raw ? JSON.parse(raw) : [];
+  }catch(e){ return []; }
+}
+function aiGuardarHistorial(){
+  try{ localStorage.setItem(AI_CHAT_KEY, JSON.stringify(_aiHistorial.slice(-60))); }catch(e){}
+}
+function aiBorrarHistorial(){
+  if(!confirm('¿Borrar toda la conversación con el asistente? No se puede deshacer.')) return;
+  _aiHistorial = [];
+  try{ localStorage.removeItem(AI_CHAT_KEY); }catch(e){}
+  const box = g('ai-chat-msgs');
+  if(box) box.innerHTML = '';
+  aiAgregarMensaje('assistant', 'Listo, empezamos de cero. ¿Qué querés saber?');
+}
 
 function renderAsistente(){
   const box = g('ai-chat-msgs');
   if(!box) return;
-  if(box.children.length === 0){
-    aiAgregarMensaje('assistant', '¡Hola! Soy tu asistente financiero. Puedo ver los datos cargados en ODSA (sueldos, gastos, ingresos, cash flow, etc.) y contestarte preguntas sobre tu situación económica. Por ejemplo:\n\n• ¿Cómo viene el mes comparado con el anterior?\n• ¿En qué gasté más este mes?\n• ¿Cuánto me queda de margen entre ingresos y egresos?\n\n¿Qué querés saber?');
+  if(box.children.length > 0) return; // ya esta renderizado en esta sesion de la pagina
+  _aiHistorial = aiCargarHistorial();
+  if(_aiHistorial.length === 0){
+    aiAgregarMensaje('assistant', '¡Hola! Soy tu asistente financiero. Puedo ver los datos cargados en ODSA (sueldos, empleados, gastos, ingresos, cash flow, etc.) y contestarte preguntas sobre tu situación económica. Por ejemplo:\n\n• ¿Cómo viene el mes comparado con el anterior?\n• ¿En qué gasté más este mes?\n• ¿Cuál es el CBU de tal empleado?\n\nMe voy a acordar de esta conversación la próxima vez que entres. ¿Qué querés saber?');
+  } else {
+    // Reconstruir los mensajes guardados de sesiones anteriores
+    _aiHistorial.forEach(h => aiAgregarMensaje(h.role, h.content));
   }
 }
 
@@ -1792,8 +1817,9 @@ function aiAgregarMensaje(role, texto){
   return bubble;
 }
 
-// Arma un resumen compacto de la situacion financiera para darle contexto a la IA,
-// sin mandar datos personales sensibles (CUIT, CBU, etc.) de cada empleado.
+// Arma un resumen completo de la situacion financiera y de cada empleado
+// (sueldo, banco, CBU, CUIL) para darle contexto de todo el sistema a la IA.
+// OJO: esto viaja a la API de Anthropic con tu propia clave en cada pregunta.
 function construirContextoFinanciero(){
   const m = mesSel;
   const rActual = calcResumenFor(m);
@@ -1820,6 +1846,23 @@ function construirContextoFinanciero(){
   const adelantosPendientes = (D.adelantos||[]).filter(a=>a.mes===m && !a.pagado).reduce((s,a)=>s+a.monto,0);
   const chequesPendientes = (D.cheques||[]).filter(c=>c.mes===m && c.estado && c.estado!=='cobrado' && c.estado!=='Pagado').length;
 
+  const empleadosDetalle = D.empleados.map(e=>{
+    const n = getNominaEmp(e, m);
+    return {
+      nombre: e.nombre,
+      sector: SECTORES[e.sector] || e.sector,
+      sueldo_base: e.sueldo || 0,
+      sueldo_este_mes: n.sueldo,
+      hs_extra_comisiones_este_mes: n.hsExtra || 0,
+      pagado_este_mes: !!n.pagado,
+      modalidad: e.mod || '',
+      banco: e.banco || '',
+      cuil: e.cuil || '',
+      cbu: e.cbu || '',
+      nota: e.nota || ''
+    };
+  });
+
   return {
     mes_actual: mesLabel(m),
     resumen_mes_actual: {
@@ -1841,6 +1884,7 @@ function construirContextoFinanciero(){
     tendencia_ultimos_6_meses: historicos,
     cash_flow_semanal_mes_actual: cf,
     empleados_activos: D.empleados.length,
+    empleados_detalle: empleadosDetalle,
     adelantos_pendientes_de_pago: adelantosPendientes,
     cheques_pendientes: chequesPendientes
   };
@@ -1855,6 +1899,7 @@ async function enviarPreguntaAsistente(){
 
   aiAgregarMensaje('user', pregunta);
   _aiHistorial.push({role:'user', content:pregunta});
+  aiGuardarHistorial();
 
   const btn = g('ai-btn-enviar');
   btn.disabled = true; btn.textContent = '...';
@@ -1874,6 +1919,7 @@ async function enviarPreguntaAsistente(){
     } else {
       aiAgregarMensaje('assistant', data.respuesta || '(sin respuesta)');
       _aiHistorial.push({role:'assistant', content: data.respuesta || ''});
+      aiGuardarHistorial();
     }
   }catch(e){
     pensando.remove();
