@@ -176,6 +176,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
       <div class="ssep">General</div>
       <div class="sitem on" data-page="resumen" onclick="navPage('resumen')"><span class="ico">📊</span>Resumen</div>
       <div class="sitem" data-page="analisis" onclick="navPage('analisis')"><span class="ico">📈</span>Análisis Financiero</div>
+      <div class="sitem" data-page="asistente" onclick="navPage('asistente')"><span class="ico">🤖</span>Asistente IA</div>
 
       <div class="ssep">Administración</div>
       <div class="sitem" data-page="empleados" onclick="navPage('empleados')"><span class="ico">💰</span>Sueldos</div>
@@ -312,6 +313,26 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
             <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:16px">Qué podés mejorar</div>
             <div id="an-recomendaciones" style="font-size:13.5px;color:#3a4553;line-height:1.7"></div>
           </div>
+        </div>
+      </div>
+
+      <!-- ASISTENTE IA -->
+      <div id="page-asistente" class="page">
+        <div style="background:linear-gradient(135deg,#0F1923 0%,#1B2D42 60%,#0F1923 100%);border-radius:16px;padding:32px 36px;margin-bottom:24px">
+          <div style="font-size:11px;font-weight:800;letter-spacing:2px;color:#C9A84C;text-transform:uppercase;margin-bottom:8px">Consultá tu situación</div>
+          <div style="font-size:28px;font-weight:800;color:#fff;margin-bottom:6px;letter-spacing:-.5px">🤖 Asistente Financiero</div>
+          <div style="font-size:14px;color:rgba(255,255,255,.5)">Preguntale lo que quieras sobre tus números — usa los datos reales del sistema.</div>
+        </div>
+
+        <div style="background:#fff;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.06);display:flex;flex-direction:column;height:60vh;min-height:420px">
+          <div id="ai-chat-msgs" style="flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:14px"></div>
+          <div style="border-top:1px solid #F0F4F8;padding:14px 18px;display:flex;gap:10px;align-items:flex-end">
+            <textarea id="ai-input" rows="1" placeholder="Preguntale algo, ej: ¿cómo viene el mes comparado con el anterior?" style="flex:1;resize:none;border:1.5px solid #D8E2EC;border-radius:10px;padding:10px 14px;font-family:inherit;font-size:14px;max-height:120px" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarPreguntaAsistente();}"></textarea>
+            <button onclick="enviarPreguntaAsistente()" style="background:#1B3A6B;color:#fff;border:none;border-radius:10px;padding:10px 20px;font-weight:700;cursor:pointer;font-size:14px" id="ai-btn-enviar">Enviar</button>
+          </div>
+        </div>
+        <div style="font-size:12px;color:#8A9BAB;margin-top:10px">
+          El asistente responde en base a los datos cargados en el sistema. No reemplaza a un contador o asesor financiero para decisiones grandes.
         </div>
       </div>
 
@@ -1281,6 +1302,7 @@ function navPage(name){
   const s = document.querySelector('[data-page="'+name+'"]'); if(s) s.classList.add('on');
   if(name==='resumen') renderResumen();
   if(name==='analisis') renderAnalisis();
+  if(name==='asistente') renderAsistente();
   if(name==='empleados'){ renderEmpleados(); }
   if(name==='adelantos'){ fillAdEmp(); renderAdelantos(); }
   if(name==='ventas'){ fillPremEmp(); renderPremios(); }
@@ -1625,6 +1647,125 @@ function renderChartTendencia(historicos){
     ctx.fillStyle = '#8A9BAB'; ctx.font='10px system-ui'; ctx.textAlign='center';
     ctx.fillText(MES[d.getMonth()].slice(0,3), x+barW/2, H-10);
   });
+}
+
+// ═══════════════════════════════
+// ASISTENTE IA
+// ═══════════════════════════════
+let _aiHistorial = []; // [{role:'user'|'assistant', content:'...'}]
+
+function renderAsistente(){
+  const box = g('ai-chat-msgs');
+  if(!box) return;
+  if(box.children.length === 0){
+    aiAgregarMensaje('assistant', '¡Hola! Soy tu asistente financiero. Puedo ver los datos cargados en ODSA (sueldos, gastos, ingresos, cash flow, etc.) y contestarte preguntas sobre tu situación económica. Por ejemplo:\n\n• ¿Cómo viene el mes comparado con el anterior?\n• ¿En qué gasté más este mes?\n• ¿Cuánto me queda de margen entre ingresos y egresos?\n\n¿Qué querés saber?');
+  }
+}
+
+function aiAgregarMensaje(role, texto){
+  const box = g('ai-chat-msgs');
+  if(!box) return;
+  const esUser = role === 'user';
+  const bubble = document.createElement('div');
+  bubble.style.cssText = 'max-width:80%;padding:12px 16px;border-radius:14px;font-size:14px;line-height:1.5;white-space:pre-wrap;'
+    + (esUser
+      ? 'align-self:flex-end;background:#1B3A6B;color:#fff;border-bottom-right-radius:4px'
+      : 'align-self:flex-start;background:#F0F4F8;color:#1a2332;border-bottom-left-radius:4px');
+  bubble.textContent = texto;
+  box.appendChild(bubble);
+  box.scrollTop = box.scrollHeight;
+  return bubble;
+}
+
+// Arma un resumen compacto de la situacion financiera para darle contexto a la IA,
+// sin mandar datos personales sensibles (CUIT, CBU, etc.) de cada empleado.
+function construirContextoFinanciero(){
+  const m = mesSel;
+  const rActual = calcResumenFor(m);
+  const mAnt = shiftMes(m, -1);
+  const rAnterior = calcResumenFor(mAnt);
+
+  const historicos = [];
+  for(let i=5;i>=0;i--){
+    const mm = shiftMes(m,-i);
+    const r = calcResumenFor(mm);
+    historicos.push({mes: mesLabel(mm), ingresos:r.totalIngresos, egresos:r.totalEgresos, resultado:r.resultado});
+  }
+
+  let cf = null;
+  try{
+    const {ing_sem, eg_sem} = getCFData(m);
+    cf = [1,2,3,4,5].map(s=>({
+      semana: s,
+      ingresos: (ing_sem[s]||[]).reduce((sum,i)=>sum+(i.monto||0),0),
+      egresos: ((eg_sem[s]&&eg_sem[s].items)||[]).reduce((sum,i)=>sum+(i.monto||0),0)
+    })).filter(x=>x.ingresos>0 || x.egresos>0);
+  }catch(e){ cf = null; }
+
+  const adelantosPendientes = (D.adelantos||[]).filter(a=>a.mes===m && !a.pagado).reduce((s,a)=>s+a.monto,0);
+  const chequesPendientes = (D.cheques||[]).filter(c=>c.mes===m && c.estado && c.estado!=='cobrado' && c.estado!=='Pagado').length;
+
+  return {
+    mes_actual: mesLabel(m),
+    resumen_mes_actual: {
+      ingresos: rActual.totalIngresos,
+      egresos: rActual.totalEgresos,
+      resultado_neto: rActual.resultado,
+      sueldos_nomina: rActual.totalSueldos,
+      premios_semanales: rActual.totalPremios,
+      comisiones_externos: rActual.totalComisiones,
+      gastos_generales: rActual.totalGastos,
+      cheques_emitidos: rActual.totalCheques
+    },
+    resumen_mes_anterior: {
+      mes: mesLabel(mAnt),
+      ingresos: rAnterior.totalIngresos,
+      egresos: rAnterior.totalEgresos,
+      resultado_neto: rAnterior.resultado
+    },
+    tendencia_ultimos_6_meses: historicos,
+    cash_flow_semanal_mes_actual: cf,
+    empleados_activos: D.empleados.length,
+    adelantos_pendientes_de_pago: adelantosPendientes,
+    cheques_pendientes: chequesPendientes
+  };
+}
+
+async function enviarPreguntaAsistente(){
+  const input = g('ai-input');
+  const pregunta = (input.value||'').trim();
+  if(!pregunta) return;
+  input.value = '';
+  input.style.height = 'auto';
+
+  aiAgregarMensaje('user', pregunta);
+  _aiHistorial.push({role:'user', content:pregunta});
+
+  const btn = g('ai-btn-enviar');
+  btn.disabled = true; btn.textContent = '...';
+  const pensando = aiAgregarMensaje('assistant', 'Pensando...');
+
+  try{
+    const contexto = construirContextoFinanciero();
+    const r = await fetch('/api/asistente', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+      body: JSON.stringify({ pregunta, contexto, historial: _aiHistorial.slice(0,-1) })
+    });
+    const data = await r.json();
+    pensando.remove();
+    if(!r.ok || !data.ok){
+      aiAgregarMensaje('assistant', '⚠️ No pude responder: '+(data.error||'error desconocido')+'. Si esto sigue pasando, puede que falte configurar la clave de la IA en el servidor.');
+    } else {
+      aiAgregarMensaje('assistant', data.respuesta || '(sin respuesta)');
+      _aiHistorial.push({role:'assistant', content: data.respuesta || ''});
+    }
+  }catch(e){
+    pensando.remove();
+    aiAgregarMensaje('assistant', '⚠️ Error de conexión. Probá de nuevo en un momento.');
+  }finally{
+    btn.disabled = false; btn.textContent = 'Enviar';
+  }
 }
 
 // ═══════════════════════════════
