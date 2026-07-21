@@ -175,6 +175,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
     <div class="sidebar">
       <div class="ssep">General</div>
       <div class="sitem on" data-page="resumen" onclick="navPage('resumen')"><span class="ico">📊</span>Resumen</div>
+      <div class="sitem" data-page="analisis" onclick="navPage('analisis')"><span class="ico">📈</span>Análisis Financiero</div>
 
       <div class="ssep">Administración</div>
       <div class="sitem" data-page="empleados" onclick="navPage('empleados')"><span class="ico">💰</span>Sueldos</div>
@@ -255,6 +256,62 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
             </tr></thead>
             <tbody id="res-desglose"></tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- ANALISIS FINANCIERO -->
+      <div id="page-analisis" class="page">
+        <div style="background:linear-gradient(135deg,#0F1923 0%,#1B2D42 60%,#0F1923 100%);border-radius:16px;padding:32px 36px;margin-bottom:24px;position:relative;overflow:hidden">
+          <div style="position:absolute;right:36px;top:32px;z-index:2" id="analisis-periodo-wrap"></div>
+          <div style="font-size:11px;font-weight:800;letter-spacing:2px;color:#C9A84C;text-transform:uppercase;margin-bottom:8px">Evaluación económica</div>
+          <div style="font-size:28px;font-weight:800;color:#fff;margin-bottom:6px;letter-spacing:-.5px">Análisis Financiero</div>
+          <div style="font-size:14px;color:rgba(255,255,255,.5)" id="an-sub"></div>
+        </div>
+
+        <!-- Comparacion vs mes anterior -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px">
+          <div class="kpi-card">
+            <div class="kpi-label">Resultado este mes</div>
+            <div class="kpi-val" id="an-result-actual" style="font-size:24px"></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Resultado mes anterior</div>
+            <div class="kpi-val" id="an-result-anterior" style="font-size:24px;color:#6B7E8F"></div>
+          </div>
+          <div class="kpi-card" id="an-comparacion-card">
+            <div class="kpi-label">Comparación</div>
+            <div class="kpi-val" id="an-comparacion" style="font-size:20px"></div>
+          </div>
+        </div>
+
+        <!-- Veredicto / evaluacion -->
+        <div id="an-veredicto" style="border-radius:14px;padding:20px 24px;margin-bottom:24px;font-size:15px;line-height:1.5"></div>
+
+        <!-- Tendencia ultimos meses -->
+        <div style="background:#fff;border-radius:14px;padding:24px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+          <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:16px">Tendencia — últimos 6 meses</div>
+          <canvas id="an-chart-tendencia" style="width:100%;height:180px"></canvas>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+          <!-- Que aumento / disminuyo -->
+          <div style="background:#fff;border-radius:14px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+            <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:16px">Variación de gastos vs. mes anterior</div>
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead><tr>
+                <th style="padding:8px 6px;text-align:left;font-size:10px;font-weight:800;color:#8A9BAB;text-transform:uppercase;border-bottom:2px solid #E4EAF0">Categoría</th>
+                <th style="padding:8px 6px;text-align:right;font-size:10px;font-weight:800;color:#8A9BAB;text-transform:uppercase;border-bottom:2px solid #E4EAF0">Este mes</th>
+                <th style="padding:8px 6px;text-align:right;font-size:10px;font-weight:800;color:#8A9BAB;text-transform:uppercase;border-bottom:2px solid #E4EAF0">Variación</th>
+              </tr></thead>
+              <tbody id="an-tabla-categorias"></tbody>
+            </table>
+          </div>
+
+          <!-- Recomendaciones -->
+          <div style="background:#fff;border-radius:14px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+            <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:16px">Qué podés mejorar</div>
+            <div id="an-recomendaciones" style="font-size:13.5px;color:#3a4553;line-height:1.7"></div>
+          </div>
         </div>
       </div>
 
@@ -890,12 +947,13 @@ function actualizarLabelsMes(){
   const ingWrap = g('ing-periodo-wrap'); if(ingWrap) ingWrap.innerHTML = periodoSelectorHTML('ing');
   const cheWrap = g('che-periodo-wrap'); if(cheWrap) cheWrap.innerHTML = periodoSelectorHTML('che');
   const resWrap = g('res-periodo-wrap'); if(resWrap) resWrap.innerHTML = periodoSelectorHTML('res');
+  const anWrap = g('analisis-periodo-wrap'); if(anWrap) anWrap.innerHTML = periodoSelectorHTML('analisis');
   const cfSel = g('cf-mes'); if(cfSel && [...cfSel.options].some(o=>o.value===mesSel)) cfSel.value = mesSel;
   const extSel = g('ext-filtro-mes'); if(extSel && [...extSel.options].some(o=>o.value===mesSel)) extSel.value = mesSel;
 }
 function renderTodoElPeriodo(){
   renderEmpleados(); renderGastos(); renderPremios(); renderIngresos(); renderCheques();
-  renderCashFlow(); renderExternos(); renderResumen();
+  renderCashFlow(); renderExternos(); renderResumen(); renderAnalisis();
 }
 function cambiarMesSel(delta){
   mesSel = shiftMes(mesSel, delta);
@@ -1222,6 +1280,7 @@ function navPage(name){
   const p = g('page-'+name); if(p) p.classList.add('on');
   const s = document.querySelector('[data-page="'+name+'"]'); if(s) s.classList.add('on');
   if(name==='resumen') renderResumen();
+  if(name==='analisis') renderAnalisis();
   if(name==='empleados'){ renderEmpleados(); }
   if(name==='adelantos'){ fillAdEmp(); renderAdelantos(); }
   if(name==='ventas'){ fillPremEmp(); renderPremios(); }
@@ -1283,8 +1342,7 @@ g('ex-rol')&&g('ex-rol').addEventListener('change',()=>{
 // ═══════════════════════════════
 // RESUMEN
 // ═══════════════════════════════
-function calcResumen(){
-  const m = mesSel;
+function calcResumenFor(m){
   const totalSueldos = D.empleados.reduce((s,e)=>{ const n=getNominaEmp(e,m); return s+(n.sueldo+(n.hsExtra||0)); },0);
   const totalPremios = D.premios.filter(p=>p.mes===m).reduce((s,p)=>s+p.monto,0);
   const totalComisiones = D.comisiones.filter(c=>c.mes===m).reduce((s,c)=>s+c.total,0);
@@ -1292,8 +1350,9 @@ function calcResumen(){
   const totalCheques = D.cheques.filter(c=>c.mes===m).reduce((s,c)=>s+c.monto,0);
   const totalIngresos = D.ingresos.filter(i=>i.mes===m).reduce((s,i)=>s+i.monto,0);
   const totalEgresos = totalSueldos+totalPremios+totalComisiones+totalGastos+totalCheques;
-  return {totalSueldos,totalPremios,totalComisiones,totalGastos,totalCheques,totalIngresos,totalEgresos,resultado:totalIngresos-totalEgresos};
+  return {mes:m,totalSueldos,totalPremios,totalComisiones,totalGastos,totalCheques,totalIngresos,totalEgresos,resultado:totalIngresos-totalEgresos};
 }
+function calcResumen(){ return calcResumenFor(mesSel); }
 
 function renderResumen(){
   const _wrap = g('res-periodo-wrap'); if(_wrap && !_wrap.innerHTML) _wrap.innerHTML = periodoSelectorHTML('res');
@@ -1409,6 +1468,163 @@ function renderChart(r){
       <span style="font-size:11px;font-weight:700;margin-left:auto">${fmt(x.val)}</span>
     </div>
   `).join('');
+}
+
+// ═══════════════════════════════
+// ANALISIS FINANCIERO
+// ═══════════════════════════════
+function renderAnalisis(){
+  const _wrap = g('analisis-periodo-wrap'); if(_wrap && !_wrap.innerHTML) _wrap.innerHTML = periodoSelectorHTML('analisis');
+  const m = mesSel;
+  const mAnt = shiftMes(m, -1);
+  g('an-sub').textContent = 'Evaluación de '+mesLabel(m)+' comparada con '+mesLabel(mAnt);
+
+  const rActual = calcResumenFor(m);
+  const rAnt = calcResumenFor(mAnt);
+
+  // --- Comparacion de resultado neto ---
+  g('an-result-actual').textContent = fmt(rActual.resultado);
+  g('an-result-actual').style.color = rActual.resultado >= 0 ? '#1A7A52' : '#C0392B';
+  g('an-result-anterior').textContent = fmt(rAnt.resultado);
+
+  const diff = rActual.resultado - rAnt.resultado;
+  const huboMesAnterior = (rAnt.totalIngresos > 0 || rAnt.totalEgresos > 0);
+  const compEl = g('an-comparacion');
+  const compCard = g('an-comparacion-card');
+  if(!huboMesAnterior){
+    compEl.textContent = 'Sin datos del mes anterior';
+    compEl.style.color = '#8A9BAB';
+  } else if(diff > 0){
+    compEl.innerHTML = '▲ Mejor por '+fmt(Math.abs(diff));
+    compEl.style.color = '#1A7A52';
+  } else if(diff < 0){
+    compEl.innerHTML = '▼ Peor por '+fmt(Math.abs(diff));
+    compEl.style.color = '#C0392B';
+  } else {
+    compEl.textContent = 'Igual que el mes anterior';
+    compEl.style.color = '#8A9BAB';
+  }
+
+  // --- Veredicto general ---
+  const veredictoEl = g('an-veredicto');
+  let veredictoTxt = '', veredictoBg = '#EAF6EF', veredictoColor='#166534';
+  if(!huboMesAnterior){
+    veredictoTxt = '📊 Todavía no hay datos cargados del mes anterior ('+mesLabel(mAnt)+') para poder comparar. Cargá ese mes para tener una evaluación más completa.';
+    veredictoBg = '#F0F4F8'; veredictoColor = '#3a4553';
+  } else if(rActual.resultado < 0){
+    veredictoTxt = '🔴 Este mes vas a estar en pérdida: los egresos ('+fmt(rActual.totalEgresos)+') superan a los ingresos ('+fmt(rActual.totalIngresos)+'). '+(diff<0 ? 'Además, es peor que el mes anterior.' : 'Aun así, mejoraste respecto al mes anterior.');
+    veredictoBg = '#FDEDEC'; veredictoColor = '#922B21';
+  } else if(diff > 0){
+    veredictoTxt = '🟢 Este mes ganaste más que el anterior: tu resultado mejoró en '+fmt(Math.abs(diff))+(rAnt.resultado!==0 ? ' ('+Math.round(Math.abs(diff)/Math.abs(rAnt.resultado)*100)+'% más)' : '')+'. Vas en la dirección correcta.';
+  } else if(diff < 0){
+    veredictoTxt = '🟡 Ganaste este mes, pero fue '+fmt(Math.abs(diff))+' menos que el mes anterior. Convendría revisar qué categoría creció (mirá la tabla de variación).';
+    veredictoBg = '#FEF9E7'; veredictoColor = '#7D6608';
+  } else {
+    veredictoTxt = '⚪ Tu resultado quedó exactamente igual que el mes anterior.';
+    veredictoBg = '#F0F4F8'; veredictoColor = '#3a4553';
+  }
+  veredictoEl.style.background = veredictoBg;
+  veredictoEl.style.color = veredictoColor;
+  veredictoEl.innerHTML = veredictoTxt;
+
+  // --- Tendencia ultimos 6 meses ---
+  const historicos = [];
+  for(let i=5;i>=0;i--){ const mm = shiftMes(m,-i); historicos.push(calcResumenFor(mm)); }
+  renderChartTendencia(historicos);
+
+  // --- Tabla de variacion por categoria ---
+  const categorias = [
+    {key:'totalSueldos', label:'Sueldos nómina'},
+    {key:'totalPremios', label:'Premios semanales'},
+    {key:'totalComisiones', label:'Comisiones externos'},
+    {key:'totalGastos', label:'Gastos generales'},
+    {key:'totalCheques', label:'Cheques emitidos'},
+  ];
+  const variaciones = categorias.map(c=>{
+    const actual = rActual[c.key]||0;
+    const anterior = rAnt[c.key]||0;
+    const delta = actual - anterior;
+    const pct = anterior > 0 ? Math.round(delta/anterior*100) : (actual>0 ? 100 : 0);
+    return {label:c.label, actual, anterior, delta, pct};
+  }).sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta));
+
+  g('an-tabla-categorias').innerHTML = variaciones.map(v=>{
+    const subio = v.delta > 0;
+    const color = v.delta===0 ? '#8A9BAB' : (subio ? '#C0392B' : '#1A7A52');
+    const flecha = v.delta===0 ? '—' : (subio ? '▲' : '▼');
+    const pctTxt = huboMesAnterior ? (v.delta===0?'sin cambio':(flecha+' '+Math.abs(v.pct)+'% ('+fmt(Math.abs(v.delta))+')')) : '—';
+    return `<tr>
+      <td style="padding:9px 6px;border-bottom:1px solid #F0F4F8">${v.label}</td>
+      <td style="padding:9px 6px;border-bottom:1px solid #F0F4F8;text-align:right;font-weight:700">${fmt(v.actual)}</td>
+      <td style="padding:9px 6px;border-bottom:1px solid #F0F4F8;text-align:right;color:${color};font-weight:700;white-space:nowrap">${pctTxt}</td>
+    </tr>`;
+  }).join('');
+
+  // --- Recomendaciones automaticas ---
+  const recos = [];
+  if(huboMesAnterior){
+    const peorCategoria = variaciones.find(v=>v.delta>0);
+    const mejorCategoria = [...variaciones].reverse().find(v=>v.delta<0);
+    if(peorCategoria){
+      recos.push('📌 <b>'+peorCategoria.label+'</b> fue lo que más aumentó respecto al mes anterior (+'+fmt(peorCategoria.delta)+'). Es el primer lugar donde buscar un recorte.');
+    }
+    if(mejorCategoria){
+      recos.push('✅ Lograste bajar <b>'+mejorCategoria.label+'</b> en '+fmt(Math.abs(mejorCategoria.delta))+' respecto al mes anterior. Mantené esa tendencia.');
+    }
+  }
+  const pctEgIng = rActual.totalIngresos > 0 ? rActual.totalEgresos/rActual.totalIngresos*100 : 0;
+  if(pctEgIng >= 95){
+    recos.push('⚠️ Tus egresos representan el '+Math.round(pctEgIng)+'% de tus ingresos este mes — muy poco margen. Cualquier imprevisto te puede llevar a pérdida.');
+  } else if(pctEgIng >= 80){
+    recos.push('🟡 Tus egresos son el '+Math.round(pctEgIng)+'% de tus ingresos. Hay margen, pero conviene no aumentar gastos fijos por ahora.');
+  } else if(rActual.totalIngresos > 0){
+    recos.push('🟢 Tus egresos son solo el '+Math.round(pctEgIng)+'% de tus ingresos — buen margen de ganancia este mes.');
+  }
+  const mayorCategoriaActual = categorias.map(c=>({label:c.label, monto:rActual[c.key]||0})).sort((a,b)=>b.monto-a.monto)[0];
+  if(mayorCategoriaActual && rActual.totalEgresos>0){
+    const pctDelTotal = Math.round(mayorCategoriaActual.monto/rActual.totalEgresos*100);
+    recos.push('🔎 <b>'+mayorCategoriaActual.label+'</b> es tu mayor gasto (representa el '+pctDelTotal+'% de todos los egresos del mes). Es donde más impacto tiene cualquier ajuste.');
+  }
+  if(recos.length===0) recos.push('Cargá más meses para que el sistema pueda darte recomendaciones más precisas.');
+  g('an-recomendaciones').innerHTML = recos.map(r=>'<div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #F5F7FA">'+r+'</div>').join('');
+}
+
+function renderChartTendencia(historicos){
+  const canvas = g('an-chart-tendencia');
+  if(!canvas) return;
+  const W = canvas.parentElement.offsetWidth - 48 || 500;
+  const H = 180;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+
+  const vals = historicos.map(h=>h.resultado);
+  const maxAbs = Math.max(...vals.map(v=>Math.abs(v)), 1);
+  const padTop = 10, padBottom = 28, padSide = 8;
+  const chartH = H - padTop - padBottom;
+  const zeroY = padTop + chartH/2;
+  const barW = (W - padSide*2) / historicos.length;
+
+  // linea de cero
+  ctx.strokeStyle = '#E4EAF0'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(padSide, zeroY); ctx.lineTo(W-padSide, zeroY); ctx.stroke();
+
+  historicos.forEach((h,i)=>{
+    const x = padSide + i*barW;
+    const barH = (Math.abs(h.resultado)/maxAbs) * (chartH/2 - 4);
+    const bw = barW*0.55;
+    const bx = x + (barW-bw)/2;
+    ctx.fillStyle = h.resultado >= 0 ? '#4ADE80' : '#F87171';
+    if(h.resultado >= 0){
+      ctx.fillRect(bx, zeroY-barH, bw, barH);
+    } else {
+      ctx.fillRect(bx, zeroY, bw, barH);
+    }
+    // label mes abreviado
+    const d = new Date(h.mes+'-01T00:00:00');
+    ctx.fillStyle = '#8A9BAB'; ctx.font='10px system-ui'; ctx.textAlign='center';
+    ctx.fillText(MES[d.getMonth()].slice(0,3), x+barW/2, H-10);
+  });
 }
 
 // ═══════════════════════════════
