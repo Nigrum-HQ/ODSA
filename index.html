@@ -177,6 +177,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
       <div class="sitem on" data-page="resumen" onclick="navPage('resumen')"><span class="ico">📊</span>Resumen</div>
       <div class="sitem" data-page="analisis" onclick="navPage('analisis')"><span class="ico">📈</span>Análisis Financiero</div>
       <div class="sitem" data-page="asistente" onclick="navPage('asistente')"><span class="ico">🤖</span>Asistente IA</div>
+      <div class="sitem" data-page="importhist" onclick="navPage('importhist')"><span class="ico">⏳</span>Importar histórico</div>
 
       <div class="ssep">Administración</div>
       <div class="sitem" data-page="empleados" onclick="navPage('empleados')"><span class="ico">💰</span>Sueldos</div>
@@ -346,6 +347,21 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
         <div style="font-size:12px;color:#8A9BAB;margin-top:10px">
           El asistente responde en base a los datos cargados en el sistema (incluye sueldos, CBU y bancos de empleados) y a una conversación compartida con tu compañero/a de trabajo (la ven los dos, desde cualquier computadora). Puede proponer cargar gastos, ingresos, adelantos o premios, pero nunca los guarda sin que vos confirmes cada acción. No reemplaza a un contador o asesor financiero para decisiones grandes.
         </div>
+      </div>
+
+      <!-- IMPORTAR HISTORICO ENE-ABR 2026 (herramienta temporal, un solo uso) -->
+      <div id="page-importhist" class="page">
+        <div style="background:linear-gradient(135deg,#0F1923 0%,#1B2D42 60%,#0F1923 100%);border-radius:16px;padding:32px 36px;margin-bottom:24px">
+          <div style="font-size:11px;font-weight:800;letter-spacing:2px;color:#C9A84C;text-transform:uppercase;margin-bottom:8px">Herramienta temporal</div>
+          <div style="font-size:28px;font-weight:800;color:#fff;margin-bottom:6px;letter-spacing:-.5px">⏳ Importar histórico Enero-Abril 2026</div>
+          <div style="font-size:14px;color:rgba(255,255,255,.5)">Carga de una sola vez los gastos y comisiones de esos 4 meses, tomados de tu Excel de Caja y Cash Flow.</div>
+        </div>
+
+        <div id="ih-resumen" style="background:#fff;border-radius:14px;padding:24px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,.06)"></div>
+        <div id="ih-comisiones-check" style="background:#fff;border-radius:14px;padding:24px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,.06)"></div>
+
+        <button id="ih-btn-confirmar" onclick="confirmarImportacionHistorico()" style="background:#1B3A6B;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-weight:700;cursor:pointer;font-size:14px">Confirmar e importar</button>
+        <div id="ih-resultado" style="margin-top:20px;font-size:13.5px;line-height:1.7"></div>
       </div>
 
       <!-- EMPLEADOS -->
@@ -1339,6 +1355,7 @@ function navPage(name){
   if(name==='resumen') renderResumen();
   if(name==='analisis') renderAnalisis();
   if(name==='asistente') renderAsistente();
+  if(name==='importhist') renderImportHistorico();
   if(name==='empleados'){ renderEmpleados(); }
   if(name==='adelantos'){ fillAdEmp(); renderAdelantos(); }
   if(name==='ventas'){ fillPremEmp(); renderPremios(); }
@@ -2288,6 +2305,474 @@ async function enviarPreguntaAsistente(){
   aiGuardarHistorial();
 
   await aiProcesarTurno();
+}
+
+// ═══════════════════════════════
+// IMPORTAR HISTORICO ENE-ABR 2026 (herramienta temporal, un solo uso)
+// ═══════════════════════════════
+const IH_FLAG = '_historicoEneAbr2026Importado';
+
+const IH_GASTOS = [
+  {desc:"Sueldos operadoras",cat:"Sueldos",monto:5559300.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"Sueldos operadoras",cat:"Sueldos",monto:2000000.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {desc:"Sueldos operadoras",cat:"Sueldos",monto:3863316.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {desc:"Sueldos operadoras",cat:"Sueldos",monto:2500000.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {desc:"Sueldos operadoras",cat:"Sueldos",monto:4013723.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {desc:"Sueldos operadoras",cat:"Sueldos",monto:6380888.0,fecha:"2026-04-01",mes:"2026-04",sem:1},
+  {desc:"Comisiones Operadores",cat:"Sueldos",monto:7204808.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"Comisiones Operadores",cat:"Sueldos",monto:10978681.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {desc:"Comisiones Operadores",cat:"Sueldos",monto:9476930.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {desc:"Comisiones Operadores",cat:"Sueldos",monto:8949096.0,fecha:"2026-04-01",mes:"2026-04",sem:1},
+  {desc:"Premios semanales",cat:"Sueldos",monto:335000.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"Premios semanales",cat:"Sueldos",monto:335000.0,fecha:"2026-01-08",mes:"2026-01",sem:2},
+  {desc:"Premios semanales",cat:"Sueldos",monto:335000.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {desc:"Premios semanales",cat:"Sueldos",monto:335000.0,fecha:"2026-01-22",mes:"2026-01",sem:4},
+  {desc:"Premios semanales",cat:"Sueldos",monto:335000.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {desc:"Premios semanales",cat:"Sueldos",monto:335000.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {desc:"Premios semanales",cat:"Sueldos",monto:335000.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {desc:"Premios semanales",cat:"Sueldos",monto:335000.0,fecha:"2026-02-22",mes:"2026-02",sem:4},
+  {desc:"Premios semanales",cat:"Sueldos",monto:335000.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {desc:"Premios semanales",cat:"Sueldos",monto:335000.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {desc:"Premios semanales",cat:"Sueldos",monto:335000.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {desc:"Premios semanales",cat:"Sueldos",monto:335000.0,fecha:"2026-03-22",mes:"2026-03",sem:4},
+  {desc:"Premios semanales",cat:"Sueldos",monto:335000.0,fecha:"2026-04-01",mes:"2026-04",sem:1},
+  {desc:"Premios semanales",cat:"Sueldos",monto:335000.0,fecha:"2026-04-08",mes:"2026-04",sem:2},
+  {desc:"Premios semanales",cat:"Sueldos",monto:252000.0,fecha:"2026-04-15",mes:"2026-04",sem:3},
+  {desc:"Premios semanales",cat:"Sueldos",monto:217000.0,fecha:"2026-04-22",mes:"2026-04",sem:4},
+  {desc:"Yamaha",cat:"Sueldos",monto:3139415.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"Yamaha",cat:"Sueldos",monto:128745.0,fecha:"2026-01-08",mes:"2026-01",sem:2},
+  {desc:"Yamaha",cat:"Sueldos",monto:140805.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {desc:"Yamaha",cat:"Sueldos",monto:2894817.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {desc:"Yamaha",cat:"Sueldos",monto:648000.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {desc:"Yamaha",cat:"Sueldos",monto:355632.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {desc:"Yamaha",cat:"Sueldos",monto:2539953.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {desc:"Yamaha",cat:"Sueldos",monto:600000.0,fecha:"2026-03-22",mes:"2026-03",sem:4},
+  {desc:"Yamaha",cat:"Sueldos",monto:2984691.0,fecha:"2026-04-01",mes:"2026-04",sem:1},
+  {desc:"Yamaha",cat:"Sueldos",monto:237795.0,fecha:"2026-04-08",mes:"2026-04",sem:2},
+  {desc:"Salud 360 (YA NO ESTA)",cat:"otro",monto:1344824.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"Salud 360 (YA NO ESTA)",cat:"otro",monto:1487772.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {desc:"Salud 360 (YA NO ESTA)",cat:"otro",monto:360000.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {desc:"Salud 360 (YA NO ESTA)",cat:"otro",monto:1487772.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {desc:"Salud 360 (YA NO ESTA)",cat:"otro",monto:1487772.0,fecha:"2026-04-01",mes:"2026-04",sem:1},
+  {desc:"Salud 360 (YA NO ESTA)",cat:"otro",monto:661356.0,fecha:"2026-04-08",mes:"2026-04",sem:2},
+  {desc:"Turnos osmedica",cat:"Sueldos",monto:11616042.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"Turnos osmedica",cat:"Sueldos",monto:448000.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {desc:"Turnos osmedica",cat:"Sueldos",monto:3968836.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {desc:"Turnos osmedica",cat:"Sueldos",monto:8868491.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {desc:"Turnos osmedica",cat:"Sueldos",monto:180000.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {desc:"Turnos osmedica",cat:"Sueldos",monto:700000.0,fecha:"2026-02-22",mes:"2026-02",sem:4},
+  {desc:"Turnos osmedica",cat:"Sueldos",monto:2337767.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {desc:"Turnos osmedica",cat:"Sueldos",monto:8233401.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {desc:"Turnos osmedica",cat:"Sueldos",monto:250000.0,fecha:"2026-03-22",mes:"2026-03",sem:4},
+  {desc:"Turnos osmedica",cat:"Sueldos",monto:11304936.0,fecha:"2026-04-01",mes:"2026-04",sem:1},
+  {desc:"Sueldo Wendy",cat:"Sueldos",monto:1102000.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"Sueldo Wendy",cat:"Sueldos",monto:1179859.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {desc:"Sueldo Wendy",cat:"Sueldos",monto:1179859.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {desc:"Sueldo Wendy",cat:"Sueldos",monto:1180000.0,fecha:"2026-04-01",mes:"2026-04",sem:1},
+  {desc:"Moderacion",cat:"Sueldos",monto:479227.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"Moderacion",cat:"Sueldos",monto:533000.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {desc:"Moderacion",cat:"Sueldos",monto:533000.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {desc:"Moderacion",cat:"Sueldos",monto:533000.0,fecha:"2026-04-01",mes:"2026-04",sem:1},
+  {desc:"Retiro",cat:"Sueldos",monto:6244000.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"Retiro",cat:"Sueldos",monto:6679218.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {desc:"Retiro",cat:"Sueldos",monto:6679218.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {desc:"Retiro",cat:"Sueldos",monto:6679218.0,fecha:"2026-04-01",mes:"2026-04",sem:1},
+  {desc:"Idalmys",cat:"Sueldos",monto:1943000.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"Idalmys",cat:"Sueldos",monto:1939159.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {desc:"Idalmys",cat:"Sueldos",monto:1939159.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {desc:"Idalmys",cat:"Sueldos",monto:2139159.0,fecha:"2026-04-01",mes:"2026-04",sem:1},
+  {desc:"Idalmys",cat:"Sueldos",monto:1154802.0,fecha:"2026-04-15",mes:"2026-04",sem:3},
+  {desc:"Liquidaciones finales",cat:"Sueldos",monto:661728.0,fecha:"2026-02-22",mes:"2026-02",sem:4},
+  {desc:"VICTORIA VIDEOS",cat:"otro",monto:1843000.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {desc:"VICTORIA VIDEOS",cat:"otro",monto:570000.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {desc:"VICTORIA VIDEOS",cat:"otro",monto:1987792.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {desc:"VICTORIA VIDEOS",cat:"otro",monto:480000.0,fecha:"2026-03-22",mes:"2026-03",sem:4},
+  {desc:"VICTORIA VIDEOS",cat:"otro",monto:370000.0,fecha:"2026-04-08",mes:"2026-04",sem:2},
+  {desc:"Aportes Obra social",cat:"arca",monto:1004000.0,fecha:"2026-01-08",mes:"2026-01",sem:2},
+  {desc:"Aportes Obra social",cat:"arca",monto:942675.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {desc:"Aportes Obra social",cat:"arca",monto:832925.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {desc:"Aportes Obra social",cat:"arca",monto:1024728.0,fecha:"2026-04-08",mes:"2026-04",sem:2},
+  {desc:"Cargas sociales",cat:"arca",monto:4500000.0,fecha:"2026-04-08",mes:"2026-04",sem:2},
+  {desc:"Publicidad pautas",cat:"publicidad",monto:4735000.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"Publicidad pautas",cat:"publicidad",monto:4735000.0,fecha:"2026-01-08",mes:"2026-01",sem:2},
+  {desc:"Publicidad pautas",cat:"publicidad",monto:5735000.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {desc:"Publicidad pautas",cat:"publicidad",monto:4735000.0,fecha:"2026-01-22",mes:"2026-01",sem:4},
+  {desc:"Publicidad pautas",cat:"publicidad",monto:5228608.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {desc:"Publicidad pautas",cat:"publicidad",monto:5100000.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {desc:"Publicidad pautas",cat:"publicidad",monto:5100000.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {desc:"Publicidad pautas",cat:"publicidad",monto:5100000.0,fecha:"2026-02-22",mes:"2026-02",sem:4},
+  {desc:"Publicidad pautas",cat:"publicidad",monto:5250000.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {desc:"Publicidad pautas",cat:"publicidad",monto:4250000.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {desc:"Publicidad pautas",cat:"publicidad",monto:4603000.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {desc:"Publicidad pautas",cat:"publicidad",monto:4603000.0,fecha:"2026-03-22",mes:"2026-03",sem:4},
+  {desc:"Publicidad pautas",cat:"publicidad",monto:5250000.0,fecha:"2026-04-01",mes:"2026-04",sem:1},
+  {desc:"Publicidad pautas",cat:"publicidad",monto:4603000.0,fecha:"2026-04-08",mes:"2026-04",sem:2},
+  {desc:"Publicidad pautas",cat:"publicidad",monto:4603000.0,fecha:"2026-04-15",mes:"2026-04",sem:3},
+  {desc:"Publicidad pautas",cat:"publicidad",monto:4603000.0,fecha:"2026-04-22",mes:"2026-04",sem:4},
+  {desc:"Pilar",cat:"Sueldos",monto:842160.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"Pilar",cat:"Sueldos",monto:842160.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {desc:"Pilar",cat:"Sueldos",monto:1200000.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {desc:"Pilar",cat:"Sueldos",monto:1200000.0,fecha:"2026-04-01",mes:"2026-04",sem:1},
+  {desc:"Pedro",cat:"Sueldos",monto:842160.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"Pedro",cat:"Sueldos",monto:842160.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {desc:"Pedro",cat:"Sueldos",monto:1000000.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {desc:"Pedro",cat:"Sueldos",monto:1000000.0,fecha:"2026-04-01",mes:"2026-04",sem:1},
+  {desc:"Rocio",cat:"Sueldos",monto:500000.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"Rocio",cat:"Sueldos",monto:500000.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {desc:"Rocio",cat:"Sueldos",monto:500000.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {desc:"Rocio",cat:"Sueldos",monto:266667.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {desc:"Rocio",cat:"Sueldos",monto:1000000.0,fecha:"2026-04-01",mes:"2026-04",sem:1},
+  {desc:"Rocio",cat:"Sueldos",monto:18500.0,fecha:"2026-04-08",mes:"2026-04",sem:2},
+  {desc:"Asistclick servicios",cat:"servicios",monto:1803000.0,fecha:"2026-01-08",mes:"2026-01",sem:2},
+  {desc:"Asistclick servicios",cat:"servicios",monto:1834646.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {desc:"Asistclick servicios",cat:"servicios",monto:1883449.0,fecha:"2026-04-01",mes:"2026-04",sem:1},
+  {desc:"Movistar",cat:"servicios",monto:1850000.0,fecha:"2026-01-08",mes:"2026-01",sem:2},
+  {desc:"Movistar",cat:"servicios",monto:2478376.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {desc:"Movistar",cat:"servicios",monto:1950000.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {desc:"Movistar",cat:"servicios",monto:2276000.0,fecha:"2026-04-08",mes:"2026-04",sem:2},
+  {desc:"Limpieza",cat:"insumos",monto:750000.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {desc:"Limpieza",cat:"insumos",monto:750000.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {desc:"Limpieza",cat:"insumos",monto:750000.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {desc:"Limpieza",cat:"insumos",monto:49232.0,fecha:"2026-04-08",mes:"2026-04",sem:2},
+  {desc:"Limpieza",cat:"insumos",monto:750000.0,fecha:"2026-04-15",mes:"2026-04",sem:3},
+  {desc:"JOAQUIN sistemas",cat:"Sueldos",monto:694912.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"JOAQUIN sistemas",cat:"Sueldos",monto:743886.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {desc:"JOAQUIN sistemas",cat:"Sueldos",monto:743886.0,fecha:"2026-04-01",mes:"2026-04",sem:1},
+  {desc:"Odoo sistema",cat:"sistemas",monto:880600.0,fecha:"2026-03-22",mes:"2026-03",sem:4},
+  {desc:"Odoo sistema",cat:"sistemas",monto:943928.0,fecha:"2026-04-15",mes:"2026-04",sem:3},
+  {desc:"Anura sistema",cat:"sistemas",monto:320000.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {desc:"Anura sistema",cat:"sistemas",monto:380000.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {desc:"Anura sistema",cat:"sistemas",monto:50000.0,fecha:"2026-02-22",mes:"2026-02",sem:4},
+  {desc:"Anura sistema",cat:"sistemas",monto:450000.0,fecha:"2026-03-22",mes:"2026-03",sem:4},
+  {desc:"Anura sistema",cat:"sistemas",monto:450000.0,fecha:"2026-04-22",mes:"2026-04",sem:4},
+  {desc:"Internet",cat:"servicios",monto:192000.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"Internet",cat:"servicios",monto:197000.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {desc:"Internet",cat:"servicios",monto:200000.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {desc:"Internet",cat:"servicios",monto:205000.0,fecha:"2026-04-08",mes:"2026-04",sem:2},
+  {desc:"Redsom",cat:"otro",monto:2250000.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"Gastos oficina",cat:"insumos",monto:750000.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {desc:"Gastos oficina",cat:"insumos",monto:800000.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {desc:"Gastos oficina",cat:"insumos",monto:800000.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {desc:"Gastos oficina",cat:"insumos",monto:800000.0,fecha:"2026-04-08",mes:"2026-04",sem:2},
+  {desc:"Compras oficina",cat:"insumos",monto:1415000.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"Compras oficina",cat:"insumos",monto:750000.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {desc:"Alquiler (seervicios)",cat:"alquiler",monto:2800000.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"Alquiler (seervicios)",cat:"alquiler",monto:2800000.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {desc:"Alquiler (seervicios)",cat:"alquiler",monto:2800000.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {desc:"Alquiler (seervicios)",cat:"alquiler",monto:819360.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {desc:"Alquiler (seervicios)",cat:"alquiler",monto:790314.0,fecha:"2026-04-15",mes:"2026-04",sem:3},
+  {desc:"Balbi",cat:"otro",monto:1500000.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"Balbi",cat:"otro",monto:802276.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {desc:"Balbi",cat:"otro",monto:500000.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {desc:"Balbi",cat:"otro",monto:1104552.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {desc:"Balbi",cat:"otro",monto:1604552.0,fecha:"2026-04-01",mes:"2026-04",sem:1},
+  {desc:"Astervoip",cat:"servicios",monto:200000.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {desc:"Astervoip",cat:"servicios",monto:200000.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {desc:"Astervoip",cat:"servicios",monto:205000.0,fecha:"2026-04-08",mes:"2026-04",sem:2},
+  {desc:"SMRHC",cat:"otro",monto:3790000.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"SMRHC",cat:"otro",monto:7113750.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {desc:"SMRHC",cat:"otro",monto:910000.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {desc:"SMRHC",cat:"otro",monto:3510000.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {desc:"SMRHC",cat:"otro",monto:3600000.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {desc:"SMRHC",cat:"otro",monto:4570000.0,fecha:"2026-04-01",mes:"2026-04",sem:1},
+  {desc:"SMRHC",cat:"otro",monto:1207980.0,fecha:"2026-04-22",mes:"2026-04",sem:4},
+  {desc:"Agua",cat:"servicios",monto:75000.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {desc:"Agua",cat:"servicios",monto:133000.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {desc:"Contador",cat:"otro",monto:2345000.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"Contador",cat:"otro",monto:200000.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {desc:"Contador",cat:"otro",monto:6815000.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {desc:"Contador",cat:"otro",monto:200000.0,fecha:"2026-02-22",mes:"2026-02",sem:4},
+  {desc:"Contador",cat:"otro",monto:6887000.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {desc:"Contador",cat:"otro",monto:2560000.0,fecha:"2026-04-08",mes:"2026-04",sem:2},
+  {desc:"planes arca, obligaciones",cat:"arca",monto:820269.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"planes arca, obligaciones",cat:"arca",monto:6009000.0,fecha:"2026-01-08",mes:"2026-01",sem:2},
+  {desc:"planes arca, obligaciones",cat:"arca",monto:14000000.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {desc:"planes arca, obligaciones",cat:"arca",monto:5000000.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {desc:"planes arca, obligaciones",cat:"arca",monto:2500000.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {desc:"planes arca, obligaciones",cat:"arca",monto:20000000.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {desc:"planes arca, obligaciones",cat:"arca",monto:6000000.0,fecha:"2026-02-22",mes:"2026-02",sem:4},
+  {desc:"planes arca, obligaciones",cat:"arca",monto:6000000.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {desc:"planes arca, obligaciones",cat:"arca",monto:25000000.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {desc:"planes arca, obligaciones",cat:"arca",monto:12500000.0,fecha:"2026-03-22",mes:"2026-03",sem:4},
+  {desc:"planes arca, obligaciones",cat:"arca",monto:27312025.0,fecha:"2026-04-15",mes:"2026-04",sem:3},
+  {desc:"planes arca, obligaciones",cat:"arca",monto:33000000.0,fecha:"2026-04-22",mes:"2026-04",sem:4},
+  {desc:"PAGOS - Daiana Osmedica",cat:"otro",monto:1097368.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {desc:"PAGOS - Daiana Osmedica",cat:"otro",monto:1132113.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {desc:"PAGOS - Daiana Osmedica",cat:"otro",monto:1059246.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {desc:"Osmedica",cat:"otro",monto:750000.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {desc:"Osmedica",cat:"otro",monto:2760000.0,fecha:"2026-03-01",mes:"2026-03",sem:1}
+];
+
+const IH_COMISIONES = [
+  {nombre:"Eve",met:"transferencia",monto:501736.0,fecha:"2026-01-08",mes:"2026-01",sem:2},
+  {nombre:"Eve",met:"transferencia",monto:13274490.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {nombre:"Eve",met:"transferencia",monto:7700029.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {nombre:"Eve",met:"transferencia",monto:4099589.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {nombre:"Eve",met:"transferencia",monto:3755101.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {nombre:"Eve",met:"transferencia",monto:4594125.0,fecha:"2026-02-22",mes:"2026-02",sem:4},
+  {nombre:"Eve",met:"transferencia",monto:8400670.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {nombre:"Eve",met:"transferencia",monto:6444179.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {nombre:"Eve",met:"transferencia",monto:11211100.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {nombre:"Eve",met:"transferencia",monto:14351608.0,fecha:"2026-03-22",mes:"2026-03",sem:4},
+  {nombre:"Eve",met:"transferencia",monto:21810790.0,fecha:"2026-04-15",mes:"2026-04",sem:3},
+  {nombre:"Eve",met:"transferencia",monto:10980490.0,fecha:"2026-04-22",mes:"2026-04",sem:4},
+  {nombre:"Jacky",met:"transferencia",monto:2447865.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {nombre:"Jacky",met:"transferencia",monto:416838.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {nombre:"Jacky",met:"transferencia",monto:1629126.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {nombre:"Jacky",met:"transferencia",monto:910819.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {nombre:"Euge",met:"transferencia",monto:176167.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {nombre:"Euge",met:"transferencia",monto:505474.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {nombre:"Euge",met:"transferencia",monto:200265.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {nombre:"Euge",met:"transferencia",monto:123004.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {nombre:"Euge",met:"transferencia",monto:892658.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {nombre:"Euge",met:"transferencia",monto:961144.0,fecha:"2026-03-22",mes:"2026-03",sem:4},
+  {nombre:"Euge",met:"transferencia",monto:662796.0,fecha:"2026-04-15",mes:"2026-04",sem:3},
+  {nombre:"Antonella",met:"transferencia",monto:952762.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {nombre:"Antonella",met:"transferencia",monto:1379931.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {nombre:"Antonella",met:"transferencia",monto:998396.0,fecha:"2026-02-22",mes:"2026-02",sem:4},
+  {nombre:"Antonella",met:"transferencia",monto:842569.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {nombre:"Antonella",met:"transferencia",monto:2157505.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {nombre:"Antonella",met:"transferencia",monto:1032569.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {nombre:"Antonella",met:"transferencia",monto:1468916.0,fecha:"2026-03-22",mes:"2026-03",sem:4},
+  {nombre:"Antonella",met:"transferencia",monto:509105.0,fecha:"2026-04-08",mes:"2026-04",sem:2},
+  {nombre:"Antonella",met:"transferencia",monto:683275.0,fecha:"2026-04-15",mes:"2026-04",sem:3},
+  {nombre:"Antonella",met:"transferencia",monto:245459.0,fecha:"2026-04-22",mes:"2026-04",sem:4},
+  {nombre:"Manuel",met:"transferencia",monto:6942328.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {nombre:"Manuel",met:"transferencia",monto:10583871.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {nombre:"Manuel",met:"transferencia",monto:12016664.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {nombre:"Manuel",met:"transferencia",monto:7606381.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {nombre:"Manuel",met:"transferencia",monto:6690811.0,fecha:"2026-02-22",mes:"2026-02",sem:4},
+  {nombre:"Manuel",met:"transferencia",monto:5212838.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {nombre:"Manuel",met:"transferencia",monto:5066974.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {nombre:"Manuel",met:"transferencia",monto:2647241.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {nombre:"Manuel",met:"transferencia",monto:5589360.0,fecha:"2026-03-22",mes:"2026-03",sem:4},
+  {nombre:"Manuel",met:"transferencia",monto:7841364.0,fecha:"2026-04-15",mes:"2026-04",sem:3},
+  {nombre:"Manuel",met:"transferencia",monto:7695000.77,fecha:"2026-04-22",mes:"2026-04",sem:4},
+  {nombre:"Agustin frias",met:"transferencia",monto:788398.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {nombre:"Agustin frias",met:"transferencia",monto:512761.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {nombre:"Agustin frias",met:"transferencia",monto:194010.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {nombre:"Agustin frias",met:"transferencia",monto:387200.0,fecha:"2026-02-22",mes:"2026-02",sem:4},
+  {nombre:"Agustin frias",met:"transferencia",monto:127575.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {nombre:"Agustin frias",met:"transferencia",monto:763348.0,fecha:"2026-04-15",mes:"2026-04",sem:3},
+  {nombre:"Agustin frias",met:"transferencia",monto:767033.0,fecha:"2026-04-22",mes:"2026-04",sem:4},
+  {nombre:"Jesica",met:"transferencia",monto:398433.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {nombre:"Jesica",met:"transferencia",monto:444579.0,fecha:"2026-02-22",mes:"2026-02",sem:4},
+  {nombre:"Jesica",met:"transferencia",monto:141260.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {nombre:"Jesica",met:"transferencia",monto:1401211.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {nombre:"Jesica",met:"transferencia",monto:671870.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {nombre:"Jesica",met:"transferencia",monto:210689.0,fecha:"2026-03-22",mes:"2026-03",sem:4},
+  {nombre:"Jesica",met:"transferencia",monto:807971.0,fecha:"2026-04-15",mes:"2026-04",sem:3},
+  {nombre:"Jesica",met:"transferencia",monto:261909.0,fecha:"2026-04-22",mes:"2026-04",sem:4},
+  {nombre:"Rodrigo",met:"transferencia",monto:183191.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {nombre:"Rodrigo",met:"transferencia",monto:224420.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {nombre:"Rodrigo",met:"transferencia",monto:733037.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {nombre:"Rodrigo",met:"transferencia",monto:210309.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {nombre:"Rodrigo",met:"transferencia",monto:385864.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {nombre:"Rodrigo",met:"transferencia",monto:1956488.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {nombre:"Rodrigo",met:"transferencia",monto:1790587.0,fecha:"2026-03-22",mes:"2026-03",sem:4},
+  {nombre:"Rodrigo",met:"transferencia",monto:1205166.0,fecha:"2026-04-01",mes:"2026-04",sem:1},
+  {nombre:"Rodrigo",met:"transferencia",monto:2880604.0,fecha:"2026-04-15",mes:"2026-04",sem:3},
+  {nombre:"Rodrigo",met:"transferencia",monto:203435.0,fecha:"2026-04-22",mes:"2026-04",sem:4},
+  {nombre:"Camila",met:"transferencia",monto:390902.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {nombre:"Camila",met:"transferencia",monto:401423.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {nombre:"Camila",met:"transferencia",monto:181386.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {nombre:"Camila",met:"transferencia",monto:394589.0,fecha:"2026-03-22",mes:"2026-03",sem:4},
+  {nombre:"Camila",met:"transferencia",monto:572242.0,fecha:"2026-04-15",mes:"2026-04",sem:3},
+  {nombre:"Camila",met:"transferencia",monto:202783.0,fecha:"2026-04-22",mes:"2026-04",sem:4},
+  {nombre:"Luciano",met:"transferencia",monto:387200.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {nombre:"Luciano",met:"transferencia",monto:511225.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {nombre:"Luciano",met:"transferencia",monto:819459.0,fecha:"2026-02-22",mes:"2026-02",sem:4},
+  {nombre:"Luciano",met:"transferencia",monto:189694.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {nombre:"Luciano",met:"transferencia",monto:207687.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {nombre:"Luciano",met:"transferencia",monto:201843.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {nombre:"Luciano",met:"transferencia",monto:759000.0,fecha:"2026-03-22",mes:"2026-03",sem:4},
+  {nombre:"Luciano",met:"transferencia",monto:435256.0,fecha:"2026-04-22",mes:"2026-04",sem:4},
+  {nombre:"Flor",met:"transferencia",monto:485787.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {nombre:"Flor",met:"transferencia",monto:495930.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {nombre:"Flor",met:"transferencia",monto:510515.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {nombre:"Flor",met:"transferencia",monto:105756.0,fecha:"2026-03-22",mes:"2026-03",sem:4},
+  {nombre:"Flor",met:"transferencia",monto:729991.0,fecha:"2026-04-15",mes:"2026-04",sem:3},
+  {nombre:"Flor",met:"transferencia",monto:280353.0,fecha:"2026-04-22",mes:"2026-04",sem:4},
+  {nombre:"Melina",met:"transferencia",monto:891750.0,fecha:"2026-04-15",mes:"2026-04",sem:3},
+  {nombre:"Melina",met:"transferencia",monto:2047084.0,fecha:"2026-04-22",mes:"2026-04",sem:4},
+  {nombre:"Ian",met:"efectivo",monto:3533333.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {nombre:"Ian",met:"efectivo",monto:3533333.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {nombre:"Ian",met:"efectivo",monto:3533333.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {nombre:"Ian",met:"efectivo",monto:7000000.0,fecha:"2026-02-22",mes:"2026-02",sem:4},
+  {nombre:"Ian",met:"efectivo",monto:388633.0,fecha:"2026-04-22",mes:"2026-04",sem:4},
+  {nombre:"Ian",met:"transferencia",monto:15687104.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {nombre:"Ian",met:"transferencia",monto:54528983.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {nombre:"Ian",met:"transferencia",monto:58902744.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {nombre:"Ian",met:"transferencia",monto:47369416.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {nombre:"Ian",met:"transferencia",monto:36972505.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {nombre:"Ian",met:"transferencia",monto:30481852.0,fecha:"2026-02-22",mes:"2026-02",sem:4},
+  {nombre:"Ian",met:"transferencia",monto:25095250.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {nombre:"Ian",met:"transferencia",monto:35069148.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {nombre:"Ian",met:"transferencia",monto:26008253.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {nombre:"Ian",met:"transferencia",monto:31663968.0,fecha:"2026-03-22",mes:"2026-03",sem:4},
+  {nombre:"Ian",met:"transferencia",monto:77441139.0,fecha:"2026-04-15",mes:"2026-04",sem:3},
+  {nombre:"Ian",met:"transferencia",monto:38446119.0,fecha:"2026-04-22",mes:"2026-04",sem:4},
+  {nombre:"Juan",met:"transferencia",monto:2674617.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {nombre:"Juan",met:"transferencia",monto:1324599.0,fecha:"2026-01-08",mes:"2026-01",sem:2},
+  {nombre:"Juan",met:"transferencia",monto:9095202.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {nombre:"Juan",met:"transferencia",monto:5954686.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {nombre:"Juan",met:"transferencia",monto:5962381.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {nombre:"Juan",met:"transferencia",monto:5123957.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {nombre:"Juan",met:"transferencia",monto:3845272.0,fecha:"2026-02-22",mes:"2026-02",sem:4},
+  {nombre:"Juan",met:"transferencia",monto:2328445.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {nombre:"Juan",met:"transferencia",monto:4054719.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {nombre:"Juan",met:"transferencia",monto:4266800.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {nombre:"Juan",met:"transferencia",monto:6353720.0,fecha:"2026-03-22",mes:"2026-03",sem:4},
+  {nombre:"Juan",met:"transferencia",monto:6531421.0,fecha:"2026-04-15",mes:"2026-04",sem:3},
+  {nombre:"Juan",met:"transferencia",monto:6769649.0,fecha:"2026-04-22",mes:"2026-04",sem:4},
+  {nombre:"Lucas",met:"transferencia",monto:933953.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {nombre:"Lucas",met:"transferencia",monto:501457.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {nombre:"Lucas",met:"transferencia",monto:2267096.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {nombre:"Lucas",met:"transferencia",monto:302688.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {nombre:"Lucas",met:"transferencia",monto:375891.0,fecha:"2026-02-22",mes:"2026-02",sem:4},
+  {nombre:"Lucas",met:"transferencia",monto:1212664.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {nombre:"Lucas",met:"transferencia",monto:1060593.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {nombre:"Lucas",met:"transferencia",monto:1116579.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {nombre:"Lucas",met:"transferencia",monto:1248648.0,fecha:"2026-04-15",mes:"2026-04",sem:3},
+  {nombre:"Lucas",met:"transferencia",monto:502800.0,fecha:"2026-04-22",mes:"2026-04",sem:4},
+  {nombre:"Damian",met:"transferencia",monto:295358.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {nombre:"Damian",met:"transferencia",monto:145709.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {nombre:"Damian",met:"transferencia",monto:130473.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {nombre:"Damian",met:"transferencia",monto:610051.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {nombre:"Jose",met:"transferencia",monto:1430692.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {nombre:"Jose",met:"transferencia",monto:230723.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {nombre:"Jose",met:"transferencia",monto:623018.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {nombre:"Jose",met:"transferencia",monto:1500000.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {nombre:"Jose",met:"transferencia",monto:217486.0,fecha:"2026-02-22",mes:"2026-02",sem:4},
+  {nombre:"Jose",met:"transferencia",monto:187626.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {nombre:"Jose",met:"transferencia",monto:271007.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {nombre:"Jose",met:"transferencia",monto:435538.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {nombre:"Jose",met:"transferencia",monto:237893.0,fecha:"2026-03-22",mes:"2026-03",sem:4},
+  {nombre:"Jose",met:"transferencia",monto:1173853.0,fecha:"2026-04-15",mes:"2026-04",sem:3},
+  {nombre:"Facundo",met:"transferencia",monto:3486907.0,fecha:"2026-01-01",mes:"2026-01",sem:1},
+  {nombre:"Facundo",met:"transferencia",monto:3373261.0,fecha:"2026-01-08",mes:"2026-01",sem:2},
+  {nombre:"Facundo",met:"transferencia",monto:11358735.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {nombre:"Facundo",met:"transferencia",monto:8697661.0,fecha:"2026-02-01",mes:"2026-02",sem:1},
+  {nombre:"Facundo",met:"transferencia",monto:12145154.0,fecha:"2026-02-08",mes:"2026-02",sem:2},
+  {nombre:"Facundo",met:"transferencia",monto:6167677.0,fecha:"2026-02-15",mes:"2026-02",sem:3},
+  {nombre:"Facundo",met:"transferencia",monto:6231160.0,fecha:"2026-02-22",mes:"2026-02",sem:4},
+  {nombre:"Facundo",met:"transferencia",monto:4552328.0,fecha:"2026-03-01",mes:"2026-03",sem:1},
+  {nombre:"Facundo",met:"transferencia",monto:10219695.0,fecha:"2026-03-08",mes:"2026-03",sem:2},
+  {nombre:"Facundo",met:"transferencia",monto:4895812.0,fecha:"2026-03-15",mes:"2026-03",sem:3},
+  {nombre:"Facundo",met:"transferencia",monto:5946581.0,fecha:"2026-03-22",mes:"2026-03",sem:4},
+  {nombre:"Facundo",met:"transferencia",monto:13390003.0,fecha:"2026-04-01",mes:"2026-04",sem:1},
+  {nombre:"Facundo",met:"transferencia",monto:257184.0,fecha:"2026-04-08",mes:"2026-04",sem:2},
+  {nombre:"Facundo",met:"transferencia",monto:10370703.0,fecha:"2026-04-15",mes:"2026-04",sem:3},
+  {nombre:"Facundo",met:"transferencia",monto:7336822.0,fecha:"2026-04-22",mes:"2026-04",sem:4},
+  {nombre:"Omar",met:"transferencia",monto:143755.0,fecha:"2026-01-15",mes:"2026-01",sem:3},
+  {nombre:"Omar",met:"transferencia",monto:225349.0,fecha:"2026-02-08",mes:"2026-02",sem:2}
+];
+
+function ihResolverExterno(nombre){
+  const q = (nombre||'').toLowerCase().trim();
+  if(!q) return {match:null, candidatos:[]};
+  let m = D.externos.find(e=>e.nombre.toLowerCase()===q);
+  if(m) return {match:m, candidatos:[]};
+  let parciales = D.externos.filter(e=>e.nombre.toLowerCase().includes(q));
+  if(parciales.length===1) return {match:parciales[0], candidatos:[]};
+  if(parciales.length>1) return {match:null, candidatos:parciales};
+  parciales = D.externos.filter(e=>e.nombre.toLowerCase().split(/\s+/).some(p=>p===q || q.includes(p)));
+  if(parciales.length===1) return {match:parciales[0], candidatos:[]};
+  return {match:null, candidatos:parciales};
+}
+
+function renderImportHistorico(){
+  const yaImportado = !!D[IH_FLAG];
+  const totalGastos = IH_GASTOS.reduce((s,g)=>s+g.monto,0);
+  const totalComisiones = IH_COMISIONES.reduce((s,c)=>s+c.monto,0);
+
+  g('ih-resumen').innerHTML = `
+    <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:16px">Qué se va a cargar</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+      <div class="kpi-card"><div class="kpi-label">Gastos (Sueldos, Alquiler, ARCA, etc.)</div><div class="kpi-val red">${IH_GASTOS.length} registros — ${fmt(totalGastos)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Comisiones externas</div><div class="kpi-val gold">${IH_COMISIONES.length} registros — ${fmt(totalComisiones)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Total Enero-Abril 2026</div><div class="kpi-val blue">${fmt(totalGastos+totalComisiones)}</div></div>
+    </div>
+  `;
+
+  // Verificar de antemano si todos los nombres de comisiones matchean con Vendedores Externos
+  const nombresUnicos = [...new Set(IH_COMISIONES.map(c=>c.nombre))];
+  const chequeos = nombresUnicos.map(n=>{
+    const {match, candidatos} = ihResolverExterno(n);
+    return {nombre:n, match, candidatos};
+  });
+  const sinMatch = chequeos.filter(c=>!c.match);
+
+  g('ih-comisiones-check').innerHTML = `
+    <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:16px">Verificación de vendedores externos</div>
+    ${sinMatch.length===0
+      ? '<div style="color:#1A7A52;font-weight:700">✅ Los '+nombresUnicos.length+' nombres de comisiones matchean correctamente con Vendedores Externos ya cargados.</div>'
+      : '<div style="color:#C0392B;font-weight:700;margin-bottom:10px">⚠️ '+sinMatch.length+' nombre(s) no matchean con ningún Vendedor Externo — esas comisiones se van a SALTEAR si continuás:</div>'
+        + sinMatch.map(s=>'<div style="padding:6px 0;border-bottom:1px solid #F5F7FA">"'+s.nombre+'" — '+(s.candidatos.length ? 'candidatos ambiguos: '+s.candidatos.map(c=>c.nombre).join(', ') : 'no se encontró ningún Vendedor Externo parecido')+'</div>').join('')
+    }
+  `;
+
+  const btn = g('ih-btn-confirmar');
+  if(yaImportado){
+    btn.disabled = true;
+    btn.textContent = 'Ya importado';
+    btn.style.opacity = 0.5;
+    g('ih-resultado').innerHTML = '<div style="color:#1A7A52;font-weight:700">✅ El histórico de Enero-Abril 2026 ya fue importado anteriormente en este sistema. Si necesitás volver a correrlo (por ejemplo porque algo salió mal), avisale a Claude para que quite la marca de "ya importado".</div>';
+  } else {
+    btn.disabled = false;
+    btn.textContent = 'Confirmar e importar';
+    btn.style.opacity = 1;
+  }
+}
+
+function confirmarImportacionHistorico(){
+  if(D[IH_FLAG]){ alert('Esto ya fue importado antes.'); return; }
+  const totalGastos = IH_GASTOS.reduce((s,g)=>s+g.monto,0);
+  const totalComisiones = IH_COMISIONES.reduce((s,c)=>s+c.monto,0);
+  const ok = confirm(
+    'Vas a importar '+IH_GASTOS.length+' gastos y '+IH_COMISIONES.length+' comisiones de Enero-Abril 2026, '
+    +'por un total de '+fmt(totalGastos+totalComisiones)+'.\n\nEsto no se puede deshacer fácilmente. ¿Confirmás?'
+  );
+  if(!ok) return;
+
+  let gastosCargados = 0;
+  IH_GASTOS.forEach(g=>{
+    D.gastos.push({
+      id: uid(), desc: g.desc, cat: g.cat, monto: g.monto, fecha: g.fecha, mes: g.mes,
+      nota: 'Importado del histórico Excel', pagado: true, semPago: g.sem, medio: 'transferencia'
+    });
+    gastosCargados++;
+  });
+
+  let comisionesCargadas = 0;
+  const saltadas = [];
+  IH_COMISIONES.forEach(c=>{
+    const {match, candidatos} = ihResolverExterno(c.nombre);
+    if(!match){
+      saltadas.push(c.nombre + ' (' + fmt(c.monto) + ', ' + c.mes + ' Sem ' + c.sem + ')' + (candidatos.length ? ' — ambiguo: '+candidatos.map(x=>x.nombre).join(', ') : ' — no encontrado'));
+      return;
+    }
+    const transf = c.met==='efectivo' ? 0 : c.monto;
+    const efec = c.met==='efectivo' ? c.monto : 0;
+    D.comisiones.push({
+      id: uid(), quien_id: match.id, sem: c.sem, semPago: c.sem, met: c.met,
+      total: c.monto, transf, efec, mes: c.mes
+    });
+    comisionesCargadas++;
+  });
+
+  D[IH_FLAG] = true;
+  save();
+  renderGastos(); renderExternos(); renderResumen(); renderAnalisis(); renderCashFlow();
+
+  g('ih-resultado').innerHTML = `
+    <div style="color:#1A7A52;font-weight:800;font-size:14.5px;margin-bottom:10px">✅ Importación completa</div>
+    <div>Gastos cargados: <b>${gastosCargados}</b> de ${IH_GASTOS.length}</div>
+    <div>Comisiones cargadas: <b>${comisionesCargadas}</b> de ${IH_COMISIONES.length}</div>
+    ${saltadas.length ? '<div style="margin-top:12px;color:#C0392B;font-weight:700">Comisiones salteadas (no se encontró el vendedor externo):</div>' + saltadas.map(s=>'<div style="padding:4px 0">• '+s+'</div>').join('') : ''}
+    <div style="margin-top:14px;color:#6B7E8F">Ya podés revisar Enero, Febrero, Marzo y Abril 2026 en Gastos, Externos, Resumen y Análisis Financiero.</div>
+  `;
+  renderImportHistorico();
 }
 
 // ═══════════════════════════════
