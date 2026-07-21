@@ -344,7 +344,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
           </div>
         </div>
         <div style="font-size:12px;color:#8A9BAB;margin-top:10px">
-          El asistente responde en base a los datos cargados en el sistema (incluye sueldos, CBU y bancos de empleados) y a tu historial de conversación en este navegador. Puede proponer cargar gastos, ingresos, adelantos o premios, pero nunca los guarda sin que vos confirmes cada acción. No reemplaza a un contador o asesor financiero para decisiones grandes.
+          El asistente responde en base a los datos cargados en el sistema (incluye sueldos, CBU y bancos de empleados) y a una conversación compartida con tu compañero/a de trabajo (la ven los dos, desde cualquier computadora). Puede proponer cargar gastos, ingresos, adelantos o premios, pero nunca los guarda sin que vos confirmes cada acción. No reemplaza a un contador o asesor financiero para decisiones grandes.
         </div>
       </div>
 
@@ -833,6 +833,16 @@ function mergeNominaArrays(localArr, cloudArr){
   return Object.values(byKey);
 }
 
+// Fusiona el historial del Asistente IA (compartido entre todos los usuarios):
+// como los mensajes son unicos por id y no se editan despues de creados, alcanza
+// con unir por id y reordenar por fecha/hora, sin perder mensajes de nadie.
+function mergeChatArrays(localArr, cloudArr){
+  const byId = {};
+  (localArr||[]).forEach(m=>{ if(m && m.id) byId[m.id] = m; });
+  (cloudArr||[]).forEach(m=>{ if(m && m.id) byId[m.id] = m; });
+  return Object.values(byId).sort((a,b)=>(a.ts||0)-(b.ts||0));
+}
+
 let _sbSaveTimeout = null;
 let _sbSaveFails = 0;
 function sbSaveDebounced(){
@@ -846,6 +856,7 @@ function sbSaveDebounced(){
       if(cloudRaw){
         const cloudD = JSON.parse(cloudRaw);
         D.nomina = mergeNominaArrays(D.nomina, cloudD.nomina);
+        D.ai_chat = mergeChatArrays(D.ai_chat, cloudD.ai_chat).slice(-100);
       }
     }catch(e){}
     D._ts = Date.now();
@@ -874,7 +885,8 @@ let D = {
   cheques: [],
   proyecciones: [],
   cf_ingresos: [],
-  semPagoSectores: {}
+  semPagoSectores: {},
+  ai_chat: [] // conversacion con el Asistente IA, compartida entre todos los usuarios
 };
 
 // Empleados iniciales
@@ -1074,7 +1086,7 @@ function pushUndo(){
 function undoLast(){
   if(!_undoStack.length){ toast('Nada para deshacer'); return; }
   const prev = _undoStack.pop();
-  D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{}}, JSON.parse(prev));
+  D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},ai_chat:[]}, JSON.parse(prev));
   save();
   const btn = document.getElementById('btn-undo');
   if(btn) btn.style.opacity = _undoStack.length ? '1' : '0.4';
@@ -1110,7 +1122,7 @@ async function load(){
   try{
     if(raw){
       const saved = JSON.parse(raw);
-      D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{}}, saved);
+      D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},ai_chat:[]}, saved);
     }
   }catch(e){}
 }
@@ -1218,22 +1230,34 @@ async function syncFromCloud(){
     // sin importar cual copia es mas nueva en general, para no perder el
     // cambio de un empleado puntual aunque el resto de la nube este mas viejo.
     const mergedNomina = mergeNominaArrays(D.nomina, cloudD.nomina);
+    const mergedChat = mergeChatArrays(D.ai_chat, cloudD.ai_chat).slice(-100);
     // El resto de los datos (gastos, ingresos, etc.) se adoptan enteros solo
     // si la nube es mas nueva en general que lo que ya tenemos.
     const cloudTs = cloudD._ts || 0;
     const localTs = D._ts || 0;
     const nominaCambio = JSON.stringify(mergedNomina) !== JSON.stringify(D.nomina||[]);
-    if(cloudTs <= localTs && !nominaCambio) return; // nada nuevo que adoptar
+    const chatCambio = JSON.stringify(mergedChat) !== JSON.stringify(D.ai_chat||[]);
+    if(cloudTs <= localTs && !nominaCambio && !chatCambio) return; // nada nuevo que adoptar
     if(cloudTs > localTs && JSON.stringify(cloudD) !== JSON.stringify(D)){
-      D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{}}, cloudD);
+      D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},ai_chat:[]}, cloudD);
     }
     D.nomina = mergedNomina;
+    D.ai_chat = mergedChat;
     if(nominaCambio || cloudTs > localTs){
       try{ localStorage.setItem(ODSA_KEY, JSON.stringify(D)); }catch(e){}
       // Re-render active page silently
       const active = document.querySelector('.sitem.on');
       if(active){ const page = active.getAttribute('data-page'); if(page) navPage(page); }
       toast('🔄 Datos actualizados desde la nube');
+    } else if(chatCambio){
+      // Si solo cambio el chat del asistente, refrescamos esa pagina en
+      // silencio (sin el toast general) para no interrumpir otras pantallas.
+      try{ localStorage.setItem(ODSA_KEY, JSON.stringify(D)); }catch(e){}
+      const active = document.querySelector('.sitem.on');
+      if(active && active.getAttribute('data-page')==='asistente'){
+        const box = g('ai-chat-msgs');
+        if(box){ box.innerHTML=''; renderAsistente(); }
+      }
     }
   }catch(e){}
 }
@@ -1768,24 +1792,24 @@ function renderChartTendencia(historicos){
 // ═══════════════════════════════
 // ASISTENTE IA
 // ═══════════════════════════════
-const AI_CHAT_KEY = 'odsa_ai_historial'; // se guarda en este navegador, entre sesiones
-let _aiHistorial = []; // mensajes en formato Anthropic: [{role, content:[bloques]}]
 let _aiPendienteLote = null; // acciones propuestas en el turno actual, esperando confirmacion
 
+// El historial del asistente ahora vive en D.ai_chat: se guarda y sincroniza
+// con la nube igual que el resto de los datos, así que vos y tu compañero/a
+// ven la misma conversación desde cualquier computadora.
 function aiCargarHistorial(){
-  try{
-    const raw = localStorage.getItem(AI_CHAT_KEY);
-    return raw ? JSON.parse(raw) : [];
-  }catch(e){ return []; }
+  if(!D.ai_chat) D.ai_chat = [];
+  return D.ai_chat;
 }
 function aiGuardarHistorial(){
-  try{ localStorage.setItem(AI_CHAT_KEY, JSON.stringify(_aiHistorial.slice(-60))); }catch(e){}
+  D.ai_chat = D.ai_chat.slice(-100);
+  save();
 }
 function aiBorrarHistorial(){
-  if(!confirm('¿Borrar toda la conversación con el asistente? No se puede deshacer.')) return;
-  _aiHistorial = [];
+  if(!confirm('¿Borrar toda la conversación con el asistente? Esto la borra para vos Y para tu compañero/a (es compartida). No se puede deshacer.')) return;
+  D.ai_chat = [];
   _aiPendienteLote = null;
-  try{ localStorage.removeItem(AI_CHAT_KEY); }catch(e){}
+  save();
   const box = g('ai-chat-msgs');
   if(box) box.innerHTML = '';
   aiAgregarMensaje('assistant', 'Listo, empezamos de cero. ¿Qué querés saber o qué querés cargar?');
@@ -1800,21 +1824,22 @@ function renderAsistente(){
   const box = g('ai-chat-msgs');
   if(!box) return;
   if(box.children.length > 0) return; // ya esta renderizado en esta sesion de la pagina
-  _aiHistorial = aiCargarHistorial();
-  if(_aiHistorial.length === 0){
+  const historial = aiCargarHistorial();
+  if(historial.length === 0){
     aiMensajeBienvenida();
     return;
   }
-  // Reconstruir la conversacion guardada. Las acciones (tool_use) se muestran
-  // como resueltas (usando el tool_result que las sigue), nunca como botones
-  // activos, para no permitir re-ejecutar algo de una sesion anterior.
-  _aiHistorial.forEach((msg, i)=>{
+  // Reconstruir la conversacion guardada (compartida con tu compañero/a). Las
+  // acciones (tool_use) se muestran como resueltas (usando el tool_result que
+  // las sigue), nunca como botones activos, para no permitir re-ejecutar algo
+  // de una sesion anterior.
+  historial.forEach((msg, i)=>{
     (msg.content||[]).forEach(block=>{
       if(block.type === 'text' && block.text && block.text.trim()){
         aiAgregarMensaje(msg.role, block.text);
       } else if(block.type === 'tool_use'){
         let resultText = '';
-        const siguiente = _aiHistorial[i+1];
+        const siguiente = historial[i+1];
         if(siguiente && Array.isArray(siguiente.content)){
           const tr = siguiente.content.find(b=>b.type==='tool_result' && b.tool_use_id===block.id);
           if(tr) resultText = typeof tr.content === 'string' ? tr.content : '';
@@ -1981,7 +2006,7 @@ function aiVerificarLoteCompleto(){
 
 async function aiEnviarToolResults(resultadosPorId){
   const content = Object.entries(resultadosPorId).map(([tool_use_id, text])=>({type:'tool_result', tool_use_id, content:text}));
-  _aiHistorial.push({role:'user', content});
+  D.ai_chat.push({id:uid(), ts:Date.now(), role:'user', content});
   aiGuardarHistorial();
   await aiProcesarTurno();
 }
@@ -2015,12 +2040,34 @@ function aiProcesarToolUses(toolBlocks){
   pendientesConfirmar.forEach(tb => aiRenderAccionCard(tb));
 }
 
+// La API de Anthropic exige que los turnos alternen user/assistant. Si vos y
+// tu compañero/a preguntan casi al mismo tiempo, la fusion por fecha/hora
+// podria dejar dos mensajes seguidos del mismo rol (ej: dos preguntas antes
+// de que ninguna tuviera respuesta) — los combinamos en un solo turno para
+// no perder ninguno de los dos mensajes ni romper el pedido a la IA.
+function aiCoalescerMensajes(messages){
+  const out = [];
+  messages.forEach(m=>{
+    const last = out[out.length-1];
+    if(last && last.role === m.role){
+      last.content = last.content.concat(m.content);
+    } else {
+      out.push({role:m.role, content:[...m.content]});
+    }
+  });
+  return out;
+}
+
 async function aiLlamarAPI(){
   const contexto = construirContextoFinanciero();
+  // Le mandamos a la IA solo role+content (sin id/ts, que son metadata nuestra
+  // para poder fusionar el historial compartido entre los dos usuarios)
+  const crudos = (D.ai_chat||[]).slice(-40).map(m=>({role:m.role, content:m.content}));
+  const messages = aiCoalescerMensajes(crudos);
   const r = await fetch('/api/asistente', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
-    body: JSON.stringify({ contexto, messages: _aiHistorial })
+    body: JSON.stringify({ contexto, messages })
   });
   const data = await r.json();
   return { ok: r.ok && data.ok, data };
@@ -2037,7 +2084,7 @@ async function aiProcesarTurno(){
       aiAgregarMensaje('assistant', '⚠️ No pude responder: '+(data.error||'error desconocido')+'. Si esto sigue pasando, puede que falte configurar la clave de la IA en el servidor.');
       return;
     }
-    _aiHistorial.push({role:'assistant', content: data.content});
+    D.ai_chat.push({id:uid(), ts:Date.now(), role:'assistant', content: data.content});
     aiGuardarHistorial();
 
     (data.content||[]).forEach(block=>{
@@ -2066,7 +2113,7 @@ async function enviarPreguntaAsistente(){
   input.style.height = 'auto';
 
   aiAgregarMensaje('user', pregunta);
-  _aiHistorial.push({role:'user', content:[{type:'text', text:pregunta}]});
+  D.ai_chat.push({id:uid(), ts:Date.now(), role:'user', content:[{type:'text', text:pregunta}]});
   aiGuardarHistorial();
 
   await aiProcesarTurno();
