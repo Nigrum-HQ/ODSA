@@ -1817,7 +1817,7 @@ function aiBorrarHistorial(){
 
 // Texto de bienvenida (primera vez, sin historial guardado)
 function aiMensajeBienvenida(){
-  aiAgregarMensaje('assistant', '¡Hola! Soy tu asistente financiero. Puedo ver todos los datos cargados en ODSA (sueldos, empleados, gastos, ingresos, cash flow, etc.) y contestarte preguntas sobre tu situación económica. También puedo cargar cosas por vos si me lo pedís:\n\n• "Agregá un gasto de $50.000 en insumos"\n• "Registrá un ingreso de $120.000 de hoy"\n• "Cargá un adelanto de $30.000 para Juan"\n• "Poné un premio de $10.000 para Noe en la semana 2"\n\nSiempre te voy a mostrar la acción antes de ejecutarla, para que la confirmes vos. Ahora la conversación es compartida con tu compañero/a de trabajo. ¿Qué necesitás?');
+  aiAgregarMensaje('assistant', '¡Hola! Soy tu asistente financiero. Puedo ver todos los datos cargados en ODSA (sueldos, empleados, gastos, ingresos, cash flow, etc.) y contestarte preguntas sobre tu situación económica. También puedo cargar cosas por vos si me lo pedís:\n\n• "Agregá un gasto de $50.000 en insumos"\n• "Registrá un ingreso de $120.000 de hoy"\n• "Cargá un adelanto de $30.000 para Juan"\n• "Poné un premio de $10.000 para Noe en la semana 2"\n• "Borrá el gasto de viandas del 21/07"\n\nSiempre te voy a mostrar la acción antes de ejecutarla, para que la confirmes vos. La conversación es compartida con tu compañero/a de trabajo. ¿Qué necesitás?');
 }
 
 function renderAsistente(){
@@ -1879,6 +1879,11 @@ function aiDescribirAccion(tb){
       return {titulo:'Agregar adelanto', detalle:(n.nombre_empleado||'—')+' · '+montoTxt+' · '+fd(n.fecha||hoy())};
     case 'agregar_premio':
       return {titulo:'Agregar premio', detalle:(n.nombre_empleado||'—')+' · '+montoTxt+(n.semana?' · Sem '+n.semana:'')};
+    case 'eliminar_movimiento': {
+      const {match} = aiResolverRegistro(n.tipo, n.busqueda, n.monto, n.fecha);
+      const etiquetaTipo = {gasto:'gasto', ingreso:'ingreso', adelanto:'adelanto', premio:'premio'}[n.tipo] || n.tipo;
+      return {titulo:'Eliminar '+etiquetaTipo, detalle: match ? aiDescribirRegistro(n.tipo, match) : ('No identificado: "'+(n.busqueda||'')+'"')};
+    }
     default:
       return {titulo: tb.name, detalle: JSON.stringify(n)};
   }
@@ -1939,6 +1944,37 @@ function aiResolverEmpleado(nombre){
   return {match:null, candidatos:parciales};
 }
 
+// --- Buscar un gasto/ingreso/adelanto/premio ya cargado, para poder borrarlo ---
+function aiDescribirRegistro(tipo, rec){
+  if(!rec) return '';
+  if(tipo === 'gasto') return rec.desc+' · '+fmt(rec.monto)+' · '+fd(rec.fecha);
+  if(tipo === 'ingreso') return (rec.desc||'Ingreso')+' · '+fmt(rec.monto)+' · '+fd(rec.fecha);
+  if(tipo === 'adelanto'){ const e=D.empleados.find(x=>x.id===rec.emp_id); return (e?e.nombre:'—')+' · '+fmt(rec.monto)+' · '+fd(rec.fecha); }
+  if(tipo === 'premio'){ const e=D.empleados.find(x=>x.id===rec.emp_id); return (e?e.nombre:'—')+' · '+fmt(rec.monto)+(rec.sem?' · Sem '+rec.sem:''); }
+  return JSON.stringify(rec);
+}
+function aiResolverRegistro(tipo, busqueda, monto, fecha){
+  const q = (busqueda||'').toLowerCase().trim();
+  let arr = [], matchFn = () => false;
+  if(tipo === 'gasto'){
+    arr = D.gastos; matchFn = r => (r.desc||'').toLowerCase().includes(q);
+  } else if(tipo === 'ingreso'){
+    arr = D.ingresos; matchFn = r => (r.desc||'').toLowerCase().includes(q);
+  } else if(tipo === 'adelanto'){
+    arr = D.adelantos; matchFn = r => { const e=D.empleados.find(x=>x.id===r.emp_id); return e && e.nombre.toLowerCase().includes(q); };
+  } else if(tipo === 'premio'){
+    arr = D.premios; matchFn = r => { const e=D.empleados.find(x=>x.id===r.emp_id); return e && e.nombre.toLowerCase().includes(q); };
+  } else {
+    return {match:null, candidatos:[]};
+  }
+  let candidatos = (arr||[]).filter(matchFn);
+  if(monto) candidatos = candidatos.filter(r=>Math.abs((r.monto||0)-Number(monto))<1);
+  if(fecha) candidatos = candidatos.filter(r=>r.fecha===fecha);
+  if(candidatos.length===1) return {match:candidatos[0], candidatos:[]};
+  if(candidatos.length>1) return {match:null, candidatos};
+  return {match:null, candidatos:[]};
+}
+
 // --- Ejecutar de verdad la accion confirmada (mutacion real sobre D) ---
 function aiEjecutarAccion(nombreTool, input){
   try{
@@ -1969,6 +2005,17 @@ function aiEjecutarAccion(nombreTool, input){
       const rec = {id:uid(), emp_id:match.id, monto:Number(input.monto)||0, sem, semPago:sem, concepto:input.concepto||'Premio semanal', mes:mesSel};
       D.premios.push(rec); save(); renderPremios();
       return 'Premio agregado a '+match.nombre+': '+fmt(rec.monto)+' (Sem '+sem+').';
+    }
+    if(nombreTool === 'eliminar_movimiento'){
+      const {match} = aiResolverRegistro(input.tipo, input.busqueda, input.monto, input.fecha);
+      if(!match) return 'No se pudo eliminar: no se encontró el registro (puede que ya se haya borrado antes).';
+      const descripcionBorrado = aiDescribirRegistro(input.tipo, match);
+      if(input.tipo === 'gasto'){ D.gastos = D.gastos.filter(r=>r.id!==match.id); save(); renderGastos(); renderResumen(); }
+      else if(input.tipo === 'ingreso'){ D.ingresos = D.ingresos.filter(r=>r.id!==match.id); save(); renderIngresos(); renderResumen(); }
+      else if(input.tipo === 'adelanto'){ D.adelantos = D.adelantos.filter(r=>r.id!==match.id); save(); renderAdelantos(); renderEmpleados(); }
+      else if(input.tipo === 'premio'){ D.premios = D.premios.filter(r=>r.id!==match.id); save(); renderPremios(); }
+      else return 'No se pudo eliminar: tipo de registro no reconocido ("'+input.tipo+'").';
+      return 'Eliminado: '+descripcionBorrado+'.';
     }
     return 'Acción no reconocida.';
   }catch(e){
@@ -2025,6 +2072,15 @@ function aiProcesarToolUses(toolBlocks){
         resultadosPrevios[tb.id] = candidatos.length
           ? 'No se pudo identificar con certeza al empleado. Candidatos posibles: '+candidatos.map(c=>c.nombre).join(', ')+'. Pedile a la persona que aclare el nombre completo.'
           : 'No se encontró ningún empleado activo con el nombre "'+(tb.input&&tb.input.nombre_empleado)+'". Pedile a la persona que revise el nombre.';
+        return;
+      }
+    } else if(tb.name === 'eliminar_movimiento'){
+      const {match, candidatos} = aiResolverRegistro(tb.input && tb.input.tipo, tb.input && tb.input.busqueda, tb.input && tb.input.monto, tb.input && tb.input.fecha);
+      if(!match){
+        const tipo = (tb.input && tb.input.tipo) || 'registro';
+        resultadosPrevios[tb.id] = candidatos.length
+          ? 'Hay '+candidatos.length+' '+tipo+'s que coinciden con esa búsqueda, no se puede elegir cuál borrar con certeza. Detalle: '+candidatos.map(c=>aiDescribirRegistro(tb.input.tipo,c)).join(' | ')+'. Pedile a la persona más detalles (monto exacto o fecha) para identificar cuál.'
+          : 'No se encontró ningún '+tipo+' que coincida con "'+(tb.input&&tb.input.busqueda)+'". Pedile a la persona que revise la descripción o el nombre.';
         return;
       }
     }
