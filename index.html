@@ -1817,7 +1817,7 @@ function aiBorrarHistorial(){
 
 // Texto de bienvenida (primera vez, sin historial guardado)
 function aiMensajeBienvenida(){
-  aiAgregarMensaje('assistant', '¡Hola! Soy tu asistente financiero. Puedo ver todos los datos cargados en ODSA (sueldos, empleados, gastos, ingresos, cash flow, etc.) y contestarte preguntas sobre tu situación económica. También puedo cargar cosas por vos si me lo pedís:\\n\\n• "Agregá un gasto de $50.000 en insumos"\\n• "Registrá un ingreso de $120.000 de hoy"\\n• "Cargá un adelanto de $30.000 para Juan"\\n• "Poné un premio de $10.000 para Noe en la semana 2"\\n\\nSiempre te voy a mostrar la acción antes de ejecutarla, para que la confirmes vos. Me acuerdo de esta conversación entre sesiones. ¿Qué necesitás?');
+  aiAgregarMensaje('assistant', '¡Hola! Soy tu asistente financiero. Puedo ver todos los datos cargados en ODSA (sueldos, empleados, gastos, ingresos, cash flow, etc.) y contestarte preguntas sobre tu situación económica. También puedo cargar cosas por vos si me lo pedís:\n\n• "Agregá un gasto de $50.000 en insumos"\n• "Registrá un ingreso de $120.000 de hoy"\n• "Cargá un adelanto de $30.000 para Juan"\n• "Poné un premio de $10.000 para Noe en la semana 2"\n\nSiempre te voy a mostrar la acción antes de ejecutarla, para que la confirmes vos. Ahora la conversación es compartida con tu compañero/a de trabajo. ¿Qué necesitás?');
 }
 
 function renderAsistente(){
@@ -2098,8 +2098,9 @@ async function aiProcesarTurno(){
       if(toolBlocks.length) aiProcesarToolUses(toolBlocks);
     }
   }catch(e){
+    console.error('Asistente IA error:', e);
     pensando.remove();
-    aiAgregarMensaje('assistant', '⚠️ Error de conexión. Probá de nuevo en un momento.');
+    aiAgregarMensaje('assistant', '⚠️ Error de conexión: '+(e && e.message ? e.message : 'desconocido')+'. Probá de nuevo en un momento.');
   }finally{
     if(btn){ btn.disabled = false; btn.textContent = 'Enviar'; }
   }
