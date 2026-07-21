@@ -2128,12 +2128,38 @@ function construirContextoFinanciero(){
   };
 }
 
+// Si por cualquier motivo quedo guardada una accion propuesta (tool_use) sin
+// su tool_result correspondiente (ej: se cerro la conversacion, hubo un error,
+// o el usuario recargo la pagina antes de confirmar/cancelar), esto la repara
+// agregando un resultado generico, para que la conversacion con la IA nunca
+// quede rota de forma permanente.
+function aiSanearMensajes(messages){
+  const out = [];
+  for(let i=0;i<messages.length;i++){
+    const m = messages[i];
+    out.push(m);
+    if(m.role !== 'assistant') continue;
+    const toolUses = (m.content||[]).filter(b=>b.type==='tool_use');
+    if(!toolUses.length) continue;
+    const next = messages[i+1];
+    const resolvedIds = new Set();
+    if(next && next.role === 'user'){
+      (next.content||[]).forEach(b=>{ if(b.type==='tool_result') resolvedIds.add(b.tool_use_id); });
+    }
+    const faltantes = toolUses.filter(tb=>!resolvedIds.has(tb.id));
+    if(faltantes.length){
+      out.push({ role:'user', content: faltantes.map(tb=>({type:'tool_result', tool_use_id:tb.id, content:'No se pudo confirmar esta acción (la conversación se interrumpió antes); no se realizó ningún cambio.'})) });
+    }
+  }
+  return out;
+}
+
 async function aiLlamarAPI(){
   const contexto = construirContextoFinanciero();
   // Le mandamos a la IA solo role+content (sin id/ts, que son metadata nuestra
   // para poder fusionar el historial compartido entre los dos usuarios)
   const crudos = (D.ai_chat||[]).slice(-40).map(m=>({role:m.role, content:m.content}));
-  const messages = aiCoalescerMensajes(crudos);
+  const messages = aiCoalescerMensajes(aiSanearMensajes(crudos));
   const r = await fetch('/api/asistente', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
@@ -2182,6 +2208,24 @@ async function enviarPreguntaAsistente(){
   if(!pregunta) return;
   input.value = '';
   input.style.height = 'auto';
+
+  // Si habia una accion propuesta sin resolver (el usuario no toco ni
+  // Confirmar ni Cancelar y en cambio escribio otra cosa), la cancelamos
+  // automaticamente antes de continuar. La API exige una respuesta para cada
+  // accion propuesta, asi que sin esto se rompe la conversacion.
+  if(_aiPendienteLote){
+    const lote = _aiPendienteLote;
+    lote.toolBlocks.forEach(tb=>{
+      if(!lote.resueltos[tb.id]){
+        lote.resueltos[tb.id] = 'El usuario cambió de idea antes de confirmar y pidió otra cosa; no se realizó ningún cambio.';
+        aiActualizarCard(tb.id, '↩ Reemplazado por un nuevo pedido, no se guardó.');
+      }
+    });
+    const todos = Object.assign({}, lote.resultadosPrevios, lote.resueltos);
+    _aiPendienteLote = null;
+    const content = Object.entries(todos).map(([tool_use_id, text])=>({type:'tool_result', tool_use_id, content:text}));
+    D.ai_chat.push({id:uid(), ts:Date.now(), role:'user', content});
+  }
 
   aiAgregarMensaje('user', pregunta);
   D.ai_chat.push({id:uid(), ts:Date.now(), role:'user', content:[{type:'text', text:pregunta}]});
