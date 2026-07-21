@@ -392,13 +392,13 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
         </div>
 
         <div style="margin-top:32px;padding-top:24px;border-top:1px solid #E4EAF0">
-          <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:8px">Completar Junio 2026 (ya tiene datos cargados a mano)</div>
-          <div style="font-size:13px;color:#6B7E8F;margin-bottom:14px">
-            Junio ya tiene información cargada, así que esto NO recarga todo — compara contra lo que ya está en el sistema
-            y solo agrega lo que falte, evitando duplicados.
+          <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:8px">Rehacer Junio 2026 desde cero (borra lo que hay cargado y carga todo de nuevo desde el Excel)</div>
+          <div style="font-size:13px;color:#C0392B;margin-bottom:14px">
+            ⚠️ Esto BORRA todos los gastos y comisiones de Junio 2026 que estén cargados ahora mismo (para sacar los duplicados),
+            y los reemplaza por los 84 gastos y 65 comisiones que salen del Excel. No se puede deshacer.
           </div>
           <div id="ih-jun-diagnostico" style="background:#F8FAFC;border-radius:10px;padding:16px;margin-bottom:14px;font-size:13px"></div>
-          <button id="ih-btn-junio" onclick="completarJunio2026()" style="background:#B8943E;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-weight:700;cursor:pointer;font-size:14px">Completar lo que falta de Junio</button>
+          <button id="ih-btn-junio" onclick="rehacerJunio2026()" style="background:#C0392B;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-weight:700;cursor:pointer;font-size:14px">Borrar y recargar Junio desde el Excel</button>
           <div id="ih-junio-resultado" style="margin-top:16px;font-size:13.5px;line-height:1.7"></div>
         </div>
       </div>
@@ -3281,59 +3281,52 @@ const IH_JUNIO_COMISIONES_ESPERADAS = [
 // y devuelve los que faltan. Matchea por descripcion/persona + monto (con
 // una pequeña tolerancia) dentro del mismo mes, sin importar la semana exacta
 // (por si a mano se cargo con la fecha en otro dia).
-function calcularFaltantesJunio(){
-  const TOL = 1; // pesos de tolerancia por redondeo
-  const gastosExistentes = D.gastos.filter(g=>g.mes==='2026-06');
-  const faltanGastos = IH_JUNIO_GASTOS_ESPERADOS.filter(esp=>{
-    return !gastosExistentes.some(g=> g.desc===esp.desc && Math.abs(g.monto-esp.monto)<=TOL );
-  });
-
-  const comisionesExistentes = D.comisiones.filter(c=>c.mes==='2026-06');
-  const faltanComisiones = [];
-  const sinExterno = [];
-  IH_JUNIO_COMISIONES_ESPERADAS.forEach(esp=>{
-    const {match, candidatos} = ihResolverExterno(esp.nombre);
-    if(!match){ sinExterno.push(esp); return; }
-    const yaEsta = comisionesExistentes.some(c=> c.quien_id===match.id && Math.abs(c.total-esp.monto)<=TOL );
-    if(!yaEsta) faltanComisiones.push(esp);
-  });
-
-  return {faltanGastos, faltanComisiones, sinExterno, totalEsperadoGastos: IH_JUNIO_GASTOS_ESPERADOS.length, totalEsperadoComisiones: IH_JUNIO_COMISIONES_ESPERADAS.length};
+function contarJunioActual(){
+  const gastosActuales = D.gastos.filter(g=>g.mes==='2026-06');
+  const comisionesActuales = D.comisiones.filter(c=>c.mes==='2026-06');
+  const totalActual = gastosActuales.reduce((s,x)=>s+x.monto,0) + comisionesActuales.reduce((s,x)=>s+x.total,0);
+  return {gastosActuales, comisionesActuales, totalActual};
 }
 
 function renderJunioDiagnostico(){
   const el = g('ih-jun-diagnostico');
   if(!el) return;
-  const {faltanGastos, faltanComisiones, sinExterno, totalEsperadoGastos, totalEsperadoComisiones} = calcularFaltantesJunio();
-  const totalFaltante = faltanGastos.reduce((s,x)=>s+x.monto,0) + faltanComisiones.reduce((s,x)=>s+x.monto,0);
+  const {gastosActuales, comisionesActuales, totalActual} = contarJunioActual();
+  const totalExcel = IH_JUNIO_GASTOS_ESPERADOS.reduce((s,x)=>s+x.monto,0) + IH_JUNIO_COMISIONES_ESPERADAS.reduce((s,x)=>s+x.monto,0);
   el.innerHTML = `
-    <div>Gastos: ya cargados <b>${totalEsperadoGastos-faltanGastos.length}</b> de ${totalEsperadoGastos} · faltan <b style="color:#C0392B">${faltanGastos.length}</b></div>
-    <div>Comisiones: ya cargadas <b>${totalEsperadoComisiones-faltanComisiones.length-sinExterno.length}</b> de ${totalEsperadoComisiones} · faltan <b style="color:#C0392B">${faltanComisiones.length}</b>${sinExterno.length ? ' · sin externo identificado: '+sinExterno.length : ''}</div>
-    <div style="margin-top:8px;font-weight:700">Total que se agregaría si completás: ${fmt(totalFaltante)}</div>
+    <div>Actualmente cargado en el sistema: <b>${gastosActuales.length}</b> gastos + <b>${comisionesActuales.length}</b> comisiones — ${fmt(totalActual)}</div>
+    <div>Lo que dice el Excel: <b>${IH_JUNIO_GASTOS_ESPERADOS.length}</b> gastos + <b>${IH_JUNIO_COMISIONES_ESPERADAS.length}</b> comisiones — ${fmt(totalExcel)}</div>
+    <div style="margin-top:8px;font-weight:700;color:#C0392B">Si confirmás, se borra todo lo actual de Junio y se reemplaza por lo del Excel.</div>
   `;
 }
 
-function completarJunio2026(){
-  const {faltanGastos, faltanComisiones, sinExterno} = calcularFaltantesJunio();
-  if(faltanGastos.length===0 && faltanComisiones.length===0){
-    alert('No falta nada — Junio ya está completo según el Excel.');
-    return;
-  }
-  const totalFaltante = faltanGastos.reduce((s,x)=>s+x.monto,0) + faltanComisiones.reduce((s,x)=>s+x.monto,0);
-  const ok = confirm('Se van a agregar '+faltanGastos.length+' gastos y '+faltanComisiones.length+' comisiones que falta cargar de Junio 2026, por '+fmt(totalFaltante)+'. Lo que ya estaba cargado NO se toca. ¿Confirmás?');
+function rehacerJunio2026(){
+  const {gastosActuales, comisionesActuales} = contarJunioActual();
+  const totalExcel = IH_JUNIO_GASTOS_ESPERADOS.reduce((s,x)=>s+x.monto,0) + IH_JUNIO_COMISIONES_ESPERADAS.reduce((s,x)=>s+x.monto,0);
+  const ok = confirm(
+    'Vas a BORRAR '+gastosActuales.length+' gastos y '+comisionesActuales.length+' comisiones que hay cargados ahora en Junio 2026, '
+    +'y reemplazarlos por '+IH_JUNIO_GASTOS_ESPERADOS.length+' gastos y '+IH_JUNIO_COMISIONES_ESPERADAS.length+' comisiones del Excel '
+    +'(total '+fmt(totalExcel)+').\n\nEsto no se puede deshacer. ¿Confirmás?'
+  );
   if(!ok) return;
 
-  faltanGastos.forEach(gg=>{
+  // Borrar todo lo que hay cargado de Junio
+  D.gastos = D.gastos.filter(g=>g.mes!=='2026-06');
+  D.comisiones = D.comisiones.filter(c=>c.mes!=='2026-06');
+
+  // Cargar todo de nuevo desde el Excel
+  IH_JUNIO_GASTOS_ESPERADOS.forEach(gg=>{
     D.gastos.push({
       id: uid(), desc: gg.desc, cat: gg.cat, monto: gg.monto, fecha: gg.fecha, mes: gg.mes,
-      nota: 'Completado del histórico Excel', pagado: true, semPago: gg.sem, medio: 'transferencia'
+      nota: 'Recargado del histórico Excel', pagado: true, semPago: gg.sem, medio: 'transferencia'
     });
   });
 
   let comisionesCargadas = 0;
+  const saltadas = [];
   const nuevosExternos = {};
-  faltanComisiones.forEach(c=>{
-    let {match} = ihResolverExterno(c.nombre);
+  IH_JUNIO_COMISIONES_ESPERADAS.forEach(c=>{
+    let {match, candidatos} = ihResolverExterno(c.nombre);
     if(!match && IH_CREAR_SI_FALTA.includes(c.nombre)){
       if(!nuevosExternos[c.nombre]){
         const nuevo = {id: uid(), nombre: c.nombre, rol: 'lider', lider_id: null};
@@ -3342,22 +3335,32 @@ function completarJunio2026(){
       }
       match = nuevosExternos[c.nombre];
     }
-    if(!match) return;
+    if(!match){
+      saltadas.push(c.nombre + (candidatos.length ? ' — ambiguo' : ' — no encontrado'));
+      return;
+    }
     const transf = c.met==='efectivo' ? 0 : c.monto;
     const efec = c.met==='efectivo' ? c.monto : 0;
     D.comisiones.push({ id: uid(), quien_id: match.id, sem: c.sem, semPago: c.sem, met: c.met, total: c.monto, transf, efec, mes: c.mes });
     comisionesCargadas++;
   });
 
+  // Evitar el duplicado de sueldos fantasma para Junio tambien
+  if(!D.nomina) D.nomina = [];
+  D.empleados.forEach(emp=>{
+    const yaExiste = D.nomina.find(n=>n.emp_id===emp.id && n.mes==='2026-06');
+    if(!yaExiste) D.nomina.push({ id: uid(), emp_id: emp.id, mes: '2026-06', sueldo: 0, hsExtra: 0, pagado: true, semPago: 1 });
+  });
+
   save();
-  renderGastos(); renderExternos(); renderResumen(); renderAnalisis(); renderCashFlow();
+  renderGastos(); renderExternos(); renderResumen(); renderAnalisis(); renderCashFlow(); renderEmpleados();
 
   g('ih-junio-resultado').innerHTML = `
-    <div style="color:#1A7A52;font-weight:800">✅ Junio completado</div>
-    <div>Gastos agregados: <b>${faltanGastos.length}</b></div>
-    <div>Comisiones agregadas: <b>${comisionesCargadas}</b></div>
+    <div style="color:#1A7A52;font-weight:800">✅ Junio 2026 rehecho desde el Excel</div>
+    <div>Gastos cargados: <b>${IH_JUNIO_GASTOS_ESPERADOS.length}</b></div>
+    <div>Comisiones cargadas: <b>${comisionesCargadas}</b> de ${IH_JUNIO_COMISIONES_ESPERADAS.length}</div>
     ${Object.keys(nuevosExternos).length ? '<div>Externos nuevos: '+Object.keys(nuevosExternos).join(', ')+'</div>' : ''}
-    ${sinExterno.length ? '<div style="color:#C0392B">Sin externo identificado (no se cargaron): '+sinExterno.map(s=>s.nombre).join(', ')+'</div>' : ''}
+    ${saltadas.length ? '<div style="color:#C0392B">Salteadas: '+saltadas.join(', ')+'</div>' : ''}
   `;
   renderJunioDiagnostico();
 }
