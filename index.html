@@ -290,13 +290,18 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
 
         <!-- Tendencia ultimos meses -->
         <div style="background:#fff;border-radius:14px;padding:24px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
-          <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:16px">Tendencia — últimos 6 meses</div>
-          <canvas id="an-chart-tendencia" style="width:100%;height:220px"></canvas>
-          <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:8px;padding-top:12px;border-top:1px solid #F0F4F8;font-size:12px;color:#6B7E8F">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+            <div style="font-size:15px;font-weight:800;color:#1a2332">Tendencia — últimos 6 meses</div>
+            <div style="font-size:11.5px;color:#8A9BAB">Resultado neto (ingresos − egresos) mes a mes</div>
+          </div>
+          <div id="an-chart-resumen" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;padding:12px 16px;background:#F8FAFC;border-radius:10px;font-size:12.5px"></div>
+          <canvas id="an-chart-tendencia" style="width:100%;height:260px;display:block"></canvas>
+          <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:10px;padding-top:12px;border-top:1px solid #F0F4F8;font-size:12px;color:#6B7E8F">
             <span><span style="display:inline-block;width:10px;height:10px;background:#4ADE80;border-radius:2px;margin-right:5px;vertical-align:middle"></span>Barra hacia arriba = ese mes ganaste (ingresos &gt; egresos)</span>
             <span><span style="display:inline-block;width:10px;height:10px;background:#F87171;border-radius:2px;margin-right:5px;vertical-align:middle"></span>Barra hacia abajo = ese mes perdiste (egresos &gt; ingresos)</span>
+            <span>★/⚠ marca el mejor y el peor mes del período</span>
           </div>
-          <div style="font-size:11.5px;color:#8A9BAB;margin-top:6px">El número arriba/debajo de cada barra es el resultado neto de ese mes (ingresos − egresos). El tamaño de la barra es proporcional a ese monto: cuanto más alta o más baja, mayor la ganancia o la pérdida.</div>
+          <div style="font-size:11.5px;color:#8A9BAB;margin-top:6px">El número sobre cada barra es el resultado neto exacto de ese mes. El tamaño de la barra (y las líneas de fondo, marcadas en $) son proporcionales a ese monto: cuanto más alta o más baja, mayor la ganancia o la pérdida.</div>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
@@ -1628,51 +1633,135 @@ function fmtCompacto(n){
   return sign+'$'+Math.round(abs);
 }
 
+// Dibuja un rectangulo con esquinas redondeadas (arriba o abajo segun corresponda)
+function barRedondeada(ctx, x, y, w, h, radius, redondearArriba){
+  const r = Math.min(radius, w/2, Math.abs(h));
+  ctx.beginPath();
+  if(redondearArriba){
+    ctx.moveTo(x, y+h);
+    ctx.lineTo(x, y+r);
+    ctx.arcTo(x, y, x+r, y, r);
+    ctx.lineTo(x+w-r, y);
+    ctx.arcTo(x+w, y, x+w, y+r, r);
+    ctx.lineTo(x+w, y+h);
+  } else {
+    ctx.moveTo(x, y);
+    ctx.lineTo(x, y+h-r);
+    ctx.arcTo(x, y+h, x+r, y+h, r);
+    ctx.lineTo(x+w-r, y+h);
+    ctx.arcTo(x+w, y+h, x+w, y+h-r, r);
+    ctx.lineTo(x+w, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
 function renderChartTendencia(historicos){
   const canvas = g('an-chart-tendencia');
   if(!canvas) return;
-  const W = canvas.parentElement.offsetWidth - 48 || 500;
-  const H = 220;
-  canvas.width = W; canvas.height = H;
+  const cssW = canvas.parentElement.offsetWidth - 48 || 500;
+  const cssH = 260;
+  // Nitidez en pantallas retina/alta densidad: dibujamos a resolucion real
+  // del dispositivo y escalamos hacia abajo con CSS, en vez de que el canvas
+  // se vea borroso al estirarse.
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = cssW * dpr;
+  canvas.height = cssH * dpr;
+  canvas.style.width = cssW+'px';
+  canvas.style.height = cssH+'px';
   const ctx = canvas.getContext('2d');
-  ctx.clearRect(0,0,W,H);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,cssW,cssH);
+  ctx.textBaseline = 'alphabetic';
 
+  const W = cssW, H = cssH;
   const vals = historicos.map(h=>h.resultado);
   const maxAbs = Math.max(...vals.map(v=>Math.abs(v)), 1);
-  // Mas padding arriba y abajo para que entren los montos en $ sobre/debajo de cada barra
-  const padTop = 26, padBottom = 40, padSide = 8;
+  const padTop = 34, padBottom = 44, padLeft = 46, padRight = 10;
   const chartH = H - padTop - padBottom;
   const zeroY = padTop + chartH/2;
-  const barW = (W - padSide*2) / historicos.length;
+  const plotW = W - padLeft - padRight;
+  const barW = plotW / historicos.length;
 
-  // linea de cero
-  ctx.strokeStyle = '#E4EAF0'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(padSide, zeroY); ctx.lineTo(W-padSide, zeroY); ctx.stroke();
-  ctx.fillStyle = '#B8C4CE'; ctx.font='9px system-ui'; ctx.textAlign='left';
-  ctx.fillText('$0', padSide, zeroY-4);
+  // --- Cuadricula horizontal con escala en $ (arriba y abajo del cero) ---
+  ctx.strokeStyle = '#EEF2F6'; ctx.lineWidth = 1;
+  ctx.fillStyle = '#9AAABB'; ctx.font = '10px system-ui'; ctx.textAlign = 'right';
+  [0.5, 1].forEach(frac=>{
+    const off = frac * (chartH/2 - 4);
+    [zeroY-off, zeroY+off].forEach(y=>{
+      ctx.beginPath(); ctx.moveTo(padLeft, y); ctx.lineTo(W-padRight, y); ctx.stroke();
+    });
+    ctx.fillText('+'+fmtCompacto(frac*maxAbs), padLeft-8, zeroY-off+3);
+    ctx.fillText('-'+fmtCompacto(frac*maxAbs), padLeft-8, zeroY+off+3);
+  });
+
+  // Linea de cero, mas marcada
+  ctx.strokeStyle = '#C7D2DC'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(padLeft, zeroY); ctx.lineTo(W-padRight, zeroY); ctx.stroke();
+  ctx.fillStyle = '#6B7E8F'; ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'right';
+  ctx.fillText('$0', padLeft-8, zeroY+3);
+
+  // --- Identificar mejor y peor mes para destacarlos ---
+  let idxMejor = 0, idxPeor = 0;
+  historicos.forEach((h,i)=>{
+    if(h.resultado > historicos[idxMejor].resultado) idxMejor = i;
+    if(h.resultado < historicos[idxPeor].resultado) idxPeor = i;
+  });
 
   historicos.forEach((h,i)=>{
-    const x = padSide + i*barW;
-    const barH = (Math.abs(h.resultado)/maxAbs) * (chartH/2 - 4);
-    const bw = barW*0.55;
+    const x = padLeft + i*barW;
+    const barH = Math.max((Math.abs(h.resultado)/maxAbs) * (chartH/2 - 4), h.resultado===0?0:2);
+    const bw = barW*0.5;
     const bx = x + (barW-bw)/2;
     const esGanancia = h.resultado >= 0;
-    ctx.fillStyle = esGanancia ? '#4ADE80' : '#F87171';
+    const esDestacado = (i===idxMejor && esGanancia) || (i===idxPeor && !esGanancia);
+
+    // Degrade sutil para look mas profesional
+    const grad = ctx.createLinearGradient(0, esGanancia?zeroY-barH:zeroY, 0, esGanancia?zeroY:zeroY+barH);
+    if(esGanancia){ grad.addColorStop(0, '#34D399'); grad.addColorStop(1, '#6EE7B7'); }
+    else { grad.addColorStop(0, '#FCA5A5'); grad.addColorStop(1, '#EF4444'); }
+    ctx.fillStyle = grad;
+    ctx.globalAlpha = esDestacado ? 1 : 0.85;
     if(esGanancia){
-      ctx.fillRect(bx, zeroY-barH, bw, barH);
+      barRedondeada(ctx, bx, zeroY-barH, bw, barH, 5, true);
     } else {
-      ctx.fillRect(bx, zeroY, bw, barH);
+      barRedondeada(ctx, bx, zeroY, bw, barH, 5, false);
     }
-    // Monto en $ arriba de la barra (si es ganancia) o debajo (si es perdida)
+    ctx.globalAlpha = 1;
+
+    // Contorno + etiqueta "mejor/peor mes" para el que se destaca
+    if(esDestacado){
+      ctx.strokeStyle = esGanancia ? '#059669' : '#B91C1C';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(bx-1, esGanancia?zeroY-barH-1:zeroY+1, bw+2, barH+2);
+      ctx.fillStyle = esGanancia ? '#059669' : '#B91C1C';
+      ctx.font = 'bold 9px system-ui'; ctx.textAlign = 'center';
+      const tagY = esGanancia ? (zeroY-barH-26) : (zeroY+barH+34);
+      ctx.fillText(esGanancia ? '★ MEJOR MES' : '⚠ PEOR MES', x+barW/2, tagY);
+    }
+
+    // Monto en $ (exacto, no compacto) arriba o debajo de la barra
     ctx.fillStyle = esGanancia ? '#1A7A52' : '#C0392B';
-    ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center';
-    const labelY = esGanancia ? (zeroY - barH - 6) : (zeroY + barH + 12);
-    ctx.fillText(fmtCompacto(h.resultado), x+barW/2, labelY);
+    ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center';
+    const labelY = esGanancia ? (zeroY - barH - (esDestacado?12:6)) : (zeroY + barH + (esDestacado?12:16));
+    ctx.fillText(fmt(h.resultado), x+barW/2, labelY);
+
     // Nombre del mes debajo del eje
     const d = new Date(h.mes+'-01T00:00:00');
-    ctx.fillStyle = '#8A9BAB'; ctx.font='10px system-ui'; ctx.textAlign='center';
-    ctx.fillText(MES[d.getMonth()].slice(0,3), x+barW/2, H-10);
+    ctx.fillStyle = '#5A6B7A'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText(MES[d.getMonth()].slice(0,3)+' '+String(d.getFullYear()).slice(2), x+barW/2, H-12);
   });
+
+  // --- Resumen del periodo (promedio, mejor, peor) ---
+  const promedio = vals.reduce((s,v)=>s+v,0) / vals.length;
+  const resumenEl = g('an-chart-resumen');
+  if(resumenEl){
+    resumenEl.innerHTML = `
+      <div><span style="color:#8A9BAB">Promedio mensual</span><br><b style="color:${promedio>=0?'#1A7A52':'#C0392B'}">${fmt(promedio)}</b></div>
+      <div><span style="color:#8A9BAB">★ Mejor mes</span><br><b style="color:#1A7A52">${MES[new Date(historicos[idxMejor].mes+'-01T00:00:00').getMonth()]} — ${fmt(historicos[idxMejor].resultado)}</b></div>
+      <div><span style="color:#8A9BAB">⚠ Peor mes</span><br><b style="color:#C0392B">${MES[new Date(historicos[idxPeor].mes+'-01T00:00:00').getMonth()]} — ${fmt(historicos[idxPeor].resultado)}</b></div>
+    `;
+  }
 }
 
 // ═══════════════════════════════
