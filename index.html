@@ -3519,24 +3519,26 @@ function mesMasAntiguoConDatos(){
 function initCFMes(){
   const sel = g('cf-mes');
   if(!sel) return;
-  // Solo construir la lista de opciones una vez
-  if(sel.options.length === 0){
-    const d = new Date();
-    let iDesde = -3;
-    const masAntiguo = mesMasAntiguoConDatos();
-    if(masAntiguo){
-      const [ay,am] = masAntiguo.split('-').map(Number);
-      const diffMeses = (ay - d.getFullYear())*12 + (am - (d.getMonth()+1));
-      if(diffMeses < iDesde) iDesde = diffMeses;
-    }
-    const meses = [];
-    for(let i=iDesde; i<=12; i++){
-      const dd = new Date(d.getFullYear(), d.getMonth()+i, 1);
-      meses.push({val:dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0'),
-        label:MES[dd.getMonth()]+' '+dd.getFullYear()});
-    }
-    sel.innerHTML = meses.map(x=>`<option value="${x.val}">${x.label}</option>`).join('');
+  // Reconstruimos la lista de opciones siempre (es barato) en vez de solo la
+  // primera vez: si se arma antes de que terminen de llegar los datos de la
+  // nube (por ejemplo justo despues de una importacion historica), una sola
+  // construccion inicial se quedaria corta y nunca se corrige sola.
+  const d = new Date();
+  let iDesde = -3;
+  const masAntiguo = mesMasAntiguoConDatos();
+  if(masAntiguo){
+    const [ay,am] = masAntiguo.split('-').map(Number);
+    const diffMeses = (ay - d.getFullYear())*12 + (am - (d.getMonth()+1));
+    if(diffMeses < iDesde) iDesde = diffMeses;
   }
+  const meses = [];
+  for(let i=iDesde; i<=12; i++){
+    const dd = new Date(d.getFullYear(), d.getMonth()+i, 1);
+    meses.push({val:dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0'),
+      label:MES[dd.getMonth()]+' '+dd.getFullYear()});
+  }
+  const nuevasOpciones = meses.map(x=>`<option value="${x.val}">${x.label}</option>`).join('');
+  if(sel.innerHTML !== nuevasOpciones) sel.innerHTML = nuevasOpciones;
   // Siempre reflejar el mes global seleccionado (sincronizado con el resto del sistema)
   if([...sel.options].some(o=>o.value===mesSel)) sel.value = mesSel;
 }
