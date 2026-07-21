@@ -291,7 +291,12 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
         <!-- Tendencia ultimos meses -->
         <div style="background:#fff;border-radius:14px;padding:24px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
           <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:16px">Tendencia — últimos 6 meses</div>
-          <canvas id="an-chart-tendencia" style="width:100%;height:180px"></canvas>
+          <canvas id="an-chart-tendencia" style="width:100%;height:220px"></canvas>
+          <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:8px;padding-top:12px;border-top:1px solid #F0F4F8;font-size:12px;color:#6B7E8F">
+            <span><span style="display:inline-block;width:10px;height:10px;background:#4ADE80;border-radius:2px;margin-right:5px;vertical-align:middle"></span>Barra hacia arriba = ese mes ganaste (ingresos &gt; egresos)</span>
+            <span><span style="display:inline-block;width:10px;height:10px;background:#F87171;border-radius:2px;margin-right:5px;vertical-align:middle"></span>Barra hacia abajo = ese mes perdiste (egresos &gt; ingresos)</span>
+          </div>
+          <div style="font-size:11.5px;color:#8A9BAB;margin-top:6px">El número arriba/debajo de cada barra es el resultado neto de ese mes (ingresos − egresos). El tamaño de la barra es proporcional a ese monto: cuanto más alta o más baja, mayor la ganancia o la pérdida.</div>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
@@ -1613,18 +1618,29 @@ function renderAnalisis(){
   g('an-recomendaciones').innerHTML = recos.map(r=>'<div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #F5F7FA">'+r+'</div>').join('');
 }
 
+// Formato compacto de moneda para que los montos entren arriba de cada barra
+// (ej: 195797859 -> "$195,8M")
+function fmtCompacto(n){
+  const sign = n<0 ? '-' : '';
+  const abs = Math.abs(n);
+  if(abs>=1000000) return sign+'$'+(abs/1000000).toFixed(1).replace('.',',')+'M';
+  if(abs>=1000) return sign+'$'+Math.round(abs/1000)+'K';
+  return sign+'$'+Math.round(abs);
+}
+
 function renderChartTendencia(historicos){
   const canvas = g('an-chart-tendencia');
   if(!canvas) return;
   const W = canvas.parentElement.offsetWidth - 48 || 500;
-  const H = 180;
+  const H = 220;
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0,0,W,H);
 
   const vals = historicos.map(h=>h.resultado);
   const maxAbs = Math.max(...vals.map(v=>Math.abs(v)), 1);
-  const padTop = 10, padBottom = 28, padSide = 8;
+  // Mas padding arriba y abajo para que entren los montos en $ sobre/debajo de cada barra
+  const padTop = 26, padBottom = 40, padSide = 8;
   const chartH = H - padTop - padBottom;
   const zeroY = padTop + chartH/2;
   const barW = (W - padSide*2) / historicos.length;
@@ -1632,19 +1648,27 @@ function renderChartTendencia(historicos){
   // linea de cero
   ctx.strokeStyle = '#E4EAF0'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(padSide, zeroY); ctx.lineTo(W-padSide, zeroY); ctx.stroke();
+  ctx.fillStyle = '#B8C4CE'; ctx.font='9px system-ui'; ctx.textAlign='left';
+  ctx.fillText('$0', padSide, zeroY-4);
 
   historicos.forEach((h,i)=>{
     const x = padSide + i*barW;
     const barH = (Math.abs(h.resultado)/maxAbs) * (chartH/2 - 4);
     const bw = barW*0.55;
     const bx = x + (barW-bw)/2;
-    ctx.fillStyle = h.resultado >= 0 ? '#4ADE80' : '#F87171';
-    if(h.resultado >= 0){
+    const esGanancia = h.resultado >= 0;
+    ctx.fillStyle = esGanancia ? '#4ADE80' : '#F87171';
+    if(esGanancia){
       ctx.fillRect(bx, zeroY-barH, bw, barH);
     } else {
       ctx.fillRect(bx, zeroY, bw, barH);
     }
-    // label mes abreviado
+    // Monto en $ arriba de la barra (si es ganancia) o debajo (si es perdida)
+    ctx.fillStyle = esGanancia ? '#1A7A52' : '#C0392B';
+    ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center';
+    const labelY = esGanancia ? (zeroY - barH - 6) : (zeroY + barH + 12);
+    ctx.fillText(fmtCompacto(h.resultado), x+barW/2, labelY);
+    // Nombre del mes debajo del eje
     const d = new Date(h.mes+'-01T00:00:00');
     ctx.fillStyle = '#8A9BAB'; ctx.font='10px system-ui'; ctx.textAlign='center';
     ctx.fillText(MES[d.getMonth()].slice(0,3), x+barW/2, H-10);
