@@ -333,7 +333,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
           <button onclick="aiBorrarHistorial()" style="position:absolute;right:28px;top:28px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.7);font-size:12px;border-radius:8px;padding:6px 12px;cursor:pointer">🗑 Borrar historial</button>
           <div style="font-size:11px;font-weight:800;letter-spacing:2px;color:#C9A84C;text-transform:uppercase;margin-bottom:8px">Consultá tu situación</div>
           <div style="font-size:28px;font-weight:800;color:#fff;margin-bottom:6px;letter-spacing:-.5px">🤖 Asistente Financiero</div>
-          <div style="font-size:14px;color:rgba(255,255,255,.5)">Preguntale lo que quieras sobre tus números — usa los datos reales del sistema, incluyendo empleados.</div>
+          <div style="font-size:14px;color:rgba(255,255,255,.5)">Preguntale lo que quieras sobre tus números, o pedile que cargue gastos, ingresos, adelantos y premios — siempre te va a pedir confirmación antes de guardar nada.</div>
         </div>
 
         <div style="background:#fff;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.06);display:flex;flex-direction:column;height:60vh;min-height:420px">
@@ -344,7 +344,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
           </div>
         </div>
         <div style="font-size:12px;color:#8A9BAB;margin-top:10px">
-          El asistente responde en base a los datos cargados en el sistema (incluye sueldos, CBU y bancos de empleados) y a tu historial de conversación en este navegador. No reemplaza a un contador o asesor financiero para decisiones grandes.
+          El asistente responde en base a los datos cargados en el sistema (incluye sueldos, CBU y bancos de empleados) y a tu historial de conversación en este navegador. Puede proponer cargar gastos, ingresos, adelantos o premios, pero nunca los guarda sin que vos confirmes cada acción. No reemplaza a un contador o asesor financiero para decisiones grandes.
         </div>
       </div>
 
@@ -1769,7 +1769,8 @@ function renderChartTendencia(historicos){
 // ASISTENTE IA
 // ═══════════════════════════════
 const AI_CHAT_KEY = 'odsa_ai_historial'; // se guarda en este navegador, entre sesiones
-let _aiHistorial = []; // [{role:'user'|'assistant', content:'...'}]
+let _aiHistorial = []; // mensajes en formato Anthropic: [{role, content:[bloques]}]
+let _aiPendienteLote = null; // acciones propuestas en el turno actual, esperando confirmacion
 
 function aiCargarHistorial(){
   try{
@@ -1783,10 +1784,16 @@ function aiGuardarHistorial(){
 function aiBorrarHistorial(){
   if(!confirm('¿Borrar toda la conversación con el asistente? No se puede deshacer.')) return;
   _aiHistorial = [];
+  _aiPendienteLote = null;
   try{ localStorage.removeItem(AI_CHAT_KEY); }catch(e){}
   const box = g('ai-chat-msgs');
   if(box) box.innerHTML = '';
-  aiAgregarMensaje('assistant', 'Listo, empezamos de cero. ¿Qué querés saber?');
+  aiAgregarMensaje('assistant', 'Listo, empezamos de cero. ¿Qué querés saber o qué querés cargar?');
+}
+
+// Texto de bienvenida (primera vez, sin historial guardado)
+function aiMensajeBienvenida(){
+  aiAgregarMensaje('assistant', '¡Hola! Soy tu asistente financiero. Puedo ver todos los datos cargados en ODSA (sueldos, empleados, gastos, ingresos, cash flow, etc.) y contestarte preguntas sobre tu situación económica. También puedo cargar cosas por vos si me lo pedís:\\n\\n• "Agregá un gasto de $50.000 en insumos"\\n• "Registrá un ingreso de $120.000 de hoy"\\n• "Cargá un adelanto de $30.000 para Juan"\\n• "Poné un premio de $10.000 para Noe en la semana 2"\\n\\nSiempre te voy a mostrar la acción antes de ejecutarla, para que la confirmes vos. Me acuerdo de esta conversación entre sesiones. ¿Qué necesitás?');
 }
 
 function renderAsistente(){
@@ -1795,11 +1802,28 @@ function renderAsistente(){
   if(box.children.length > 0) return; // ya esta renderizado en esta sesion de la pagina
   _aiHistorial = aiCargarHistorial();
   if(_aiHistorial.length === 0){
-    aiAgregarMensaje('assistant', '¡Hola! Soy tu asistente financiero. Puedo ver los datos cargados en ODSA (sueldos, empleados, gastos, ingresos, cash flow, etc.) y contestarte preguntas sobre tu situación económica. Por ejemplo:\n\n• ¿Cómo viene el mes comparado con el anterior?\n• ¿En qué gasté más este mes?\n• ¿Cuál es el CBU de tal empleado?\n\nMe voy a acordar de esta conversación la próxima vez que entres. ¿Qué querés saber?');
-  } else {
-    // Reconstruir los mensajes guardados de sesiones anteriores
-    _aiHistorial.forEach(h => aiAgregarMensaje(h.role, h.content));
+    aiMensajeBienvenida();
+    return;
   }
+  // Reconstruir la conversacion guardada. Las acciones (tool_use) se muestran
+  // como resueltas (usando el tool_result que las sigue), nunca como botones
+  // activos, para no permitir re-ejecutar algo de una sesion anterior.
+  _aiHistorial.forEach((msg, i)=>{
+    (msg.content||[]).forEach(block=>{
+      if(block.type === 'text' && block.text && block.text.trim()){
+        aiAgregarMensaje(msg.role, block.text);
+      } else if(block.type === 'tool_use'){
+        let resultText = '';
+        const siguiente = _aiHistorial[i+1];
+        if(siguiente && Array.isArray(siguiente.content)){
+          const tr = siguiente.content.find(b=>b.type==='tool_result' && b.tool_use_id===block.id);
+          if(tr) resultText = typeof tr.content === 'string' ? tr.content : '';
+        }
+        aiRenderAccionResuelta(block, resultText || '(no se resolvió en su momento)');
+      }
+    });
+  });
+  box.scrollTop = box.scrollHeight;
 }
 
 function aiAgregarMensaje(role, texto){
@@ -1817,77 +1841,221 @@ function aiAgregarMensaje(role, texto){
   return bubble;
 }
 
-// Arma un resumen completo de la situacion financiera y de cada empleado
-// (sueldo, banco, CBU, CUIL) para darle contexto de todo el sistema a la IA.
-// OJO: esto viaja a la API de Anthropic con tu propia clave en cada pregunta.
-function construirContextoFinanciero(){
-  const m = mesSel;
-  const rActual = calcResumenFor(m);
-  const mAnt = shiftMes(m, -1);
-  const rAnterior = calcResumenFor(mAnt);
-
-  const historicos = [];
-  for(let i=5;i>=0;i--){
-    const mm = shiftMes(m,-i);
-    const r = calcResumenFor(mm);
-    historicos.push({mes: mesLabel(mm), ingresos:r.totalIngresos, egresos:r.totalEgresos, resultado:r.resultado});
+// --- Tarjetas de accion propuesta (tool_use) ---
+function aiDescribirAccion(tb){
+  const n = tb.input||{};
+  const montoTxt = fmt(Number(n.monto)||0);
+  switch(tb.name){
+    case 'agregar_gasto':
+      return {titulo:'Agregar gasto', detalle:(n.descripcion||'Gasto')+' · '+montoTxt+' · '+(n.categoria||'Otro')+' · '+fd(n.fecha||hoy())};
+    case 'agregar_ingreso':
+      return {titulo:'Agregar ingreso', detalle:(n.descripcion||'Ingreso')+' · '+montoTxt+' · '+fd(n.fecha||hoy())};
+    case 'agregar_adelanto':
+      return {titulo:'Agregar adelanto', detalle:(n.nombre_empleado||'—')+' · '+montoTxt+' · '+fd(n.fecha||hoy())};
+    case 'agregar_premio':
+      return {titulo:'Agregar premio', detalle:(n.nombre_empleado||'—')+' · '+montoTxt+(n.semana?' · Sem '+n.semana:'')};
+    default:
+      return {titulo: tb.name, detalle: JSON.stringify(n)};
   }
+}
 
-  let cf = null;
+function aiRenderAccionCard(tb){
+  const box = g('ai-chat-msgs');
+  if(!box) return;
+  const {titulo, detalle} = aiDescribirAccion(tb);
+  const card = document.createElement('div');
+  card.dataset.toolId = tb.id;
+  card.style.cssText = 'align-self:flex-start;max-width:85%;background:#FFF8E7;border:1px solid #F0DFA8;border-radius:12px;padding:14px 16px;font-size:13.5px;color:#1a2332';
+  card.innerHTML = '<div style="font-weight:800;margin-bottom:4px">📝 '+titulo+'</div>'
+    + '<div style="color:#5a6472;margin-bottom:10px">'+detalle+'</div>'
+    + '<div style="display:flex;gap:8px">'
+    + '<button onclick="aiConfirmarAccion(\'' + tb.id + '\')" style="background:#1A7A52;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12.5px;font-weight:700;cursor:pointer">✅ Confirmar</button>'
+    + '<button onclick="aiCancelarAccion(\'' + tb.id + '\')" style="background:#fff;color:#6B7E8F;border:1px solid #D8E2EC;border-radius:8px;padding:6px 14px;font-size:12.5px;font-weight:700;cursor:pointer">✖ Cancelar</button>'
+    + '</div>';
+  box.appendChild(card);
+  box.scrollTop = box.scrollHeight;
+}
+
+function aiRenderAccionResuelta(tb, resultado){
+  const box = g('ai-chat-msgs');
+  if(!box) return;
+  const {titulo, detalle} = aiDescribirAccion(tb);
+  const card = document.createElement('div');
+  card.style.cssText = 'align-self:flex-start;max-width:85%;background:#F0F4F8;border:1px solid #E4EAF0;border-radius:12px;padding:12px 16px;font-size:13px;color:#3a4553';
+  card.innerHTML = '<div style="font-weight:700;margin-bottom:3px">📝 '+titulo+'</div>'
+    + '<div style="color:#6B7E8F;margin-bottom:4px">'+detalle+'</div>'
+    + '<div>'+resultado+'</div>';
+  box.appendChild(card);
+}
+
+function aiActualizarCard(toolUseId, texto){
+  const card = document.querySelector('[data-tool-id="'+toolUseId+'"]');
+  if(!card) return;
+  const tb = _aiPendienteLote && _aiPendienteLote.toolBlocks.find(t=>t.id===toolUseId);
+  const {titulo, detalle} = tb ? aiDescribirAccion(tb) : {titulo:'', detalle:''};
+  card.innerHTML = '<div style="font-weight:700;margin-bottom:3px">📝 '+titulo+'</div>'
+    + '<div style="color:#6B7E8F;margin-bottom:4px">'+detalle+'</div>'
+    + '<div>'+texto+'</div>';
+  card.style.background = '#F0F4F8';
+  card.style.border = '1px solid #E4EAF0';
+}
+
+// --- Resolver nombre de empleado escrito en lenguaje natural ---
+function aiResolverEmpleado(nombre){
+  const q = (nombre||'').toLowerCase().trim();
+  if(!q) return {match:null, candidatos:[]};
+  let m = D.empleados.find(e=>e.nombre.toLowerCase()===q);
+  if(m) return {match:m, candidatos:[]};
+  let parciales = D.empleados.filter(e=>e.nombre.toLowerCase().includes(q));
+  if(parciales.length===1) return {match:parciales[0], candidatos:[]};
+  if(parciales.length>1) return {match:null, candidatos:parciales};
+  parciales = D.empleados.filter(e=>e.nombre.toLowerCase().split(/\s+/).includes(q));
+  if(parciales.length===1) return {match:parciales[0], candidatos:[]};
+  return {match:null, candidatos:parciales};
+}
+
+// --- Ejecutar de verdad la accion confirmada (mutacion real sobre D) ---
+function aiEjecutarAccion(nombreTool, input){
   try{
-    const {ing_sem, eg_sem} = getCFData(m);
-    cf = [1,2,3,4,5].map(s=>({
-      semana: s,
-      ingresos: (ing_sem[s]||[]).reduce((sum,i)=>sum+(i.monto||0),0),
-      egresos: ((eg_sem[s]&&eg_sem[s].items)||[]).reduce((sum,i)=>sum+(i.monto||0),0)
-    })).filter(x=>x.ingresos>0 || x.egresos>0);
-  }catch(e){ cf = null; }
+    if(nombreTool === 'agregar_gasto'){
+      const fecha = input.fecha || hoy();
+      const rec = {id:uid(), desc:(input.descripcion||'Gasto').trim(), cat:input.categoria||'Otro', monto:Number(input.monto)||0, fecha, mes:fecha.slice(0,7), nota:input.nota||'', pagado:false, semPago:null, medio:'transferencia'};
+      D.gastos.push(rec); save(); renderGastos(); renderResumen();
+      return 'Gasto agregado: "'+rec.desc+'" — '+fmt(rec.monto)+' el '+fd(rec.fecha)+'.';
+    }
+    if(nombreTool === 'agregar_ingreso'){
+      const fecha = input.fecha || hoy();
+      const rec = {id:uid(), desc:(input.descripcion||'Ingreso').trim(), monto:Number(input.monto)||0, fecha, mes:fecha.slice(0,7)};
+      D.ingresos.push(rec); save(); renderIngresos(); renderResumen();
+      return 'Ingreso agregado: "'+rec.desc+'" — '+fmt(rec.monto)+' el '+fd(rec.fecha)+'.';
+    }
+    if(nombreTool === 'agregar_adelanto'){
+      const {match} = aiResolverEmpleado(input.nombre_empleado);
+      if(!match) return 'No se pudo agregar: no se encontró al empleado "'+(input.nombre_empleado||'')+'".';
+      const fecha = input.fecha || hoy();
+      const rec = {id:uid(), emp_id:match.id, monto:Number(input.monto)||0, fecha, mes:fecha.slice(0,7), nota:input.nota||''};
+      D.adelantos.push(rec); save(); renderAdelantos(); renderEmpleados();
+      return 'Adelanto agregado a '+match.nombre+': '+fmt(rec.monto)+' el '+fd(rec.fecha)+'.';
+    }
+    if(nombreTool === 'agregar_premio'){
+      const {match} = aiResolverEmpleado(input.nombre_empleado);
+      if(!match) return 'No se pudo agregar: no se encontró al empleado "'+(input.nombre_empleado||'')+'".';
+      const sem = parseInt(input.semana)||1;
+      const rec = {id:uid(), emp_id:match.id, monto:Number(input.monto)||0, sem, semPago:sem, concepto:input.concepto||'Premio semanal', mes:mesSel};
+      D.premios.push(rec); save(); renderPremios();
+      return 'Premio agregado a '+match.nombre+': '+fmt(rec.monto)+' (Sem '+sem+').';
+    }
+    return 'Acción no reconocida.';
+  }catch(e){
+    return 'Error al ejecutar la acción: '+e.message;
+  }
+}
 
-  const adelantosPendientes = (D.adelantos||[]).filter(a=>a.mes===m && !a.pagado).reduce((s,a)=>s+a.monto,0);
-  const chequesPendientes = (D.cheques||[]).filter(c=>c.mes===m && c.estado && c.estado!=='cobrado' && c.estado!=='Pagado').length;
+function aiConfirmarAccion(toolUseId){
+  const lote = _aiPendienteLote;
+  if(!lote) return;
+  const tb = lote.toolBlocks.find(t=>t.id===toolUseId);
+  if(!tb) return;
+  const resultado = aiEjecutarAccion(tb.name, tb.input);
+  lote.resueltos[toolUseId] = resultado;
+  aiActualizarCard(toolUseId, '✅ '+resultado);
+  aiVerificarLoteCompleto();
+}
+function aiCancelarAccion(toolUseId){
+  const lote = _aiPendienteLote;
+  if(!lote) return;
+  const texto = 'El usuario canceló esta acción, no se realizó ningún cambio.';
+  lote.resueltos[toolUseId] = texto;
+  aiActualizarCard(toolUseId, '✖ Cancelado por el usuario.');
+  aiVerificarLoteCompleto();
+}
+function aiVerificarLoteCompleto(){
+  const lote = _aiPendienteLote;
+  if(!lote) return;
+  if(Object.keys(lote.resueltos).length === lote.toolBlocks.length){
+    const todos = Object.assign({}, lote.resultadosPrevios, lote.resueltos);
+    _aiPendienteLote = null;
+    aiEnviarToolResults(todos);
+  }
+}
 
-  const empleadosDetalle = D.empleados.map(e=>{
-    const n = getNominaEmp(e, m);
-    return {
-      nombre: e.nombre,
-      sector: SECTORES[e.sector] || e.sector,
-      sueldo_base: e.sueldo || 0,
-      sueldo_este_mes: n.sueldo,
-      hs_extra_comisiones_este_mes: n.hsExtra || 0,
-      pagado_este_mes: !!n.pagado,
-      modalidad: e.mod || '',
-      banco: e.banco || '',
-      cuil: e.cuil || '',
-      cbu: e.cbu || '',
-      nota: e.nota || ''
-    };
+async function aiEnviarToolResults(resultadosPorId){
+  const content = Object.entries(resultadosPorId).map(([tool_use_id, text])=>({type:'tool_result', tool_use_id, content:text}));
+  _aiHistorial.push({role:'user', content});
+  aiGuardarHistorial();
+  await aiProcesarTurno();
+}
+
+// Procesa los bloques tool_use de la respuesta mas reciente: resuelve solos
+// los casos ambiguos (empleado no encontrado) y muestra tarjetas de
+// confirmacion para el resto, esperando que el usuario haga clic.
+function aiProcesarToolUses(toolBlocks){
+  const resultadosPrevios = {};
+  const pendientesConfirmar = [];
+
+  toolBlocks.forEach(tb=>{
+    if(tb.name === 'agregar_adelanto' || tb.name === 'agregar_premio'){
+      const {match, candidatos} = aiResolverEmpleado(tb.input && tb.input.nombre_empleado);
+      if(!match){
+        resultadosPrevios[tb.id] = candidatos.length
+          ? 'No se pudo identificar con certeza al empleado. Candidatos posibles: '+candidatos.map(c=>c.nombre).join(', ')+'. Pedile a la persona que aclare el nombre completo.'
+          : 'No se encontró ningún empleado activo con el nombre "'+(tb.input&&tb.input.nombre_empleado)+'". Pedile a la persona que revise el nombre.';
+        return;
+      }
+    }
+    pendientesConfirmar.push(tb);
   });
 
-  return {
-    mes_actual: mesLabel(m),
-    resumen_mes_actual: {
-      ingresos: rActual.totalIngresos,
-      egresos: rActual.totalEgresos,
-      resultado_neto: rActual.resultado,
-      sueldos_nomina: rActual.totalSueldos,
-      premios_semanales: rActual.totalPremios,
-      comisiones_externos: rActual.totalComisiones,
-      gastos_generales: rActual.totalGastos,
-      cheques_emitidos: rActual.totalCheques
-    },
-    resumen_mes_anterior: {
-      mes: mesLabel(mAnt),
-      ingresos: rAnterior.totalIngresos,
-      egresos: rAnterior.totalEgresos,
-      resultado_neto: rAnterior.resultado
-    },
-    tendencia_ultimos_6_meses: historicos,
-    cash_flow_semanal_mes_actual: cf,
-    empleados_activos: D.empleados.length,
-    empleados_detalle: empleadosDetalle,
-    adelantos_pendientes_de_pago: adelantosPendientes,
-    cheques_pendientes: chequesPendientes
-  };
+  if(pendientesConfirmar.length === 0){
+    aiEnviarToolResults(resultadosPrevios);
+    return;
+  }
+
+  _aiPendienteLote = { toolBlocks: pendientesConfirmar, resultadosPrevios, resueltos: {} };
+  pendientesConfirmar.forEach(tb => aiRenderAccionCard(tb));
+}
+
+async function aiLlamarAPI(){
+  const contexto = construirContextoFinanciero();
+  const r = await fetch('/api/asistente', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+    body: JSON.stringify({ contexto, messages: _aiHistorial })
+  });
+  const data = await r.json();
+  return { ok: r.ok && data.ok, data };
+}
+
+async function aiProcesarTurno(){
+  const btn = g('ai-btn-enviar');
+  if(btn){ btn.disabled = true; btn.textContent = '...'; }
+  const pensando = aiAgregarMensaje('assistant', 'Pensando...');
+  try{
+    const {ok, data} = await aiLlamarAPI();
+    pensando.remove();
+    if(!ok){
+      aiAgregarMensaje('assistant', '⚠️ No pude responder: '+(data.error||'error desconocido')+'. Si esto sigue pasando, puede que falte configurar la clave de la IA en el servidor.');
+      return;
+    }
+    _aiHistorial.push({role:'assistant', content: data.content});
+    aiGuardarHistorial();
+
+    (data.content||[]).forEach(block=>{
+      if(block.type === 'text' && block.text && block.text.trim()){
+        aiAgregarMensaje('assistant', block.text);
+      }
+    });
+
+    if(data.stop_reason === 'tool_use'){
+      const toolBlocks = (data.content||[]).filter(b=>b.type==='tool_use');
+      if(toolBlocks.length) aiProcesarToolUses(toolBlocks);
+    }
+  }catch(e){
+    pensando.remove();
+    aiAgregarMensaje('assistant', '⚠️ Error de conexión. Probá de nuevo en un momento.');
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = 'Enviar'; }
+  }
 }
 
 async function enviarPreguntaAsistente(){
@@ -1898,35 +2066,10 @@ async function enviarPreguntaAsistente(){
   input.style.height = 'auto';
 
   aiAgregarMensaje('user', pregunta);
-  _aiHistorial.push({role:'user', content:pregunta});
+  _aiHistorial.push({role:'user', content:[{type:'text', text:pregunta}]});
   aiGuardarHistorial();
 
-  const btn = g('ai-btn-enviar');
-  btn.disabled = true; btn.textContent = '...';
-  const pensando = aiAgregarMensaje('assistant', 'Pensando...');
-
-  try{
-    const contexto = construirContextoFinanciero();
-    const r = await fetch('/api/asistente', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
-      body: JSON.stringify({ pregunta, contexto, historial: _aiHistorial.slice(0,-1) })
-    });
-    const data = await r.json();
-    pensando.remove();
-    if(!r.ok || !data.ok){
-      aiAgregarMensaje('assistant', '⚠️ No pude responder: '+(data.error||'error desconocido')+'. Si esto sigue pasando, puede que falte configurar la clave de la IA en el servidor.');
-    } else {
-      aiAgregarMensaje('assistant', data.respuesta || '(sin respuesta)');
-      _aiHistorial.push({role:'assistant', content: data.respuesta || ''});
-      aiGuardarHistorial();
-    }
-  }catch(e){
-    pensando.remove();
-    aiAgregarMensaje('assistant', '⚠️ Error de conexión. Probá de nuevo en un momento.');
-  }finally{
-    btn.disabled = false; btn.textContent = 'Enviar';
-  }
+  await aiProcesarTurno();
 }
 
 // ═══════════════════════════════
