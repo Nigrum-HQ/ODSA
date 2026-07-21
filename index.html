@@ -362,6 +362,17 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
 
         <button id="ih-btn-confirmar" onclick="confirmarImportacionHistorico()" style="background:#1B3A6B;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-weight:700;cursor:pointer;font-size:14px">Confirmar e importar</button>
         <div id="ih-resultado" style="margin-top:20px;font-size:13.5px;line-height:1.7"></div>
+
+        <div style="margin-top:32px;padding-top:24px;border-top:1px solid #E4EAF0">
+          <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:8px">Corregir sueldos duplicados (Ene-Abr 2026)</div>
+          <div style="font-size:13px;color:#6B7E8F;margin-bottom:14px">
+            Como los sueldos de Ene-Abr se cargaron como Gasto agrupado por sector (no por empleado), el sistema además
+            muestra a cada empleado ACTUAL como "sueldo pendiente" en esos meses — aunque no haya trabajado ahí — duplicando el gasto.
+            Este botón pone en $0 el sueldo de todos los empleados actuales para Enero-Abril 2026, para que no se sume dos veces.
+          </div>
+          <button id="ih-btn-fix-nomina" onclick="corregirSueldosDuplicadosHistorico()" style="background:#C0392B;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-weight:700;cursor:pointer;font-size:14px">Corregir sueldos duplicados</button>
+          <div id="ih-fix-nomina-resultado" style="margin-top:16px;font-size:13.5px;line-height:1.7"></div>
+        </div>
       </div>
 
       <!-- EMPLEADOS -->
@@ -2797,6 +2808,37 @@ function confirmarImportacionHistorico(){
     <div style="margin-top:14px;color:#6B7E8F">Ya podés revisar Enero, Febrero, Marzo y Abril 2026 en Gastos, Externos, Resumen y Análisis Financiero.</div>
   `;
   renderImportHistorico();
+}
+
+const IH_MESES_HISTORICO = ['2026-01','2026-02','2026-03','2026-04'];
+
+// Pone en $0 el sueldo de cada empleado ACTUAL para Ene-Abr 2026, para no
+// duplicar el gasto ya cargado como Gasto agrupado por sector. Es idempotente:
+// si un empleado/mes ya tiene un registro de nomina (por ejemplo porque alguien
+// lo edito a mano), no lo toca.
+function corregirSueldosDuplicadosHistorico(){
+  const ok = confirm('Esto va a poner en $0 el sueldo de todos los empleados actuales ('+D.empleados.length+') para Enero, Febrero, Marzo y Abril 2026, para no duplicar el gasto ya cargado por sector.\n\nNo va a tocar meses que ya tengan un registro cargado a mano. ¿Confirmás?');
+  if(!ok) return;
+
+  if(!D.nomina) D.nomina = [];
+  let creados = 0, yaExistian = 0;
+  D.empleados.forEach(emp=>{
+    IH_MESES_HISTORICO.forEach(mes=>{
+      const yaExiste = D.nomina.find(n=>n.emp_id===emp.id && n.mes===mes);
+      if(yaExiste){ yaExistian++; return; }
+      D.nomina.push({ id: uid(), emp_id: emp.id, mes, sueldo: 0, hsExtra: 0, pagado: true, semPago: 1 });
+      creados++;
+    });
+  });
+
+  save();
+  renderEmpleados(); renderResumen(); renderAnalisis(); renderCashFlow();
+
+  g('ih-fix-nomina-resultado').innerHTML = `
+    <div style="color:#1A7A52;font-weight:800">✅ Corrección aplicada</div>
+    <div>Registros de sueldo puestos en $0: <b>${creados}</b></div>
+    <div>Meses que ya tenían un registro cargado (no se tocaron): <b>${yaExistian}</b></div>
+  `;
 }
 
 // ═══════════════════════════════
