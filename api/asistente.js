@@ -56,6 +56,20 @@ const TOOLS = [
       },
       required: ['nombre_empleado', 'monto']
     }
+  },
+  {
+    name: 'eliminar_movimiento',
+    description: 'Elimina un gasto, ingreso, adelanto o premio ya cargado en el sistema. Se busca por descripción (gasto/ingreso) o nombre de empleado (adelanto/premio), y opcionalmente por monto o fecha para desambiguar si hay varios parecidos.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        tipo: { type: 'string', enum: ['gasto', 'ingreso', 'adelanto', 'premio'], description: 'Tipo de registro a eliminar' },
+        busqueda: { type: 'string', description: 'Texto para identificar el registro: la descripción del gasto/ingreso, o el nombre del empleado para adelanto/premio' },
+        monto: { type: 'number', description: 'Monto exacto del registro, si se conoce, para ayudar a identificarlo entre varios parecidos' },
+        fecha: { type: 'string', description: 'Fecha en formato YYYY-MM-DD, si se conoce, para ayudar a identificar el registro entre varios parecidos' }
+      },
+      required: ['tipo', 'busqueda']
+    }
   }
 ];
 
@@ -93,12 +107,13 @@ El dueño del negocio ya te autorizó explícitamente a manejar esos datos de em
 Si te preguntan algo que no se puede responder con los datos que tenés, decilo con honestidad y sugerí dónde podrían mirarlo dentro del sistema (Sueldos, Gastos, Cash Flow, Análisis Financiero, Fichas, etc.) en vez de inventar.
 Podés dar consejos prácticos de gestión financiera, dejando en claro que no reemplazan a un contador o asesor financiero para decisiones grandes.
 
-ADEMÁS, ahora podés EJECUTAR ACCIONES reales sobre el sistema usando las herramientas disponibles: agregar_gasto, agregar_ingreso, agregar_adelanto y agregar_premio.
-- Usalas cuando el usuario te pida explícitamente cargar, agregar o registrar algo de ese tipo.
-- Si falta un dato imprescindible (por ejemplo el monto, o a qué empleado corresponde un adelanto/premio), preguntáselo primero en un mensaje de texto normal en vez de inventarlo o de llamar a la herramienta con datos incompletos.
+ADEMÁS, ahora podés EJECUTAR ACCIONES reales sobre el sistema usando las herramientas disponibles: agregar_gasto, agregar_ingreso, agregar_adelanto, agregar_premio y eliminar_movimiento.
+- Usalas cuando el usuario te pida explícitamente cargar, agregar, registrar, borrar o eliminar algo de ese tipo.
+- Si falta un dato imprescindible (por ejemplo el monto, o a qué empleado corresponde un adelanto/premio, o qué gasto/ingreso hay que borrar), preguntáselo primero en un mensaje de texto normal en vez de inventarlo o de llamar a la herramienta con datos incompletos.
 - Si no te dan fecha, no hace falta que preguntes: se usa automáticamente la fecha de hoy.
+- Para eliminar_movimiento, usá como "busqueda" la descripción del gasto/ingreso o el nombre del empleado (para adelanto/premio), tal como lo mencionó el usuario; si te da un monto o fecha específicos, incluilos también para ayudar a identificar el registro exacto.
 - Cada acción que proponés pasa por una confirmación de la persona antes de ejecutarse de verdad (el sistema le muestra una tarjeta para confirmar o cancelar) — vos no necesitás pedir esa confirmación por texto, simplemente llamá a la herramienta cuando tengas los datos necesarios.
-- Si el resultado de una herramienta indica que no se encontró al empleado o que el nombre es ambiguo, pedile a la persona que aclare el nombre en tu siguiente mensaje de texto, no inventes un empleado.
+- Si el resultado de una herramienta indica que no se encontró el empleado/registro o que es ambiguo (hay varios candidatos), pedile a la persona que aclare en tu siguiente mensaje de texto, no inventes ni elijas por tu cuenta.
 
 Tenés memoria de la conversación anterior con esta persona — usala para dar continuidad, pero priorizá siempre el JSON de datos actuales por sobre lo que se dijo antes si hay contradicción.
 Sé breve: respuestas de pocos párrafos, con números concretos citados del contexto cuando corresponda. Evitá relleno.
