@@ -373,6 +373,16 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
           <button id="ih-btn-fix-nomina" onclick="corregirSueldosDuplicadosHistorico()" style="background:#C0392B;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-weight:700;cursor:pointer;font-size:14px">Corregir sueldos duplicados</button>
           <div id="ih-fix-nomina-resultado" style="margin-top:16px;font-size:13.5px;line-height:1.7"></div>
         </div>
+
+        <div style="margin-top:32px;padding-top:24px;border-top:1px solid #E4EAF0">
+          <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:8px">Cargar semana faltante: Marzo — Semana 5</div>
+          <div style="font-size:13px;color:#6B7E8F;margin-bottom:14px">
+            El Excel tenía una 5ta columna semanal para Marzo sin encabezado de texto, así que se saltó en la primera importación.
+            Son 7 gastos y 10 comisiones, por un total de $73.682.090 (coincide exacto con el "Total Egresos" de esa columna en el Excel).
+          </div>
+          <button id="ih-btn-marzo5" onclick="importarMarzoSemana5()" style="background:#1B3A6B;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-weight:700;cursor:pointer;font-size:14px">Cargar Marzo Semana 5</button>
+          <div id="ih-marzo5-resultado" style="margin-top:16px;font-size:13.5px;line-height:1.7"></div>
+        </div>
       </div>
 
       <!-- EMPLEADOS -->
@@ -2746,6 +2756,15 @@ function renderImportHistorico(){
     btn.textContent = 'Confirmar e importar';
     btn.style.opacity = 1;
   }
+
+  const btnM5 = g('ih-btn-marzo5');
+  if(btnM5){
+    if(D[IH_MARZO5_FLAG]){
+      btnM5.disabled = true; btnM5.textContent = 'Ya importado'; btnM5.style.opacity = 0.5;
+    } else {
+      btnM5.disabled = false; btnM5.textContent = 'Cargar Marzo Semana 5'; btnM5.style.opacity = 1;
+    }
+  }
 }
 
 function confirmarImportacionHistorico(){
@@ -2816,6 +2835,72 @@ const IH_MESES_HISTORICO = ['2026-01','2026-02','2026-03','2026-04'];
 // duplicar el gasto ya cargado como Gasto agrupado por sector. Es idempotente:
 // si un empleado/mes ya tiene un registro de nomina (por ejemplo porque alguien
 // lo edito a mano), no lo toca.
+const IH_MARZO5_FLAG = '_marzoSemana5Importado';
+const IH_MARZO5_GASTOS = [
+  {desc:"Premios semanales",cat:"Sueldos",monto:335000.0,fecha:"2026-03-29",mes:"2026-03",sem:5},
+  {desc:"Yamaha",cat:"Sueldos",monto:1197000.0,fecha:"2026-03-29",mes:"2026-03",sem:5},
+  {desc:"VICTORIA VIDEOS",cat:"otro",monto:1987792.0,fecha:"2026-03-29",mes:"2026-03",sem:5},
+  {desc:"Publicidad pautas",cat:"publicidad",monto:5250000.0,fecha:"2026-03-29",mes:"2026-03",sem:5},
+  {desc:"Alquiler (seervicios)",cat:"alquiler",monto:3850000.0,fecha:"2026-03-29",mes:"2026-03",sem:5},
+  {desc:"Contador",cat:"otro",monto:200000.0,fecha:"2026-03-29",mes:"2026-03",sem:5},
+  {desc:"PAGOS - Daiana Osmedica",cat:"otro",monto:1078634.0,fecha:"2026-03-29",mes:"2026-03",sem:5}
+];
+const IH_MARZO5_COMISIONES = [
+  {nombre:"Eve",met:"transferencia",monto:3061035.0,fecha:"2026-03-29",mes:"2026-03",sem:5},
+  {nombre:"Euge",met:"transferencia",monto:67996.0,fecha:"2026-03-29",mes:"2026-03",sem:5},
+  {nombre:"Manuel",met:"transferencia",monto:392625.0,fecha:"2026-03-29",mes:"2026-03",sem:5},
+  {nombre:"Rodrigo",met:"transferencia",monto:2616643.0,fecha:"2026-03-29",mes:"2026-03",sem:5},
+  {nombre:"Camila",met:"transferencia",monto:400000.0,fecha:"2026-03-29",mes:"2026-03",sem:5},
+  {nombre:"Flor",met:"transferencia",monto:566314.0,fecha:"2026-03-29",mes:"2026-03",sem:5},
+  {nombre:"Ian",met:"transferencia",monto:47252371.0,fecha:"2026-03-29",mes:"2026-03",sem:5},
+  {nombre:"Juan",met:"transferencia",monto:4114532.0,fecha:"2026-03-29",mes:"2026-03",sem:5},
+  {nombre:"Lucas",met:"transferencia",monto:1167788.0,fecha:"2026-03-29",mes:"2026-03",sem:5},
+  {nombre:"Jose",met:"transferencia",monto:144360.0,fecha:"2026-03-29",mes:"2026-03",sem:5}
+];
+
+function importarMarzoSemana5(){
+  if(D[IH_MARZO5_FLAG]){ alert('Esto ya fue importado antes.'); return; }
+  const totalG = IH_MARZO5_GASTOS.reduce((s,g)=>s+g.monto,0);
+  const totalC = IH_MARZO5_COMISIONES.reduce((s,c)=>s+c.monto,0);
+  const ok = confirm('Vas a importar '+IH_MARZO5_GASTOS.length+' gastos y '+IH_MARZO5_COMISIONES.length+' comisiones de la Semana 5 de Marzo 2026, por un total de '+fmt(totalG+totalC)+'. ¿Confirmás?');
+  if(!ok) return;
+
+  IH_MARZO5_GASTOS.forEach(g=>{
+    D.gastos.push({
+      id: uid(), desc: g.desc, cat: g.cat, monto: g.monto, fecha: g.fecha, mes: g.mes,
+      nota: 'Importado del histórico Excel (semana faltante)', pagado: true, semPago: g.sem, medio: 'transferencia'
+    });
+  });
+
+  let comisionesCargadas = 0;
+  const saltadas = [];
+  IH_MARZO5_COMISIONES.forEach(c=>{
+    const {match, candidatos} = ihResolverExterno(c.nombre);
+    if(!match){
+      saltadas.push(c.nombre + ' (' + fmt(c.monto) + ')' + (candidatos.length ? ' — ambiguo' : ' — no encontrado'));
+      return;
+    }
+    D.comisiones.push({
+      id: uid(), quien_id: match.id, sem: c.sem, semPago: c.sem, met: c.met,
+      total: c.monto, transf: c.monto, efec: 0, mes: c.mes
+    });
+    comisionesCargadas++;
+  });
+
+  D[IH_MARZO5_FLAG] = true;
+  save();
+  renderGastos(); renderExternos(); renderResumen(); renderAnalisis(); renderCashFlow();
+
+  g('ih-marzo5-resultado').innerHTML = `
+    <div style="color:#1A7A52;font-weight:800">✅ Semana 5 de Marzo importada</div>
+    <div>Gastos cargados: <b>${IH_MARZO5_GASTOS.length}</b></div>
+    <div>Comisiones cargadas: <b>${comisionesCargadas}</b> de ${IH_MARZO5_COMISIONES.length}</div>
+    ${saltadas.length ? '<div style="color:#C0392B">Salteadas: '+saltadas.join(', ')+'</div>' : ''}
+  `;
+  const btn = g('ih-btn-marzo5');
+  if(btn){ btn.disabled = true; btn.textContent = 'Ya importado'; btn.style.opacity = 0.5; }
+}
+
 function corregirSueldosDuplicadosHistorico(){
   const ok = confirm('Esto va a poner en $0 el sueldo de todos los empleados actuales ('+D.empleados.length+') para Enero, Febrero, Marzo y Abril 2026, para no duplicar el gasto ya cargado por sector.\n\nNo va a tocar meses que ya tengan un registro cargado a mano. ¿Confirmás?');
   if(!ok) return;
