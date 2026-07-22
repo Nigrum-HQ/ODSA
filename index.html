@@ -403,6 +403,16 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
         </div>
 
         <div style="margin-top:32px;padding-top:24px;border-top:1px solid #E4EAF0">
+          <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:8px">Diagnóstico detallado — todo lo que compone Junio 2026, semana por semana</div>
+          <div style="font-size:13px;color:#6B7E8F;margin-bottom:14px">
+            Lista cada Sueldo, Premio, Comisión, Gasto, Proyección y Cheque que hay cargado para Junio 2026, agrupado por semana,
+            con el total de cada semana al final — para comparar directo contra el Excel sin tener que ir página por página.
+          </div>
+          <button onclick="renderDiagnosticoJunioDetallado()" style="background:#1B3A6B;color:#fff;border:none;border-radius:10px;padding:10px 20px;font-weight:700;cursor:pointer;font-size:13.5px">Generar diagnóstico</button>
+          <div id="ih-diag-detallado" style="margin-top:16px"></div>
+        </div>
+
+        <div style="margin-top:32px;padding-top:24px;border-top:1px solid #E4EAF0">
           <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:8px">Corregir Premios duplicados de Junio</div>
           <div style="font-size:13px;color:#6B7E8F;margin-bottom:14px">
             Junio ya tenia Premios cargados por empleado en la pagina "Premios semana" antes de importar. La recarga del Excel
@@ -3376,6 +3386,39 @@ function rehacerJunio2026(){
     ${saltadas.length ? '<div style="color:#C0392B">Salteadas: '+saltadas.join(', ')+'</div>' : ''}
   `;
   renderJunioDiagnostico();
+}
+
+// Totales reales de la fila "TOTAL EGRESOS" del Excel para Junio, semana por semana
+// (verificados: coinciden exacto con la suma manual de cada fila del Excel).
+const IH_JUNIO_TOTAL_EXCEL = {1:121450746.06, 2:145880095.00, 3:102070493.00, 4:115063576.53, 5:90553896.50};
+
+function renderDiagnosticoJunioDetallado(){
+  const el = g('ih-diag-detallado');
+  if(!el) return;
+  const {eg_sem} = getCFData('2026-06');
+  let html = '';
+  for(let s=1; s<=5; s++){
+    const items = (eg_sem[s] && eg_sem[s].items) || [];
+    const total = items.reduce((sum,it)=>sum+it.monto,0);
+    const totalExcel = IH_JUNIO_TOTAL_EXCEL[s];
+    const diff = total - totalExcel;
+    const colorDiff = Math.abs(diff) < 1 ? '#1A7A52' : '#C0392B';
+    html += `<div style="margin-bottom:20px;border:1px solid #E4EAF0;border-radius:10px;overflow:hidden">
+      <div style="background:#F0F4F8;padding:10px 16px;font-weight:800;display:flex;justify-content:space-between">
+        <span>Semana ${s}</span>
+        <span>ODSA: ${fmt(total)} · Excel: ${fmt(totalExcel)} · <span style="color:${colorDiff}">Dif: ${fmt(diff)}</span></span>
+      </div>
+      <div style="padding:10px 16px">`;
+    items.forEach(it=>{
+      html += `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #F5F7FA;font-size:12.5px">
+        <span>${it.concepto}${it.cat?' <span style="color:#9AAABB">('+it.cat+')</span>':''}</span>
+        <span style="font-weight:700">${fmt(it.monto)}</span>
+      </div>`;
+    });
+    if(items.length===0) html += '<div style="color:#9AAABB;padding:6px 0">Sin items</div>';
+    html += `</div></div>`;
+  }
+  el.innerHTML = html;
 }
 
 function corregirPremiosDuplicadosJunio(){
