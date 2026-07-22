@@ -424,6 +424,19 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
         </div>
       </div>
 
+        <div style="margin-top:32px;padding-top:24px;border-top:1px solid #E4EAF0">
+          <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:8px">Corregir sueldos duplicados de Junio (forzado)</div>
+          <div style="font-size:13px;color:#6B7E8F;margin-bottom:14px">
+            Junio ya tenía sueldos reales cargados a mano para algunos empleados antes de importar. La corrección anterior
+            solo ponía en $0 los meses SIN registro previo, así que esos empleados quedaron con su sueldo real Y además
+            se sumó el Gasto agregado por sector — duplicando ese monto. Este botón fuerza el $0 en TODOS los empleados
+            para Junio 2026, tengan o no un registro previo.
+          </div>
+          <button id="ih-btn-fix-sueldo-jun" onclick="corregirSueldosDuplicadosJunioForzado()" style="background:#C0392B;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-weight:700;cursor:pointer;font-size:14px">Forzar sueldos en $0 para Junio</button>
+          <div id="ih-fix-sueldo-jun-resultado" style="margin-top:16px;font-size:13.5px;line-height:1.7"></div>
+        </div>
+      </div>
+
       <!-- EMPLEADOS -->
       <div id="page-empleados" class="page">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
@@ -3438,6 +3451,33 @@ function corregirPremiosDuplicadosJunio(){
   g('ih-fix-premios-jun-resultado').innerHTML = `
     <div style="color:#1A7A52;font-weight:800">✅ Corrección aplicada</div>
     <div>Gastos "Premios semanales" borrados: <b>${dup.length}</b> (${fmt(total)})</div>
+  `;
+}
+
+function corregirSueldosDuplicadosJunioForzado(){
+  const ok = confirm('Esto va a poner en $0 el sueldo de TODOS los empleados actuales ('+D.empleados.length+') para Junio 2026, incluso si ya tenían un sueldo real cargado — porque ese costo ya está en el Gasto agregado por sector que se importó del Excel. ¿Confirmás?');
+  if(!ok) return;
+
+  if(!D.nomina) D.nomina = [];
+  let corregidos = 0, creados = 0;
+  D.empleados.forEach(emp=>{
+    let rec = D.nomina.find(n=>n.emp_id===emp.id && n.mes==='2026-06');
+    if(rec){
+      rec.sueldo = 0; rec.hsExtra = 0; rec.pagado = true; rec.semPago = rec.semPago || 1;
+      corregidos++;
+    } else {
+      D.nomina.push({ id: uid(), emp_id: emp.id, mes: '2026-06', sueldo: 0, hsExtra: 0, pagado: true, semPago: 1 });
+      creados++;
+    }
+  });
+
+  save();
+  renderEmpleados(); renderResumen(); renderAnalisis(); renderCashFlow();
+
+  g('ih-fix-sueldo-jun-resultado').innerHTML = `
+    <div style="color:#1A7A52;font-weight:800">✅ Corrección aplicada</div>
+    <div>Registros existentes forzados a $0: <b>${corregidos}</b></div>
+    <div>Registros nuevos creados en $0: <b>${creados}</b></div>
   `;
 }
 
