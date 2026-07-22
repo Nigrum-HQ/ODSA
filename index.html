@@ -177,7 +177,6 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
       <div class="sitem on" data-page="resumen" onclick="navPage('resumen')"><span class="ico">📊</span>Resumen</div>
       <div class="sitem" data-page="analisis" onclick="navPage('analisis')"><span class="ico">📈</span>Análisis Financiero</div>
       <div class="sitem" data-page="asistente" onclick="navPage('asistente')"><span class="ico">🤖</span>Asistente IA</div>
-      <div class="sitem" data-page="importhist" onclick="navPage('importhist')"><span class="ico">⏳</span>Importar histórico</div>
 
       <div class="ssep">Administración</div>
       <div class="sitem" data-page="empleados" onclick="navPage('empleados')"><span class="ico">💰</span>Sueldos</div>
@@ -349,92 +348,6 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
         </div>
       </div>
 
-      <!-- IMPORTAR HISTORICO ENE-ABR 2026 (herramienta temporal, un solo uso) -->
-      <div id="page-importhist" class="page">
-        <div style="background:linear-gradient(135deg,#0F1923 0%,#1B2D42 60%,#0F1923 100%);border-radius:16px;padding:32px 36px;margin-bottom:24px">
-          <div style="font-size:11px;font-weight:800;letter-spacing:2px;color:#C9A84C;text-transform:uppercase;margin-bottom:8px">Herramienta temporal</div>
-          <div style="font-size:28px;font-weight:800;color:#fff;margin-bottom:6px;letter-spacing:-.5px">⏳ Importar histórico Enero-Abril 2026</div>
-          <div style="font-size:14px;color:rgba(255,255,255,.5)">Carga de una sola vez los gastos y comisiones de esos 4 meses, tomados de tu Excel de Caja y Cash Flow.</div>
-        </div>
-
-        <div id="ih-resumen" style="background:#fff;border-radius:14px;padding:24px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,.06)"></div>
-        <div id="ih-comisiones-check" style="background:#fff;border-radius:14px;padding:24px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,.06)"></div>
-
-        <button id="ih-btn-confirmar" onclick="confirmarImportacionHistorico()" style="background:#1B3A6B;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-weight:700;cursor:pointer;font-size:14px">Confirmar e importar</button>
-        <div id="ih-resultado" style="margin-top:20px;font-size:13.5px;line-height:1.7"></div>
-
-        <div style="margin-top:32px;padding-top:24px;border-top:1px solid #E4EAF0">
-          <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:8px">Corregir sueldos duplicados (Ene-Abr 2026)</div>
-          <div style="font-size:13px;color:#6B7E8F;margin-bottom:14px">
-            Como los sueldos de Ene-Abr se cargaron como Gasto agrupado por sector (no por empleado), el sistema además
-            muestra a cada empleado ACTUAL como "sueldo pendiente" en esos meses — aunque no haya trabajado ahí — duplicando el gasto.
-            Este botón pone en $0 el sueldo de todos los empleados actuales para Enero-Abril 2026, para que no se sume dos veces.
-          </div>
-          <button id="ih-btn-fix-nomina" onclick="corregirSueldosDuplicadosHistorico()" style="background:#C0392B;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-weight:700;cursor:pointer;font-size:14px">Corregir sueldos duplicados</button>
-          <div id="ih-fix-nomina-resultado" style="margin-top:16px;font-size:13.5px;line-height:1.7"></div>
-        </div>
-
-        <div style="margin-top:32px;padding-top:24px;border-top:1px solid #E4EAF0">
-          <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:8px">Cargar semana faltante: Marzo — Semana 5</div>
-          <div style="font-size:13px;color:#6B7E8F;margin-bottom:14px">
-            El Excel tenía una 5ta columna semanal para Marzo sin encabezado de texto, así que se saltó en la primera importación.
-            Son 7 gastos y 10 comisiones, por un total de $73.682.090 (coincide exacto con el "Total Egresos" de esa columna en el Excel).
-          </div>
-          <button id="ih-btn-marzo5" onclick="importarMarzoSemana5()" style="background:#1B3A6B;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-weight:700;cursor:pointer;font-size:14px">Cargar Marzo Semana 5</button>
-          <div id="ih-marzo5-resultado" style="margin-top:16px;font-size:13.5px;line-height:1.7"></div>
-        </div>
-
-        <div style="margin-top:32px;padding-top:24px;border-top:1px solid #E4EAF0">
-          <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:8px">Cargar Mayo 2026 (mes vacío)</div>
-          <div style="font-size:13px;color:#6B7E8F;margin-bottom:14px" id="ih-may-desc"></div>
-          <button id="ih-btn-mayo" onclick="importarMayo2026()" style="background:#1B3A6B;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-weight:700;cursor:pointer;font-size:14px">Cargar Mayo 2026</button>
-          <div id="ih-mayo-resultado" style="margin-top:16px;font-size:13.5px;line-height:1.7"></div>
-        </div>
-
-        <div style="margin-top:32px;padding-top:24px;border-top:1px solid #E4EAF0">
-          <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:8px">Rehacer Junio 2026 desde cero (borra lo que hay cargado y carga todo de nuevo desde el Excel)</div>
-          <div style="font-size:13px;color:#C0392B;margin-bottom:14px">
-            ⚠️ Esto BORRA todos los gastos y comisiones de Junio 2026 que estén cargados ahora mismo (para sacar los duplicados),
-            y los reemplaza por los 84 gastos y 65 comisiones que salen del Excel. No se puede deshacer.
-          </div>
-          <div id="ih-jun-diagnostico" style="background:#F8FAFC;border-radius:10px;padding:16px;margin-bottom:14px;font-size:13px"></div>
-          <button id="ih-btn-junio" onclick="rehacerJunio2026()" style="background:#C0392B;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-weight:700;cursor:pointer;font-size:14px">Borrar y recargar Junio desde el Excel</button>
-          <div id="ih-junio-resultado" style="margin-top:16px;font-size:13.5px;line-height:1.7"></div>
-        </div>
-
-        <div style="margin-top:32px;padding-top:24px;border-top:1px solid #E4EAF0">
-          <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:8px">Diagnóstico detallado — todo lo que compone Junio 2026, semana por semana</div>
-          <div style="font-size:13px;color:#6B7E8F;margin-bottom:14px">
-            Lista cada Sueldo, Premio, Comisión, Gasto, Proyección y Cheque que hay cargado para Junio 2026, agrupado por semana,
-            con el total de cada semana al final — para comparar directo contra el Excel sin tener que ir página por página.
-          </div>
-          <button onclick="renderDiagnosticoJunioDetallado()" style="background:#1B3A6B;color:#fff;border:none;border-radius:10px;padding:10px 20px;font-weight:700;cursor:pointer;font-size:13.5px">Generar diagnóstico</button>
-          <div id="ih-diag-detallado" style="margin-top:16px"></div>
-        </div>
-
-        <div style="margin-top:32px;padding-top:24px;border-top:1px solid #E4EAF0">
-          <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:8px">Corregir Premios duplicados de Junio</div>
-          <div style="font-size:13px;color:#6B7E8F;margin-bottom:14px">
-            Junio ya tenia Premios cargados por empleado en la pagina "Premios semana" antes de importar. La recarga del Excel
-            agrego ademas la fila "Premios semanales" como Gasto aparte, duplicando ese monto. Este boton saca esos gastos
-            duplicados (no toca los premios por empleado, que son los correctos).
-          </div>
-          <button id="ih-btn-fix-premios-jun" onclick="corregirPremiosDuplicadosJunio()" style="background:#C0392B;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-weight:700;cursor:pointer;font-size:14px">Corregir premios duplicados de Junio</button>
-          <div id="ih-fix-premios-jun-resultado" style="margin-top:16px;font-size:13.5px;line-height:1.7"></div>
-        </div>
-
-        <div style="margin-top:32px;padding-top:24px;border-top:1px solid #E4EAF0">
-          <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:8px">Corregir sueldos duplicados de Junio (forzado)</div>
-          <div style="font-size:13px;color:#6B7E8F;margin-bottom:14px">
-            Junio ya tenía sueldos reales cargados a mano para algunos empleados antes de importar. La corrección anterior
-            solo ponía en $0 los meses SIN registro previo, así que esos empleados quedaron con su sueldo real Y además
-            se sumó el Gasto agregado por sector — duplicando ese monto. Este botón fuerza el $0 en TODOS los empleados
-            para Junio 2026, tengan o no un registro previo.
-          </div>
-          <button id="ih-btn-fix-sueldo-jun" onclick="corregirSueldosDuplicadosJunioForzado()" style="background:#C0392B;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-weight:700;cursor:pointer;font-size:14px">Forzar sueldos en $0 para Junio</button>
-          <div id="ih-fix-sueldo-jun-resultado" style="margin-top:16px;font-size:13.5px;line-height:1.7"></div>
-        </div>
-      </div>
 
       <!-- EMPLEADOS -->
       <div id="page-empleados" class="page">
@@ -1429,7 +1342,6 @@ function navPage(name){
   if(name==='resumen') renderResumen();
   if(name==='analisis') renderAnalisis();
   if(name==='asistente') renderAsistente();
-  if(name==='importhist') renderImportHistorico();
   if(name==='empleados'){ renderEmpleados(); }
   if(name==='adelantos'){ fillAdEmp(); renderAdelantos(); }
   if(name==='ventas'){ fillPremEmp(); renderPremios(); }
