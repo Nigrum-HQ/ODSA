@@ -401,6 +401,17 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
           <button id="ih-btn-junio" onclick="rehacerJunio2026()" style="background:#C0392B;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-weight:700;cursor:pointer;font-size:14px">Borrar y recargar Junio desde el Excel</button>
           <div id="ih-junio-resultado" style="margin-top:16px;font-size:13.5px;line-height:1.7"></div>
         </div>
+
+        <div style="margin-top:32px;padding-top:24px;border-top:1px solid #E4EAF0">
+          <div style="font-size:15px;font-weight:800;color:#1a2332;margin-bottom:8px">Corregir Premios duplicados de Junio</div>
+          <div style="font-size:13px;color:#6B7E8F;margin-bottom:14px">
+            Junio ya tenia Premios cargados por empleado en la pagina "Premios semana" antes de importar. La recarga del Excel
+            agrego ademas la fila "Premios semanales" como Gasto aparte, duplicando ese monto. Este boton saca esos gastos
+            duplicados (no toca los premios por empleado, que son los correctos).
+          </div>
+          <button id="ih-btn-fix-premios-jun" onclick="corregirPremiosDuplicadosJunio()" style="background:#C0392B;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-weight:700;cursor:pointer;font-size:14px">Corregir premios duplicados de Junio</button>
+          <div id="ih-fix-premios-jun-resultado" style="margin-top:16px;font-size:13.5px;line-height:1.7"></div>
+        </div>
       </div>
 
       <!-- EMPLEADOS -->
@@ -3363,6 +3374,26 @@ function rehacerJunio2026(){
     ${saltadas.length ? '<div style="color:#C0392B">Salteadas: '+saltadas.join(', ')+'</div>' : ''}
   `;
   renderJunioDiagnostico();
+}
+
+function corregirPremiosDuplicadosJunio(){
+  const dup = D.gastos.filter(g=>g.mes==='2026-06' && g.desc==='Premios semanales');
+  if(dup.length===0){
+    alert('No hay gastos "Premios semanales" duplicados en Junio 2026 para sacar.');
+    return;
+  }
+  const total = dup.reduce((s,x)=>s+x.monto,0);
+  const ok = confirm('Se van a borrar '+dup.length+' gastos "Premios semanales" de Junio 2026 (total '+fmt(total)+'), que duplicaban los premios ya cargados por empleado. ¿Confirmás?');
+  if(!ok) return;
+
+  D.gastos = D.gastos.filter(g=>!(g.mes==='2026-06' && g.desc==='Premios semanales'));
+  save();
+  renderGastos(); renderResumen(); renderAnalisis(); renderCashFlow();
+
+  g('ih-fix-premios-jun-resultado').innerHTML = `
+    <div style="color:#1A7A52;font-weight:800">✅ Corrección aplicada</div>
+    <div>Gastos "Premios semanales" borrados: <b>${dup.length}</b> (${fmt(total)})</div>
+  `;
 }
 
 function corregirSueldosDuplicadosHistorico(){
