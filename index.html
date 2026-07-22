@@ -2149,13 +2149,27 @@ function construirContextoFinanciero(){
           sinDato += it.monto;
         }
       });
+      // Detalle linea por linea (concepto + monto + medio de pago), para que
+      // el asistente pueda decir a que corresponde cada gasto puntual, no
+      // solo el total agregado de la semana.
+      const detalleItems = items.map(it=>{
+        let medio = 'sin_registrar';
+        if(it.tipo === 'gasto') medio = it.medio || 'transferencia';
+        else if(it.tipo === 'comision_lider'){
+          if((it.totalEfec||0)>0 && (it.totalTransf||0)>0) medio = 'mixto';
+          else if((it.totalEfec||0)>0) medio = 'efectivo';
+          else medio = 'transferencia';
+        }
+        return { concepto: it.concepto, categoria: it.cat, monto: it.monto, medio };
+      });
       return {
         semana: s,
         ingresos: (ing_sem[s]||[]).reduce((sum,i)=>sum+(i.monto||0),0),
         egresos: items.reduce((sum,i)=>sum+(i.monto||0),0),
         egresos_efectivo: efec,
         egresos_transferencia: transf,
-        egresos_sin_medio_de_pago_registrado: sinDato
+        egresos_sin_medio_de_pago_registrado: sinDato,
+        detalle_items: detalleItems
       };
     }).filter(x=>x.ingresos>0 || x.egresos>0);
   }catch(e){ cf = null; }
