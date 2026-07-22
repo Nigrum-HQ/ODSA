@@ -488,6 +488,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
             <div class="card-title" style="margin-bottom:0">Historial de adelantos</div>
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <div id="ad-periodo-wrap"></div>
               <select id="ad-filtro-semana" onchange="renderAdelantos()" style="padding:6px 12px;border-radius:8px;border:1.5px solid #D8E2EC;font-size:12px;font-family:inherit;background:#fff;color:#1a2332;cursor:pointer;font-weight:600">
                 <option value="">📅 Todas las semanas</option>
                 <option value="1">Semana 1</option>
@@ -1059,12 +1060,13 @@ function actualizarLabelsMes(){
   const cheWrap = g('che-periodo-wrap'); if(cheWrap) cheWrap.innerHTML = periodoSelectorHTML('che');
   const resWrap = g('res-periodo-wrap'); if(resWrap) resWrap.innerHTML = periodoSelectorHTML('res');
   const anWrap = g('analisis-periodo-wrap'); if(anWrap) anWrap.innerHTML = periodoSelectorHTML('analisis');
+  const adWrap = g('ad-periodo-wrap'); if(adWrap) adWrap.innerHTML = periodoSelectorHTML('ad');
   const cfSel = g('cf-mes'); if(cfSel && [...cfSel.options].some(o=>o.value===mesSel)) cfSel.value = mesSel;
   const extSel = g('ext-filtro-mes'); if(extSel && [...extSel.options].some(o=>o.value===mesSel)) extSel.value = mesSel;
 }
 function renderTodoElPeriodo(){
   renderEmpleados(); renderGastos(); renderPremios(); renderIngresos(); renderCheques();
-  renderCashFlow(); renderExternos(); renderResumen(); renderAnalisis();
+  renderCashFlow(); renderExternos(); renderResumen(); renderAnalisis(); renderAdelantos();
 }
 function cambiarMesSel(delta){
   mesSel = shiftMes(mesSel, delta);
@@ -3643,8 +3645,9 @@ function getWeekOfMonth(dateStr){
 }
 
 function renderAdelantos(){
+  const _wrap = g('ad-periodo-wrap'); if(_wrap && !_wrap.innerHTML) _wrap.innerHTML = periodoSelectorHTML('ad');
   const filtroSemana = (g('ad-filtro-semana') ? g('ad-filtro-semana').value : '');
-  const m = mes();
+  const m = mesSel;
   const todosDelMes = D.adelantos.filter(a => a.mes === m);
   const filtrados = filtroSemana
     ? todosDelMes.filter(a => getWeekOfMonth(a.fecha) === parseInt(filtroSemana))
