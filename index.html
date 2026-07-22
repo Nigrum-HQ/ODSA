@@ -2143,6 +2143,24 @@ function construirContextoFinanciero(){
   const adelantosPendientes = (D.adelantos||[]).filter(a=>a.mes===m && !a.pagado).reduce((s,a)=>s+a.monto,0);
   const chequesPendientes = (D.cheques||[]).filter(c=>c.mes===m && c.estado && c.estado!=='cobrado' && c.estado!=='Pagado').length;
 
+  // Desglose por medio de pago (efectivo vs transferencia): Gastos usa el campo
+  // "medio", Comisiones ya viene partida en "efec"/"transf" (incluso si es "mixto").
+  const gastosDelMes = (D.gastos||[]).filter(g=>g.mes===m);
+  const comisionesDelMes = (D.comisiones||[]).filter(c=>c.mes===m);
+  const efectivoGastos = gastosDelMes.filter(g=>g.medio==='efectivo').reduce((s,g)=>s+(g.monto||0),0);
+  const transferenciaGastos = gastosDelMes.filter(g=>g.medio!=='efectivo').reduce((s,g)=>s+(g.monto||0),0);
+  const efectivoComisiones = comisionesDelMes.reduce((s,c)=>s+(c.efec||0),0);
+  const transferenciaComisiones = comisionesDelMes.reduce((s,c)=>s+(c.transf||0),0);
+  const desgloseMedioPago = {
+    efectivo_total: efectivoGastos + efectivoComisiones,
+    transferencia_total: transferenciaGastos + transferenciaComisiones,
+    efectivo_gastos_generales: efectivoGastos,
+    transferencia_gastos_generales: transferenciaGastos,
+    efectivo_comisiones_externos: efectivoComisiones,
+    transferencia_comisiones_externos: transferenciaComisiones,
+    nota: 'Sueldos, Premios y Cheques no tienen medio de pago registrado en el sistema; este desglose solo cubre Gastos y Comisiones.'
+  };
+
   const empleadosDetalle = D.empleados.map(e=>{
     const n = getNominaEmp(e, m);
     return {
@@ -2172,6 +2190,7 @@ function construirContextoFinanciero(){
       gastos_generales: rActual.totalGastos,
       cheques_emitidos: rActual.totalCheques
     },
+    desglose_medio_de_pago_mes_actual: desgloseMedioPago,
     resumen_mes_anterior: {
       mes: mesLabel(mAnt),
       ingresos: rAnterior.totalIngresos,
