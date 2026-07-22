@@ -2252,12 +2252,30 @@ function aiSanearMensajes(messages){
   return out;
 }
 
+// Al recortar el historial a los ultimos N mensajes, a veces el corte cae
+// justo en el medio de un par tool_use/tool_result, dejando un tool_result
+// "huerfano" al principio (sin su tool_use correspondiente, que quedo afuera
+// del recorte). La API rechaza eso. Esta funcion saca esos bloques sueltos.
+function aiSanearHuerfanosIniciales(messages){
+  const idsConTooUse = new Set();
+  messages.forEach(m=>{
+    (m.content||[]).forEach(b=>{ if(b.type==='tool_use') idsConTooUse.add(b.id); });
+  });
+  return messages.map(m=>{
+    if(m.role !== 'user') return m;
+    const tieneToolResult = (m.content||[]).some(b=>b.type==='tool_result');
+    if(!tieneToolResult) return m;
+    const contenidoLimpio = m.content.filter(b=> b.type!=='tool_result' || idsConTooUse.has(b.tool_use_id));
+    return { role: m.role, content: contenidoLimpio };
+  }).filter(m=>m.content && m.content.length>0);
+}
+
 async function aiLlamarAPI(){
   const contexto = construirContextoFinanciero();
   // Le mandamos a la IA solo role+content (sin id/ts, que son metadata nuestra
   // para poder fusionar el historial compartido entre los dos usuarios)
   const crudos = (D.ai_chat||[]).slice(-40).map(m=>({role:m.role, content:m.content}));
-  const messages = aiCoalescerMensajes(aiSanearMensajes(crudos));
+  const messages = aiCoalescerMensajes(aiSanearMensajes(aiSanearHuerfanosIniciales(crudos)));
   const r = await fetch('/api/asistente', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
