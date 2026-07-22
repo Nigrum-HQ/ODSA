@@ -4375,20 +4375,30 @@ function getCFData(mes_sel){
     });
   });
 
-  // Adelantos — aparecen en la semana de la fecha de pago
-  D.adelantos.filter(a=>a.mes===mes_sel).forEach(a=>{
-    const emp = D.empleados.find(e=>e.id===a.emp_id);
-    const sem = estimarSemana(a.fecha);
-    eg_sem[sem].items.push({
-      concepto: 'Adelanto: '+(emp?emp.nombre:'—'),
-      cat: (emp?SECTORES[emp.sector]||emp.sector:'')+(a.nota?' — '+a.nota:''),
-      monto: a.monto,
-      color: '#B8943E',
-      pagado: a.pagado||false,
-      tipo: 'adelanto',
-      id: a.id
+  // Adelantos — aparecen en la semana de la fecha de pago.
+  // EXCEPCION: en los meses historicos importados del Excel (Ene-Jun 2026), el
+  // sueldo de cada empleado se puso en $0 a proposito porque el costo real ya
+  // esta reflejado en el Gasto agregado "Sueldos <sector>" — y ese Gasto ya
+  // incluye los adelantos (el Excel los neteaba ahi). Si ademas sumamos el
+  // Adelanto como linea aparte, se cuenta dos veces. Por eso para esos meses
+  // NO se agrega la linea de Adelanto en Cash Flow (el monto ya esta adentro
+  // del Gasto importado); para el resto de los meses funciona como siempre.
+  const MESES_SUELDO_CERO_HISTORICO = ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06'];
+  if(!MESES_SUELDO_CERO_HISTORICO.includes(mes_sel)){
+    D.adelantos.filter(a=>a.mes===mes_sel).forEach(a=>{
+      const emp = D.empleados.find(e=>e.id===a.emp_id);
+      const sem = estimarSemana(a.fecha);
+      eg_sem[sem].items.push({
+        concepto: 'Adelanto: '+(emp?emp.nombre:'—'),
+        cat: (emp?SECTORES[emp.sector]||emp.sector:'')+(a.nota?' — '+a.nota:''),
+        monto: a.monto,
+        color: '#B8943E',
+        pagado: a.pagado||false,
+        tipo: 'adelanto',
+        id: a.id
+      });
     });
-  });
+  }
 
   return {ing_sem, eg_sem};
 }
