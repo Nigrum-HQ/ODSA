@@ -2133,11 +2133,31 @@ function construirContextoFinanciero(){
   let cf = null;
   try{
     const {ing_sem, eg_sem} = getCFData(m);
-    cf = [1,2,3,4,5].map(s=>({
-      semana: s,
-      ingresos: (ing_sem[s]||[]).reduce((sum,i)=>sum+(i.monto||0),0),
-      egresos: ((eg_sem[s]&&eg_sem[s].items)||[]).reduce((sum,i)=>sum+(i.monto||0),0)
-    })).filter(x=>x.ingresos>0 || x.egresos>0);
+    cf = [1,2,3,4,5].map(s=>{
+      const items = (eg_sem[s]&&eg_sem[s].items)||[];
+      // Efectivo/transferencia por semana: gastos usan "medio" (un solo medio
+      // para todo el monto), comisiones por lider ya vienen partidas en
+      // totalEfec/totalTransf. El resto (sueldos, premios, adelantos, cheques)
+      // no tiene medio de pago registrado en el sistema.
+      let efec = 0, transf = 0, sinDato = 0;
+      items.forEach(it=>{
+        if(it.tipo === 'gasto'){
+          if(it.medio === 'efectivo') efec += it.monto; else transf += it.monto;
+        } else if(it.tipo === 'comision_lider'){
+          efec += it.totalEfec||0; transf += it.totalTransf||0;
+        } else {
+          sinDato += it.monto;
+        }
+      });
+      return {
+        semana: s,
+        ingresos: (ing_sem[s]||[]).reduce((sum,i)=>sum+(i.monto||0),0),
+        egresos: items.reduce((sum,i)=>sum+(i.monto||0),0),
+        egresos_efectivo: efec,
+        egresos_transferencia: transf,
+        egresos_sin_medio_de_pago_registrado: sinDato
+      };
+    }).filter(x=>x.ingresos>0 || x.egresos>0);
   }catch(e){ cf = null; }
 
   const adelantosPendientes = (D.adelantos||[]).filter(a=>a.mes===m && !a.pagado).reduce((s,a)=>s+a.monto,0);
