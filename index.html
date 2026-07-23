@@ -4352,9 +4352,11 @@ function getCFData(mes_sel){
   // Comisiones — agrupadas por líder
   const comMes = D.comisiones.filter(c=>c.mes===mes_sel);
   const lideres = D.externos.filter(e=>e.rol==='lider');
+  const idsCubiertos = new Set(); // para detectar comisiones "huerfanas" abajo
   lideres.forEach(lid=>{
     // IDs del líder + su equipo
     const equipoIds = [lid.id, ...D.externos.filter(e=>e.lider_id===lid.id).map(e=>e.id)];
+    equipoIds.forEach(id=>idsCubiertos.add(id));
     const comsLider = comMes.filter(c=>equipoIds.includes(c.quien_id));
     if(!comsLider.length) return;
     // Agrupar por semana de pago
@@ -4388,6 +4390,51 @@ function getCFData(mes_sel){
         pagado: todoPagado,
         tipo: 'comision_lider',
         id: lid.id+'-'+semStr,
+        medio: totalEfec>0 && totalTransf===0 ? 'efectivo' : (totalEfec>0 ? 'mixto' : 'transferencia'),
+        totalEfec,
+        totalTransf
+      });
+    });
+  });
+
+  // Red de seguridad: comisiones de externos que no quedaron cubiertos por
+  // ningun lider (por ejemplo un Vendedor Externo con el lider mal vinculado,
+  // o sin lider asignado). Sin esto, esas comisiones se pierden en silencio
+  // y nunca aparecen en Cash Flow. Se muestran agrupadas por su propio nombre.
+  const comsHuerfanas = comMes.filter(c=>!idsCubiertos.has(c.quien_id));
+  const porExterno = {};
+  comsHuerfanas.forEach(c=>{
+    if(!porExterno[c.quien_id]) porExterno[c.quien_id] = [];
+    porExterno[c.quien_id].push(c);
+  });
+  Object.entries(porExterno).forEach(([quienId, coms])=>{
+    const ext = D.externos.find(e=>e.id===quienId);
+    const nombre = ext ? ext.nombre : 'Vendedor externo sin vincular';
+    const semMap = {};
+    coms.forEach(c=>{
+      const s = c.semPago||c.sem||1;
+      if(!semMap[s]) semMap[s] = [];
+      semMap[s].push(c);
+    });
+    Object.entries(semMap).forEach(([semStr, cs])=>{
+      const s = parseInt(semStr);
+      const total = cs.reduce((a,c)=>a+c.total,0);
+      const todoPagado = cs.every(c=>c.pagado||false);
+      const totalEfec = cs.reduce((a,c)=>{
+        if(c.met==='efectivo') return a+c.total;
+        if(c.met==='mixto') return a+(c.efec||0);
+        return a;
+      },0);
+      const totalTransf = total - totalEfec;
+      if(!eg_sem[s]) eg_sem[s] = {items:[]};
+      eg_sem[s].items.push({
+        concepto: 'Comisiones — '+nombre,
+        cat: cs.length+' comisión'+(cs.length!==1?'es':'')+' · sin equipo asignado',
+        monto: total,
+        color: '#B8943E',
+        pagado: todoPagado,
+        tipo: 'comision_lider',
+        id: 'huerfano-'+quienId+'-'+semStr,
         medio: totalEfec>0 && totalTransf===0 ? 'efectivo' : (totalEfec>0 ? 'mixto' : 'transferencia'),
         totalEfec,
         totalTransf
