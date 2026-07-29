@@ -166,6 +166,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
     <div class="topbar-right">
       <button id="btn-undo" onclick="undoLast()" title="Deshacer último cambio" style="background:rgba(255,255,255,.1);border:none;border-radius:8px;color:#fff;font-size:18px;cursor:pointer;padding:5px 12px;opacity:0.4;transition:.2s" >↩</button>
       <button onclick="abrirHistorialCambios()" title="Ver historial de cambios de montos" style="background:rgba(255,255,255,.1);border:none;border-radius:8px;color:#fff;font-size:14px;cursor:pointer;padding:5px 12px">🕘 Historial</button>
+      <button onclick="fusionarComisionesDuplicadas()" title="Unificar registros de comision duplicados para la misma persona/semana/mes" style="background:rgba(255,255,255,.1);border:none;border-radius:8px;color:#fff;font-size:14px;cursor:pointer;padding:5px 12px">🧹 Limpiar duplicados</button>
       <button class="btn-export" onclick="exportarAAbesa()">↑ Exportar a ABESA</button>
       <button id="btn-privado" class="btn-export" style="background:linear-gradient(135deg,#4a4a6a,#2d2d4a);min-width:44px" onclick="togglePrivado()" title="Ocultar/mostrar números">👁</button>
       <button class="btn-salir" onclick="salir()">Salir</button>
@@ -4603,6 +4604,51 @@ function fdh(isoStr){
 }
 
 const TIPO_LABEL_HIST={gasto:'Gasto',sueldo:'Sueldo',adelanto:'Adelanto',comision:'Comisión',comision_lider:'Comisiones (equipo)'};
+
+// Detecta comisiones duplicadas (misma persona + mes + semana) y las fusiona
+// en un unico registro, sumando los montos. Esto arregla el caso donde varias
+// ediciones o importaciones crearon mas de un registro para la misma persona
+// y semana, haciendo que la plata pareciera "perderse" al repartirse entre
+// registros invisibles.
+function fusionarComisionesDuplicadas(){
+  const grupos = {};
+  D.comisiones.forEach(c=>{
+    const sem = c.semPago||c.sem||1;
+    const key = c.quien_id+'|'+c.mes+'|'+sem;
+    if(!grupos[key]) grupos[key] = [];
+    grupos[key].push(c);
+  });
+  const duplicados = Object.entries(grupos).filter(([k,arr])=>arr.length>1);
+  if(!duplicados.length){
+    alert('✓ No se encontraron comisiones duplicadas. Todo está en orden.');
+    return;
+  }
+  const resumen = duplicados.map(([key,arr])=>{
+    const [quienId,mesArr,semArr] = key.split('|');
+    const persona = D.externos.find(e=>e.id===quienId);
+    const total = arr.reduce((a,c)=>a+(c.total||0),0);
+    return '• '+(persona?persona.nombre:'—')+' — '+mesArr+' sem.'+semArr+': '+arr.length+' registros → se van a fusionar en 1 de '+fmt(total);
+  }).join('\n');
+  if(!confirm('Se encontraron '+duplicados.length+' caso(s) de comisiones duplicadas:\n\n'+resumen+'\n\n¿Fusionar cada grupo en un único registro (sumando los montos)? Esta acción se puede deshacer con el botón ↩.')) return;
+  pushUndo();
+  duplicados.forEach(([key,arr])=>{
+    const totalFinal = arr.reduce((a,c)=>a+(c.total||0),0);
+    const totalTransf = arr.reduce((a,c)=>a+(c.met==='transferencia'?c.total:(c.met==='mixto'?(c.transf||0):0)),0);
+    const totalEfec = totalFinal - totalTransf;
+    // Nos quedamos con el primer registro como base y le sumamos todo
+    const base = arr[0];
+    base.total = totalFinal;
+    if(totalEfec>0 && totalTransf>0){ base.met='mixto'; base.transf=totalTransf; base.efec=totalEfec; }
+    else if(totalEfec>0){ base.met='efectivo'; base.transf=0; base.efec=totalEfec; }
+    else { base.met='transferencia'; base.transf=totalTransf; base.efec=0; }
+    // Borramos el resto de los duplicados
+    const idsABorrar = arr.slice(1).map(c=>c.id);
+    D.comisiones = D.comisiones.filter(c=>!idsABorrar.includes(c.id));
+  });
+  save();
+  renderCashFlow(); renderExternos();
+  toast('✓ Comisiones duplicadas fusionadas correctamente');
+}
 
 function abrirHistorialCambios(){
   const existente=document.getElementById('hist-overlay');
