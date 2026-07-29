@@ -4545,6 +4545,8 @@ function startEditMonto(e,tipo,id,montoActual){
   const doSave=()=>{const v=parseFloat(input.value); if(!isNaN(v)&&v>=0) updateCFMonto(tipo,id,v); else renderCashFlow();};
   input.addEventListener('blur',doSave);
   input.addEventListener('keydown',ev=>{if(ev.key==='Enter') input.blur(); if(ev.key==='Escape') renderCashFlow();});
+  // Evita que girar la rueda del mouse encima del campo le sume/reste números por accidente
+  input.addEventListener('wheel',ev=>{ ev.preventDefault(); },{passive:false});
 }
 function registrarCambio(tipo,refId,nombre,valorAnterior,valorNuevo){
   if(!D.historial_cambios) D.historial_cambios=[];
@@ -4633,7 +4635,19 @@ function restaurarValorHistorico(histId){
     }
   }
   else if(h.tipo==='comision_lider'){
-    toast('⚠ Las comisiones de equipo se repartieron proporcionalmente — restaurá cada persona por separado si hace falta.');
+    const dashIdx=h.refId.lastIndexOf('-');
+    const liderId=h.refId.substring(0,dashIdx);
+    const sem=parseInt(h.refId.substring(dashIdx+1))||1;
+    const equipoIds=[liderId,...D.externos.filter(e=>e.lider_id===liderId).map(e=>e.id)];
+    const grupo=D.comisiones.filter(c=>equipoIds.includes(c.quien_id)&&(c.semPago||c.sem||1)===sem);
+    const totalActual=grupo.reduce((a,c)=>a+(c.total||0),0);
+    if(grupo.length>0){
+      registrarCambio('comision_lider',h.refId,h.nombre,totalActual,h.valorAnterior);
+      if(totalActual>0){ grupo.forEach(c=>{ c.total=Math.round((c.total/totalActual)*h.valorAnterior); }); const diff=h.valorAnterior-grupo.reduce((a,c)=>a+(c.total||0),0); if(diff!==0) grupo[0].total=(grupo[0].total||0)+diff; }
+      else { const part=Math.floor(h.valorAnterior/grupo.length); grupo.forEach(c=>c.total=part); grupo[0].total+=h.valorAnterior-(part*grupo.length); }
+    } else {
+      toast('⚠ No se encontraron las comisiones de este equipo para restaurar.');
+    }
   }
   save();
   renderCashFlow();
