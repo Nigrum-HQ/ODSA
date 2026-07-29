@@ -852,10 +852,23 @@ function mergeChatArrays(localArr, cloudArr){
 // siempre (union); si el mismo id existe en ambos lados con datos distintos
 // (edicion simultanea del mismo registro), se resuelve por cual copia
 // completa es mas reciente en general (preferLocal).
+// IDs borrados intencionalmente hace poco (limpieza de duplicados, eliminar
+// persona, etc.) — se excluyen de la fusion para que no "revivan" solos si
+// justo en ese momento se sincroniza con una copia vieja de la nube que
+// todavia los tiene.
+window._idsBorradosRecientes = window._idsBorradosRecientes || new Set();
+function marcarComoBorrados(ids){
+  ids.forEach(id=>window._idsBorradosRecientes.add(id));
+  // Se olvida despues de 5 minutos: tiempo de sobra para que la nube se
+  // termine de actualizar con la version sin esos registros.
+  setTimeout(()=>{ ids.forEach(id=>window._idsBorradosRecientes.delete(id)); }, 5*60*1000);
+}
+
 function mergeArrayById(localArr, cloudArr, preferLocal){
   localArr = localArr || []; cloudArr = cloudArr || [];
+  const borrados = window._idsBorradosRecientes || new Set();
   const localMap = new Map(); localArr.forEach(x=>{ if(x && x.id!=null) localMap.set(x.id, x); });
-  const cloudMap = new Map(); cloudArr.forEach(x=>{ if(x && x.id!=null) cloudMap.set(x.id, x); });
+  const cloudMap = new Map(); cloudArr.forEach(x=>{ if(x && x.id!=null && !borrados.has(x.id)) cloudMap.set(x.id, x); });
   const allIds = new Set([...localMap.keys(), ...cloudMap.keys()]);
   const out = [];
   allIds.forEach(id=>{
@@ -3981,8 +3994,10 @@ function delExterno(id){
   const nombre = persona ? persona.nombre : 'esta persona';
   if(!confirm('Eliminar a ' + nombre + '?\n\nEsto borra TODAS sus comisiones.\n\nPresiona Cancelar para no borrar.')) return;
   pushUndo();
+  const comisionesBorradas = D.comisiones.filter(c=>c.quien_id===id).map(c=>c.id);
   D.externos = D.externos.filter(e=>e.id!==id);
   D.comisiones = D.comisiones.filter(c=>c.quien_id!==id);
+  marcarComoBorrados([id, ...comisionesBorradas]);
   save(); fillExtSelects(); renderExternos(); toast('Eliminado');
 }
 function editComision(id){
@@ -4631,6 +4646,7 @@ function fusionarComisionesDuplicadas(){
   }).join('\n');
   if(!confirm('Se encontraron '+duplicados.length+' caso(s) de comisiones duplicadas:\n\n'+resumen+'\n\n¿Fusionar cada grupo en un único registro (sumando los montos)? Esta acción se puede deshacer con el botón ↩.')) return;
   pushUndo();
+  const todosLosIdsABorrar=[];
   duplicados.forEach(([key,arr])=>{
     const totalFinal = arr.reduce((a,c)=>a+(c.total||0),0);
     const totalTransf = arr.reduce((a,c)=>a+(c.met==='transferencia'?c.total:(c.met==='mixto'?(c.transf||0):0)),0);
@@ -4643,8 +4659,10 @@ function fusionarComisionesDuplicadas(){
     else { base.met='transferencia'; base.transf=totalTransf; base.efec=0; }
     // Borramos el resto de los duplicados
     const idsABorrar = arr.slice(1).map(c=>c.id);
+    todosLosIdsABorrar.push(...idsABorrar);
     D.comisiones = D.comisiones.filter(c=>!idsABorrar.includes(c.id));
   });
+  marcarComoBorrados(todosLosIdsABorrar);
   save();
   renderCashFlow(); renderExternos();
   toast('✓ Comisiones duplicadas fusionadas correctamente');
