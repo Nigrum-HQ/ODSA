@@ -167,6 +167,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
       <button id="btn-undo" onclick="undoLast()" title="Deshacer último cambio" style="background:rgba(255,255,255,.1);border:none;border-radius:8px;color:#fff;font-size:18px;cursor:pointer;padding:5px 12px;opacity:0.4;transition:.2s" >↩</button>
       <button onclick="abrirHistorialCambios()" title="Ver historial de cambios de montos" style="background:rgba(255,255,255,.1);border:none;border-radius:8px;color:#fff;font-size:14px;cursor:pointer;padding:5px 12px">🕘 Historial</button>
       <button onclick="fusionarComisionesDuplicadas()" title="Unificar registros de comision duplicados para la misma persona/semana/mes" style="background:rgba(255,255,255,.1);border:none;border-radius:8px;color:#fff;font-size:14px;cursor:pointer;padding:5px 12px">🧹 Limpiar duplicados</button>
+      <button onclick="repararAgustinFrias()" title="Restaurar los valores originales de Agustin Frias en Feb/Abr/May/Jun 2026" style="background:rgba(255,80,80,.25);border:none;border-radius:8px;color:#fff;font-size:14px;cursor:pointer;padding:5px 12px">🔧 Reparar Agustín</button>
       <button class="btn-export" onclick="exportarAAbesa()">↑ Exportar a ABESA</button>
       <button id="btn-privado" class="btn-export" style="background:linear-gradient(135deg,#4a4a6a,#2d2d4a);min-width:44px" onclick="togglePrivado()" title="Ocultar/mostrar números">👁</button>
       <button class="btn-salir" onclick="salir()">Salir</button>
@@ -4668,6 +4669,43 @@ function fusionarComisionesDuplicadas(){
   toast('✓ Comisiones duplicadas fusionadas correctamente');
 }
 
+// Reparacion puntual: un bug (ya corregido) mezclaba entre si las comisiones
+// de "semana 4" de Agustin Frias de distintos meses cada vez que se editaba
+// su fila en Cash Flow. Esto restaura Feb/Abr/May/Jun 2026 a los valores
+// originales de la importacion historica (Julio no se toca, ese lo carga el
+// usuario con el valor real que corresponda).
+function repararAgustinFrias(){
+  const originales = [
+    {mes:'2026-02', sem:4, monto:387200},
+    {mes:'2026-04', sem:4, monto:767033},
+    {mes:'2026-05', sem:4, monto:1838344},
+    {mes:'2026-06', sem:4, monto:586234},
+  ];
+  const persona = D.externos.find(e=>e.nombre.toLowerCase().trim()==='agustin frias');
+  if(!persona){ alert('No se encontró a Agustín Frías en Vendedores Externos.'); return; }
+  const resumen = originales.map(o=>{
+    const c = D.comisiones.find(x=>x.quien_id===persona.id&&x.mes===o.mes&&(x.semPago||x.sem||1)===o.sem);
+    const actual = c ? c.total : 0;
+    return '• '+o.mes+' sem.'+o.sem+': actualmente '+fmt(actual)+' → se restaura a '+fmt(o.monto);
+  }).join('\n');
+  if(!confirm('Esto va a restaurar estos 4 meses de Agustín Frías a sus valores originales:\n\n'+resumen+'\n\nJulio 2026 NO se toca — ese lo cargás vos con el valor correcto.\n\n¿Confirmar?')) return;
+  pushUndo();
+  originales.forEach(o=>{
+    let c = D.comisiones.find(x=>x.quien_id===persona.id&&x.mes===o.mes&&(x.semPago||x.sem||1)===o.sem);
+    const antes = c ? c.total : 0;
+    if(c){
+      c.total = o.monto; c.met='transferencia'; c.transf=o.monto; c.efec=0;
+    } else {
+      c = {id:uid(), quien_id:persona.id, sem:o.sem, semPago:o.sem, met:'transferencia', total:o.monto, transf:o.monto, efec:0, mes:o.mes};
+      D.comisiones.push(c);
+    }
+    registrarCambio('comision','reparacion-'+c.id,'Reparación — Agustín Frías ('+o.mes+' sem.'+o.sem+')',antes,o.monto);
+  });
+  save();
+  renderCashFlow(); renderExternos();
+  toast('✓ Historial de Agustín Frías restaurado (Feb/Abr/May/Jun)');
+}
+
 function abrirHistorialCambios(){
   const existente=document.getElementById('hist-overlay');
   if(existente) existente.remove();
@@ -4789,7 +4827,11 @@ function updateCFMonto(tipo,id,monto){
     const liderId=id.substring(0,dashIdx);
     const sem=parseInt(id.substring(dashIdx+1))||1;
     const equipoIds=[liderId,...D.externos.filter(e=>e.lider_id===liderId).map(e=>e.id)];
-    const grupo=D.comisiones.filter(c=>equipoIds.includes(c.quien_id)&&(c.semPago||c.sem||1)===sem);
+    // IMPORTANTE: hay que filtrar tambien por el mes que se esta viendo (mesSel).
+    // Sin este filtro, se agrupaban comisiones de la MISMA semana-del-mes (ej.
+    // "semana 4") de TODOS los meses en los que esa persona tuvo esa semana,
+    // mezclando y repartiendo plata entre meses distintos sin querer.
+    const grupo=D.comisiones.filter(c=>equipoIds.includes(c.quien_id)&&c.mes===mesSel&&(c.semPago||c.sem||1)===sem);
     const totalActual=grupo.reduce((a,c)=>a+(c.total||0),0);
     const lider=D.externos.find(x=>x.id===liderId);
     if(grupo.length>0){
@@ -5126,7 +5168,7 @@ function toggleCFPago(tipo, id){
     const lid = D.externos.find(e=>e.id===liderId);
     if(lid){
       const equipoIds = [liderId, ...D.externos.filter(e=>e.lider_id===liderId).map(e=>e.id)];
-      const grupo = D.comisiones.filter(c=>equipoIds.includes(c.quien_id)&&String(c.semPago||c.sem||1)===semStr);
+      const grupo = D.comisiones.filter(c=>equipoIds.includes(c.quien_id)&&c.mes===mesSel&&String(c.semPago||c.sem||1)===semStr);
       const estado = !grupo.every(c=>c.pagado||false);
       grupo.forEach(c=>c.pagado=estado);
     }
