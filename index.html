@@ -4728,11 +4728,16 @@ function updateCFMonto(tipo,id,monto){
     const grupo=D.comisiones.filter(c=>equipoIds.includes(c.quien_id)&&(c.semPago||c.sem||1)===sem);
     const totalActual=grupo.reduce((a,c)=>a+(c.total||0),0);
     const lider=D.externos.find(x=>x.id===liderId);
-    registrarCambio(tipo,id,'Comisiones equipo — '+(lider?lider.nombre:'—')+' (sem. '+sem+')',totalActual,monto);
     if(grupo.length>0){
       if(totalActual>0){ grupo.forEach(c=>{ c.total=Math.round((c.total/totalActual)*monto); }); const diff=monto-grupo.reduce((a,c)=>a+(c.total||0),0); if(diff!==0) grupo[0].total=(grupo[0].total||0)+diff; }
       else { const part=Math.floor(monto/grupo.length); grupo.forEach(c=>c.total=part); grupo[0].total+=monto-(part*grupo.length); }
     }
+    // Registramos el total REAL que quedó guardado (suma de los registros del
+    // grupo despues del reparto), no el numero que se tipeo, para que el
+    // historial refleje exactamente lo que paso — incluso si hubo redondeos
+    // o mas de un registro de comision para la misma persona/semana.
+    const totalFinal=grupo.reduce((a,c)=>a+(c.total||0),0);
+    registrarCambio(tipo,id,'Comisiones equipo — '+(lider?lider.nombre:'—')+' (sem. '+sem+') · '+grupo.length+' registro'+(grupo.length!==1?'s':''),totalActual,totalFinal);
   }
   save(); renderCashFlow();
   const p=document.querySelector('.page.on');
