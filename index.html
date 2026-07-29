@@ -165,6 +165,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
     </div>
     <div class="topbar-right">
       <button id="btn-undo" onclick="undoLast()" title="Deshacer último cambio" style="background:rgba(255,255,255,.1);border:none;border-radius:8px;color:#fff;font-size:18px;cursor:pointer;padding:5px 12px;opacity:0.4;transition:.2s" >↩</button>
+      <button onclick="abrirHistorialCambios()" title="Ver historial de cambios de montos" style="background:rgba(255,255,255,.1);border:none;border-radius:8px;color:#fff;font-size:14px;cursor:pointer;padding:5px 12px">🕘 Historial</button>
       <button class="btn-export" onclick="exportarAAbesa()">↑ Exportar a ABESA</button>
       <button id="btn-privado" class="btn-export" style="background:linear-gradient(135deg,#4a4a6a,#2d2d4a);min-width:44px" onclick="togglePrivado()" title="Ocultar/mostrar números">👁</button>
       <button class="btn-salir" onclick="salir()">Salir</button>
@@ -888,7 +889,8 @@ let D = {
   proyecciones: [],
   cf_ingresos: [],
   semPagoSectores: {},
-  ai_chat: [] // conversacion con el Asistente IA, compartida entre todos los usuarios
+  ai_chat: [], // conversacion con el Asistente IA, compartida entre todos los usuarios
+  historial_cambios: [] // historial permanente de ediciones de montos (Cash Flow, sueldos, comisiones, etc.)
 };
 
 // Empleados iniciales
@@ -1125,7 +1127,7 @@ async function load(){
   try{
     if(raw){
       const saved = JSON.parse(raw);
-      D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},ai_chat:[]}, saved);
+      D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},ai_chat:[],historial_cambios:[]}, saved);
     }
   }catch(e){}
 }
@@ -3963,6 +3965,8 @@ function editComision(id){
   const monto = parseFloat(nuevoTotal.replace(/\./g,'').replace(',','.'));
   if(isNaN(monto)||monto<0){ alert('Monto invalido'); return; }
   pushUndo();
+  const persona = D.externos.find(x=>x.id===c.quien_id);
+  registrarCambio('comision', c.id, 'Comisión — '+(persona?persona.nombre:'—'), c.total, monto);
   c.total = monto;
   if(c.met==='transferencia'){ c.transf=monto; c.efec=0; }
   else if(c.met==='efectivo'){ c.efec=monto; c.transf=0; }
@@ -4542,11 +4546,132 @@ function startEditMonto(e,tipo,id,montoActual){
   input.addEventListener('blur',doSave);
   input.addEventListener('keydown',ev=>{if(ev.key==='Enter') input.blur(); if(ev.key==='Escape') renderCashFlow();});
 }
+function registrarCambio(tipo,refId,nombre,valorAnterior,valorNuevo){
+  if(!D.historial_cambios) D.historial_cambios=[];
+  if(valorAnterior===valorNuevo) return;
+  D.historial_cambios.unshift({
+    id: uid(),
+    fecha: new Date().toISOString(),
+    tipo, refId, nombre,
+    valorAnterior: valorAnterior||0,
+    valorNuevo: valorNuevo||0
+  });
+  if(D.historial_cambios.length>500) D.historial_cambios=D.historial_cambios.slice(0,500);
+}
+
+function fdh(isoStr){
+  try{
+    const d=new Date(isoStr);
+    return d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){ return '—'; }
+}
+
+const TIPO_LABEL_HIST={gasto:'Gasto',sueldo:'Sueldo',adelanto:'Adelanto',comision:'Comisión',comision_lider:'Comisiones (equipo)'};
+
+function abrirHistorialCambios(){
+  const existente=document.getElementById('hist-overlay');
+  if(existente) existente.remove();
+  const overlay=document.createElement('div');
+  overlay.id='hist-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(15,25,35,.6);z-index:9999;display:flex;align-items:center;justify-content:center';
+  overlay.onclick=(e)=>{ if(e.target===overlay) overlay.remove(); };
+
+  const hist=(D.historial_cambios||[]);
+  const filas = hist.length ? hist.map(h=>`
+    <tr>
+      <td style="padding:8px 10px;font-size:11px;color:#8A9BAB;white-space:nowrap">${fdh(h.fecha)}</td>
+      <td style="padding:8px 10px;font-size:12px"><span style="background:#EEF2F7;color:#1B3A6B;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700">${TIPO_LABEL_HIST[h.tipo]||h.tipo}</span></td>
+      <td style="padding:8px 10px;font-size:12px;font-weight:600">${h.nombre||'—'}</td>
+      <td style="padding:8px 10px;font-size:12px;color:#C0392B;text-decoration:line-through">${fmt(h.valorAnterior)}</td>
+      <td style="padding:8px 10px;font-size:12px;font-weight:700;color:#1A7A52">${fmt(h.valorNuevo)}</td>
+      <td style="padding:8px 10px"><button onclick="restaurarValorHistorico('${h.id}')" style="background:none;border:1px solid #1B3A6B;color:#1B3A6B;border-radius:6px;font-size:11px;padding:4px 10px;cursor:pointer;white-space:nowrap">↩ Restaurar</button></td>
+    </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;color:#8A9BAB;padding:2rem">Todavía no hay cambios registrados.</td></tr>`;
+
+  overlay.innerHTML=`
+    <div style="background:#fff;border-radius:14px;padding:0;width:840px;max-width:94vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.35)">
+      <div style="padding:20px 24px;border-bottom:1px solid #EDF1F5;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:16px;font-weight:800;color:#1B3A6B">🕘 Historial de cambios de montos</div>
+          <div style="font-size:11px;color:#8A9BAB;margin-top:2px">Cada vez que se edita un importe (gasto, sueldo, comisión, adelanto) queda registrado acá con el valor anterior y el nuevo.</div>
+        </div>
+        <button onclick="document.getElementById('hist-overlay').remove()" style="background:#F2F5F8;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;color:#5A6B7C">✕ Cerrar</button>
+      </div>
+      <div style="overflow-y:auto;flex:1">
+        <table style="width:100%;border-collapse:collapse">
+          <thead style="position:sticky;top:0;background:#fff">
+            <tr style="border-bottom:2px solid #EDF1F5">
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:#8A9BAB;text-transform:uppercase">Fecha</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:#8A9BAB;text-transform:uppercase">Tipo</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:#8A9BAB;text-transform:uppercase">Concepto</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:#8A9BAB;text-transform:uppercase">Antes</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:#8A9BAB;text-transform:uppercase">Después</th>
+              <th style="padding:8px 10px"></th>
+            </tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+function restaurarValorHistorico(histId){
+  const h=(D.historial_cambios||[]).find(x=>x.id===histId);
+  if(!h) return;
+  if(!confirm('¿Restaurar "'+(h.nombre||'')+'" al valor anterior ('+fmt(h.valorAnterior)+')?')) return;
+  pushUndo();
+  if(h.tipo==='gasto'){ const g=D.gastos.find(x=>x.id===h.refId); if(g){ registrarCambio('gasto',g.id,h.nombre,g.monto,h.valorAnterior); g.monto=h.valorAnterior; } }
+  else if(h.tipo==='sueldo'){ const e=D.empleados.find(x=>x.id===h.refId); if(e){ registrarCambio('sueldo',e.id,h.nombre,e.sueldo,h.valorAnterior); e.sueldo=h.valorAnterior; } }
+  else if(h.tipo==='adelanto'){ const a=D.adelantos.find(x=>x.id===h.refId); if(a){ registrarCambio('adelanto',a.id,h.nombre,a.monto,h.valorAnterior); a.monto=h.valorAnterior; } }
+  else if(h.tipo==='comision'){
+    const c=D.comisiones.find(x=>x.id===h.refId);
+    if(c){
+      registrarCambio('comision',c.id,h.nombre,c.total,h.valorAnterior);
+      c.total=h.valorAnterior;
+      if(c.met==='transferencia'){ c.transf=h.valorAnterior; c.efec=0; }
+      else if(c.met==='efectivo'){ c.efec=h.valorAnterior; c.transf=0; }
+    }
+  }
+  else if(h.tipo==='comision_lider'){
+    toast('⚠ Las comisiones de equipo se repartieron proporcionalmente — restaurá cada persona por separado si hace falta.');
+  }
+  save();
+  renderCashFlow();
+  const p=document.querySelector('.page.on');
+  if(p&&p.id==='page-empleados') renderEmpleados();
+  if(p&&p.id==='page-gastos') renderGastos();
+  if(p&&p.id==='page-externos') renderExternos();
+  toast('Valor restaurado');
+  document.getElementById('hist-overlay').remove();
+  abrirHistorialCambios();
+}
 function updateCFMonto(tipo,id,monto){
-  if(tipo==='gasto'){const g=D.gastos.find(x=>x.id===id); if(g) g.monto=monto;}
-  else if(tipo==='sueldo'){const e=D.empleados.find(x=>x.id===id); if(e){e.sueldo=monto;}}
-  else if(tipo==='adelanto'){const a=D.adelantos.find(x=>x.id===id); if(a) a.monto=monto;}
-  else if(tipo==='comision'){const c=D.comisiones.find(x=>x.id===id); if(c) c.total=monto;}
+  pushUndo();
+  const TIPO_LABEL={gasto:'Gasto',sueldo:'Sueldo',adelanto:'Adelanto',comision:'Comisión',comision_lider:'Comisiones (equipo)'};
+  if(tipo==='gasto'){
+    const g=D.gastos.find(x=>x.id===id);
+    if(g){ registrarCambio(tipo,id,g.desc||'Gasto',g.monto,monto); g.monto=monto; }
+  }
+  else if(tipo==='sueldo'){
+    const e=D.empleados.find(x=>x.id===id);
+    if(e){ registrarCambio(tipo,id,e.nombre||'Sueldo',e.sueldo,monto); e.sueldo=monto; }
+  }
+  else if(tipo==='adelanto'){
+    const a=D.adelantos.find(x=>x.id===id);
+    if(a){
+      const emp=D.empleados.find(x=>x.id===a.emp_id);
+      registrarCambio(tipo,id,'Adelanto — '+(emp?emp.nombre:'—'),a.monto,monto);
+      a.monto=monto;
+    }
+  }
+  else if(tipo==='comision'){
+    const c=D.comisiones.find(x=>x.id===id);
+    if(c){
+      const persona=D.externos.find(x=>x.id===c.quien_id);
+      registrarCambio(tipo,id,'Comisión — '+(persona?persona.nombre:'—'),c.total,monto);
+      c.total=monto;
+    }
+  }
   else if(tipo==='comision_lider'){
     const dashIdx=id.lastIndexOf('-');
     const liderId=id.substring(0,dashIdx);
@@ -4554,6 +4679,8 @@ function updateCFMonto(tipo,id,monto){
     const equipoIds=[liderId,...D.externos.filter(e=>e.lider_id===liderId).map(e=>e.id)];
     const grupo=D.comisiones.filter(c=>equipoIds.includes(c.quien_id)&&(c.semPago||c.sem||1)===sem);
     const totalActual=grupo.reduce((a,c)=>a+(c.total||0),0);
+    const lider=D.externos.find(x=>x.id===liderId);
+    registrarCambio(tipo,id,'Comisiones equipo — '+(lider?lider.nombre:'—')+' (sem. '+sem+')',totalActual,monto);
     if(grupo.length>0){
       if(totalActual>0){ grupo.forEach(c=>{ c.total=Math.round((c.total/totalActual)*monto); }); const diff=monto-grupo.reduce((a,c)=>a+(c.total||0),0); if(diff!==0) grupo[0].total=(grupo[0].total||0)+diff; }
       else { const part=Math.floor(monto/grupo.length); grupo.forEach(c=>c.total=part); grupo[0].total+=monto-(part*grupo.length); }
