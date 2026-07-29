@@ -846,6 +846,27 @@ function mergeChatArrays(localArr, cloudArr){
   return Object.values(byId).sort((a,b)=>(a.ts||0)-(b.ts||0));
 }
 
+// Fusiona arrays genericos (gastos, comisiones, adelantos, externos, etc.)
+// por id: los registros nuevos de cualquiera de los dos lados se conservan
+// siempre (union); si el mismo id existe en ambos lados con datos distintos
+// (edicion simultanea del mismo registro), se resuelve por cual copia
+// completa es mas reciente en general (preferLocal).
+function mergeArrayById(localArr, cloudArr, preferLocal){
+  localArr = localArr || []; cloudArr = cloudArr || [];
+  const localMap = new Map(); localArr.forEach(x=>{ if(x && x.id!=null) localMap.set(x.id, x); });
+  const cloudMap = new Map(); cloudArr.forEach(x=>{ if(x && x.id!=null) cloudMap.set(x.id, x); });
+  const allIds = new Set([...localMap.keys(), ...cloudMap.keys()]);
+  const out = [];
+  allIds.forEach(id=>{
+    const inLocal = localMap.has(id), inCloud = cloudMap.has(id);
+    if(inLocal && inCloud){ out.push(preferLocal ? localMap.get(id) : cloudMap.get(id)); }
+    else if(inLocal){ out.push(localMap.get(id)); }
+    else { out.push(cloudMap.get(id)); }
+  });
+  return out;
+}
+const COLECCIONES_A_FUSIONAR = ['gastos','comisiones','adelantos','externos','premios','ingresos','cheques','empleados','cf_ingresos','historial_cambios'];
+
 let _sbSaveTimeout = null;
 let _sbSaveFails = 0;
 function sbSaveDebounced(){
@@ -858,6 +879,9 @@ function sbSaveDebounced(){
       const cloudRaw = await sbGet();
       if(cloudRaw){
         const cloudD = JSON.parse(cloudRaw);
+        COLECCIONES_A_FUSIONAR.forEach(campo=>{
+          D[campo] = mergeArrayById(D[campo], cloudD[campo], true); // true = ante conflicto real, prevalece mi edicion reciente
+        });
         D.nomina = mergeNominaArrays(D.nomina, cloudD.nomina);
         D.ai_chat = mergeChatArrays(D.ai_chat, cloudD.ai_chat).slice(-100);
       }
@@ -1244,7 +1268,11 @@ async function syncFromCloud(){
     const chatCambio = JSON.stringify(mergedChat) !== JSON.stringify(D.ai_chat||[]);
     if(cloudTs <= localTs && !nominaCambio && !chatCambio) return; // nada nuevo que adoptar
     if(cloudTs > localTs && JSON.stringify(cloudD) !== JSON.stringify(D)){
-      D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},ai_chat:[]}, cloudD);
+      COLECCIONES_A_FUSIONAR.forEach(campo=>{
+        D[campo] = mergeArrayById(D[campo], cloudD[campo], false); // false = ante conflicto real, prevalece la nube (más reciente en general)
+      });
+      D.semPagoSectores = Object.assign({}, D.semPagoSectores, cloudD.semPagoSectores);
+      D._ts = cloudTs;
     }
     D.nomina = mergedNomina;
     D.ai_chat = mergedChat;
