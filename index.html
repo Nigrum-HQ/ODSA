@@ -3721,6 +3721,7 @@ function togglePagado(id){
 function delEmpleado(id){
   if(!confirm('¿Eliminar empleado?')) return;
   D.empleados = D.empleados.filter(e=>e.id!==id);
+  marcarComoBorrados([id]);
   save(); renderEmpleados(); fillSelects(); toast('Empleado eliminado');
 }
 function addEmpleado(){
@@ -3813,6 +3814,7 @@ function renderAdelantos(){
 }
 function delAdelanto(id){
   D.adelantos = D.adelantos.filter(a=>a.id!==id);
+  marcarComoBorrados([id]);
   save(); renderAdelantos(); renderEmpleados(); toast('Adelanto eliminado');
 }
 
@@ -3858,7 +3860,7 @@ function renderPremios(){
   const total = lista.reduce((a,p)=>a+p.monto,0);
   g('prem-tfoot').innerHTML = `<tr><td colspan="3" style="font-weight:700">Total premios</td><td style="font-weight:700;color:#C0392B">${fmt(total)}</td><td></td></tr>`;
 }
-function delPremio(id){ D.premios=D.premios.filter(p=>p.id!==id); save(); renderPremios(); toast('Premio eliminado'); }
+function delPremio(id){ D.premios=D.premios.filter(p=>p.id!==id); marcarComoBorrados([id]); save(); renderPremios(); toast('Premio eliminado'); }
 
 // ═══════════════════════════════
 // EXTERNOS
@@ -4063,7 +4065,7 @@ function renderGastos(){
     </td>
   </tr>`;
 }
-function delGasto(id){ D.gastos=D.gastos.filter(g=>g.id!==id); save(); renderGastos(); renderResumen(); toast('Gasto eliminado'); }
+function delGasto(id){ D.gastos=D.gastos.filter(g=>g.id!==id); marcarComoBorrados([id]); save(); renderGastos(); renderResumen(); toast('Gasto eliminado'); }
 
 // ═══════════════════════════════
 // INGRESOS
@@ -4091,7 +4093,7 @@ function renderIngresos(){
   const total = lista.reduce((s,x)=>s+x.monto,0);
   g('i-tfoot').innerHTML = `<tr><td colspan="2" style="font-weight:700">Total ingresos</td><td style="font-weight:700;color:#1A7A52">${fmt(total)}</td><td></td></tr>`;
 }
-function delIngreso(id){ D.ingresos=D.ingresos.filter(i=>i.id!==id); save(); renderIngresos(); renderResumen(); toast('Ingreso eliminado'); }
+function delIngreso(id){ D.ingresos=D.ingresos.filter(i=>i.id!==id); marcarComoBorrados([id]); save(); renderIngresos(); renderResumen(); toast('Ingreso eliminado'); }
 
 // ═══════════════════════════════
 // CHEQUES
@@ -4124,7 +4126,7 @@ function renderCheques(){
 function toggleCheque(id){
   const c=D.cheques.find(x=>x.id===id); if(c){c.cobrado=!c.cobrado; save(); renderCheques();}
 }
-function delCheque(id){ D.cheques=D.cheques.filter(c=>c.id!==id); save(); renderCheques(); renderResumen(); toast('Cheque eliminado'); }
+function delCheque(id){ D.cheques=D.cheques.filter(c=>c.id!==id); marcarComoBorrados([id]); save(); renderCheques(); renderResumen(); toast('Cheque eliminado'); }
 
 // ═══════════════════════════════
 // EXPORTAR A ABESA
@@ -5118,6 +5120,7 @@ function renderCashFlow(){
 
 function delCFIngreso(id){
   D.cf_ingresos = (D.cf_ingresos||[]).filter(i=>i.id!==id);
+  marcarComoBorrados([id]);
   save(); renderCashFlow();
 }
 
