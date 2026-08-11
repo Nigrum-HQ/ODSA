@@ -4933,9 +4933,14 @@ function exportCFPDF(s,msParam){
     +(itemsCom.length?'<div class="section-title gold">Vendedores externos</div><table><thead><tr><th>Concepto</th><th>Detalle</th><th style="text-align:center">Estado</th><th style="text-align:right">Monto</th></tr></thead><tbody>'+rowsCom+'<tr class="subtotal-row"><td colspan="3">Subtotal vendedores</td><td class="monto">'+fmt(subCom)+'</td></tr></tbody></table>':'')
     +'<div class="total-box">'
       +'<div><div class="total-label">Total egresos &mdash; Semana '+s+'</div><div class="total-val">'+fmt(egTotal)+'</div></div>'
-      +'<div class="pills">'
-        +'<div class="pill pill-ef">Efectivo: '+fmt(efTotal)+'</div>'
-        +'<div class="pill pill-tr">Transferencia: '+fmt(trTotal)+'</div>'
+      +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">'
+        +'<div class="pills">'
+          +'<div class="pill pill-ef">Efectivo: '+fmt(efTotal)+'</div>'
+          +'<div class="pill pill-tr">Transferencia: '+fmt(trTotal)+'</div>'
+        +'</div>'
+        +(items.filter(x=>!x.pagado&&!x.proyectado).reduce((a,x)=>{ const ef2=x.medio==='efectivo'?x.monto:x.medio==='mixto'?(x.totalEfec||0):0; return a+(x.monto-ef2); },0)>0
+          ?'<div style="font-size:11px;color:rgba(255,255,255,.7)">Pendiente por transferir: <span style="font-weight:900;color:#F87171;font-size:14px">'+fmt(items.filter(x=>!x.pagado&&!x.proyectado).reduce((a,x)=>{ const ef2=x.medio==='efectivo'?x.monto:x.medio==='mixto'?(x.totalEfec||0):0; return a+(x.monto-ef2); },0))+'</span></div>'
+          :'')
       +'</div>'
     +'</div>'
     +'</div>'
