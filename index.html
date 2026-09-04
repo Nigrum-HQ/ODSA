@@ -3553,11 +3553,14 @@ function getNominaEmp(emp, m){
     if(rec && rec.sueldoManual){
       return {sueldo:rec.sueldo||0, hsExtra:rec.hsExtra||0, pagado:!!rec.pagado, semPago:rec.semPago||1};
     }
-    // Mes futuro sin edición manual: sueldo/hsExtra siempre del base actual,
-    // pero respetando pagado/semPago si ya se tocaron en ese mes.
+    // Mes futuro sin edición manual del sueldo:
+    //  - El SUELDO BASE se arrastra desde la ficha del empleado (se actualiza solo).
+    //  - Las HS.EXTRA / COMISIONES NO se arrastran: son propias de cada mes, así
+    //    que arrancan en 0 salvo que se hayan cargado puntualmente en ese mes (rec.hsExtra).
+    //  - Los ADELANTOS se manejan aparte (D.adelantos, por mes), nunca se arrastran.
     return {
       sueldo: emp.sueldo||0,
-      hsExtra: emp.hsExtra||0,
+      hsExtra: rec ? (rec.hsExtra||0) : 0,
       pagado: rec ? !!rec.pagado : false,
       semPago: rec ? (rec.semPago||emp.semPago||1) : (emp.semPago||1)
     };
