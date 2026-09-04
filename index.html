@@ -3545,6 +3545,24 @@ function getNominaEmp(emp, m){
   }
   if(!D.nomina) D.nomina=[];
   const rec = D.nomina.find(n=>n.emp_id===emp.id&&n.mes===m);
+  // Para MESES FUTUROS (posteriores al mes actual real): el sueldo se ARRASTRA
+  // automáticamente desde la ficha del empleado, salvo que ese mes tenga una
+  // edición manual del sueldo/hs.extra (sueldoManual=true). Así, al actualizar
+  // el sueldo base, todos los meses futuros no editados se actualizan solos.
+  if(m > mes()){
+    if(rec && rec.sueldoManual){
+      return {sueldo:rec.sueldo||0, hsExtra:rec.hsExtra||0, pagado:!!rec.pagado, semPago:rec.semPago||1};
+    }
+    // Mes futuro sin edición manual: sueldo/hsExtra siempre del base actual,
+    // pero respetando pagado/semPago si ya se tocaron en ese mes.
+    return {
+      sueldo: emp.sueldo||0,
+      hsExtra: emp.hsExtra||0,
+      pagado: rec ? !!rec.pagado : false,
+      semPago: rec ? (rec.semPago||emp.semPago||1) : (emp.semPago||1)
+    };
+  }
+  // Meses pasados/históricos: se respeta exactamente lo que hay guardado.
   if(rec) return {sueldo:rec.sueldo||0, hsExtra:rec.hsExtra||0, pagado:!!rec.pagado, semPago:rec.semPago||1};
   // Sin historial guardado para ese mes: usamos el sueldo base como referencia (sin pagar)
   return {sueldo:emp.sueldo||0, hsExtra:0, pagado:false, semPago:emp.semPago||1};
@@ -3559,10 +3577,16 @@ function setNominaEmp(empId, m, campo, valor){
   if(!D.nomina) D.nomina=[];
   let rec = D.nomina.find(n=>n.emp_id===empId&&n.mes===m);
   if(!rec){
-    rec = {id:uid(), emp_id:empId, mes:m, sueldo:emp.sueldo||0, hsExtra:0, pagado:false, semPago:emp.semPago||1};
+    // Al crear el registro de un mes futuro, arrancamos con el sueldo base actual
+    rec = {id:uid(), emp_id:empId, mes:m, sueldo:emp.sueldo||0, hsExtra:emp.hsExtra||0, pagado:false, semPago:emp.semPago||1};
     D.nomina.push(rec);
   }
   rec[campo]=valor;
+  // Si se edita puntualmente el sueldo o las hs.extra de un mes futuro, ese mes
+  // queda "fijado a mano" y deja de arrastrarse desde la ficha del empleado.
+  if(campo==='sueldo' || campo==='hsExtra'){
+    rec.sueldoManual = true;
+  }
   rec._ts = Date.now(); // marca de tiempo por registro, para poder fusionar sin perder cambios de otra persona
 }
 function renderEmpleados(){
