@@ -809,7 +809,21 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
 
       <!-- BACKUPS -->
       <div id="page-backups" class="page">
-        <div class="page-title">Copias de seguridad</div>
+        <div class="page-title">Sistema</div>
+        <div class="page-sub">Copias de seguridad y bloqueo de meses</div>
+
+        <div class="card">
+          <div class="card-title">🔒 Cerrar / reabrir meses</div>
+          <div style="font-size:13px;color:#6B7E8F;margin-bottom:12px">Cerrar un mes lo bloquea: no se puede editar, borrar ni agregar nada de ese mes hasta que lo reabras. Sirve para proteger meses ya terminados y cuadrados.</div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+            <select id="mc-mes-sel" style="padding:8px 14px;border-radius:8px;border:1.5px solid #D8E2EC;font-size:13px;font-family:inherit;background:#fff"></select>
+            <button class="btn btn-primary" id="mc-btn" onclick="toggleCerrarMes()">🔒 Cerrar mes</button>
+          </div>
+          <div id="mc-lista"></div>
+        </div>
+
+        <div style="height:24px"></div>
+        <div class="page-title" style="font-size:18px">Copias de seguridad</div>
         <div class="page-sub">El sistema guarda una copia automática por día. También podés crear una manual cuando quieras.</div>
         <div class="card">
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
@@ -982,6 +996,7 @@ let D = {
   proyecciones: [],
   cf_ingresos: [],
   semPagoSectores: {},
+  mesesCerrados: [], // meses bloqueados (formato YYYY-MM); no se pueden editar sin reabrir
   ai_chat: [], // conversacion con el Asistente IA, compartida entre todos los usuarios
   historial_cambios: [] // historial permanente de ediciones de montos (Cash Flow, sueldos, comisiones, etc.)
 };
@@ -1057,6 +1072,21 @@ const EXT_INIT = [
 // ═══════════════════════════════
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
 const mes = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); };
+
+// ═══════════════════════════════
+// MESES CERRADOS (bloqueo de edición)
+// ═══════════════════════════════
+function mesEstaCerrado(m){
+  return !!(D.mesesCerrados && D.mesesCerrados.includes(m));
+}
+// Verifica si un mes está cerrado y, si lo está, avisa y devuelve true (para frenar la acción).
+function bloquearSiCerrado(m){
+  if(mesEstaCerrado(m)){
+    toast('🔒 ' + mesLabel(m) + ' está cerrado. Reabrilo desde "Copias de seguridad" para poder editarlo.');
+    return true;
+  }
+  return false;
+}
 
 // ═══════════════════════════════
 // SELECTOR DE PERÍODO (mes a mes) — Sueldos, Gastos, Premios
@@ -1188,7 +1218,7 @@ function pushUndo(){
 function undoLast(){
   if(!_undoStack.length){ toast('Nada para deshacer'); return; }
   const prev = _undoStack.pop();
-  D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},ai_chat:[]}, JSON.parse(prev));
+  D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},mesesCerrados:[],ai_chat:[]}, JSON.parse(prev));
   save();
   const btn = document.getElementById('btn-undo');
   if(btn) btn.style.opacity = _undoStack.length ? '1' : '0.4';
@@ -1224,7 +1254,7 @@ async function load(){
   try{
     if(raw){
       const saved = JSON.parse(raw);
-      D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},ai_chat:[],historial_cambios:[]}, saved);
+      D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},mesesCerrados:[],ai_chat:[],historial_cambios:[]}, saved);
     }
   }catch(e){}
 }
@@ -1391,11 +1421,70 @@ async function restaurarBackup(id){
     const data = await r.json();
     if(!r.ok || !data.ok){ toast('No se pudo restaurar: ' + (data.error||'')); return; }
     // Cargar los datos restaurados
-    D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},ai_chat:[],historial_cambios:[]}, JSON.parse(data.data));
+    D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},mesesCerrados:[],ai_chat:[],historial_cambios:[]}, JSON.parse(data.data));
     save();
     toast('✅ Backup restaurado');
     setTimeout(()=>location.reload(), 1000);
   }catch(e){ toast('Error: ' + e.message); }
+}
+
+// ═══════════════════════════════
+// CERRAR / REABRIR MESES
+// ═══════════════════════════════
+function renderCierreMeses(){
+  // Poblar el selector con meses (desde el más antiguo con datos hasta el actual + algunos)
+  const sel = g('mc-mes-sel');
+  if(sel){
+    const d = new Date();
+    let iDesde = -12;
+    // buscar mes más antiguo con datos
+    const arrays = [D.gastos, D.ingresos, D.adelantos, D.premios, D.comisiones, D.cheques, D.nomina];
+    let min = null;
+    arrays.forEach(arr=>(arr||[]).forEach(r=>{ if(r&&r.mes&&(!min||r.mes<min)) min=r.mes; }));
+    if(min){ const [ay,am]=min.split('-').map(Number); const diff=(ay-d.getFullYear())*12+(am-(d.getMonth()+1)); if(diff<iDesde) iDesde=diff; }
+    const opts=[];
+    for(let i=iDesde;i<=1;i++){ const dd=new Date(d.getFullYear(),d.getMonth()+i,1); const v=dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0'); opts.push('<option value="'+v+'">'+mesLabel(v)+'</option>'); }
+    sel.innerHTML = opts.reverse().join('');
+    actualizarBotonCierre();
+    sel.onchange = actualizarBotonCierre;
+  }
+  // Lista de meses cerrados
+  const cont = g('mc-lista');
+  if(cont){
+    const cerrados = (D.mesesCerrados||[]).slice().sort().reverse();
+    if(!cerrados.length){ cont.innerHTML = '<div style="font-size:13px;color:#8A9BAB">No hay meses cerrados.</div>'; }
+    else {
+      cont.innerHTML = '<div style="font-size:12px;font-weight:700;color:#8A9BAB;text-transform:uppercase;margin-bottom:8px">Meses cerrados</div>' +
+        cerrados.map(m=>'<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F0F4F8"><span style="font-weight:600">🔒 '+mesLabel(m)+'</span><button class="btn btn-sm" style="background:#fff;color:#C0392B;border:1px solid #E4C4C0" onclick="reabrirMes(\''+m+'\')">Reabrir</button></div>').join('');
+    }
+  }
+}
+function actualizarBotonCierre(){
+  const sel = g('mc-mes-sel'); const btn = g('mc-btn');
+  if(!sel||!btn) return;
+  const m = sel.value;
+  if(mesEstaCerrado(m)){ btn.textContent='🔓 Reabrir mes'; btn.style.background='#C0392B'; }
+  else { btn.textContent='🔒 Cerrar mes'; btn.style.background=''; btn.classList.add('btn-primary'); }
+}
+function toggleCerrarMes(){
+  const sel = g('mc-mes-sel'); if(!sel) return;
+  const m = sel.value;
+  if(mesEstaCerrado(m)) reabrirMes(m); else cerrarMes(m);
+}
+function cerrarMes(m){
+  if(!confirm('¿Cerrar ' + mesLabel(m) + '?\n\nNadie va a poder editar, borrar ni agregar datos de ese mes hasta que lo reabras.')) return;
+  if(!D.mesesCerrados) D.mesesCerrados = [];
+  if(!D.mesesCerrados.includes(m)) D.mesesCerrados.push(m);
+  save();
+  toast('🔒 ' + mesLabel(m) + ' cerrado');
+  renderCierreMeses();
+}
+function reabrirMes(m){
+  if(!confirm('¿Reabrir ' + mesLabel(m) + '?\n\nVa a volver a permitir editar datos de ese mes.')) return;
+  D.mesesCerrados = (D.mesesCerrados||[]).filter(x=>x!==m);
+  save();
+  toast('🔓 ' + mesLabel(m) + ' reabierto');
+  renderCierreMeses();
 }
 
 // ═══════════════════════════════
@@ -1536,7 +1625,7 @@ function navPage(name){
   if(name==='ingresos') renderIngresos();
   if(name==='cheques') renderCheques();
   if(name==='transferencias') renderTransferencias();
-  if(name==='backups') renderBackups();
+  if(name==='backups'){ renderBackups(); renderCierreMeses(); }
   if(name==='cashflow'){ initCFMes(); renderCashFlow(); }
 }
 function navTab(name){ navPage(name); }
@@ -3717,6 +3806,7 @@ function getNominaEmp(emp, m){
 function setNominaEmp(empId, m, campo, valor){
   const emp = D.empleados.find(e=>e.id===empId);
   if(!emp) return;
+  if(mesEstaCerrado(m)){ toast('🔒 ' + mesLabel(m) + ' está cerrado. Reabrilo para editar sueldos.'); return; }
   if(m===mes()){
     emp[campo]=valor;
     return;
@@ -3886,6 +3976,7 @@ function updateSueldo(id, val){
   }
 }
 function togglePagado(id){
+  if(bloquearSiCerrado(mesSel)) return;
   const n = D.empleados.find(x=>x.id===id) ? getNominaEmp(D.empleados.find(x=>x.id===id), mesSel) : null;
   if(n){ setNominaEmp(id, mesSel, 'pagado', !n.pagado); save(); renderEmpleados(); toast(!n.pagado?'✓ Marcado como pagado':'Marcado como pendiente'); }
 }
@@ -3913,6 +4004,7 @@ function addAdelanto(){
   const fecha = gv('ad-fecha');
   if(!emp_id||!monto||!fecha){ alert('Completá todos los campos'); return; }
   const m = fecha.slice(0,7);
+  if(bloquearSiCerrado(m)) return;
   D.adelantos.push({id:uid(),emp_id,monto,fecha,mes:m,nota:gv('ad-nota')});
   save(); renderAdelantos(); renderEmpleados(); toast('✓ Adelanto registrado');
   sv('ad-monto',''); sv('ad-nota','');
@@ -3984,6 +4076,7 @@ function renderAdelantos(){
   }
 }
 function delAdelanto(id){
+  const r = D.adelantos.find(a=>a.id===id); if(r && bloquearSiCerrado(r.mes)) return;
   D.adelantos = D.adelantos.filter(a=>a.id!==id);
   marcarComoBorrados([id]);
   save(); renderAdelantos(); renderEmpleados(); toast('Adelanto eliminado');
@@ -3998,6 +4091,7 @@ function addPremio(){
   const sem = parseInt(gv('prem-sem'));
   if(!emp_id||!monto){ alert('Completá los campos'); return; }
   const premSemPago = sem;
+  if(bloquearSiCerrado(mesSel)) return;
   D.premios.push({id:uid(),emp_id,monto,sem,semPago:premSemPago,concepto:gv('prem-concepto')||'Premio semanal',mes:mesSel});
   save(); renderPremios(); toast('✓ Premio registrado');
   sv('prem-monto',''); sv('prem-concepto','');
@@ -4031,7 +4125,7 @@ function renderPremios(){
   const total = lista.reduce((a,p)=>a+p.monto,0);
   g('prem-tfoot').innerHTML = `<tr><td colspan="3" style="font-weight:700">Total premios</td><td style="font-weight:700;color:#C0392B">${fmt(total)}</td><td></td></tr>`;
 }
-function delPremio(id){ D.premios=D.premios.filter(p=>p.id!==id); marcarComoBorrados([id]); save(); renderPremios(); toast('Premio eliminado'); }
+function delPremio(id){ const r=D.premios.find(p=>p.id===id); if(r&&bloquearSiCerrado(r.mes))return; D.premios=D.premios.filter(p=>p.id!==id); marcarComoBorrados([id]); save(); renderPremios(); toast('Premio eliminado'); }
 
 // ═══════════════════════════════
 // EXTERNOS
@@ -4071,6 +4165,7 @@ function addComision(){
   const selMesEl = g('ext-filtro-mes');
   const mesActual = (selMesEl && selMesEl.value) ? selMesEl.value : mesSel;
   // Si ya existe comision para esta persona/sem/mes, avisamos
+  if(bloquearSiCerrado(mesActual)) return;
   const yaExiste = D.comisiones.find(c=>c.quien_id===quien_id&&c.sem===sem&&c.mes===mesActual);
   if(yaExiste){
     const persona = D.externos.find(e=>e.id===quien_id);
@@ -4199,6 +4294,7 @@ function addGasto(){
   if(!desc||!monto||!fecha){ alert('Completá los campos'); return; }
   const gSemPago = gv('g-sem-pago') ? parseInt(gv('g-sem-pago')) : null;
   const gMedio = gv('g-medio') || 'transferencia';
+  if(bloquearSiCerrado(fecha.slice(0,7))) return;
   D.gastos.push({id:uid(),desc,cat:gv('g-cat'),monto,fecha,mes:fecha.slice(0,7),nota:gv('g-nota'),pagado:false,semPago:gSemPago,medio:gMedio});
   save(); renderGastos(); renderResumen(); toast('✓ Gasto registrado');
   sv('g-desc',''); sv('g-monto',''); sv('g-nota',''); sv('g-medio','transferencia');
@@ -4236,7 +4332,7 @@ function renderGastos(){
     </td>
   </tr>`;
 }
-function delGasto(id){ D.gastos=D.gastos.filter(g=>g.id!==id); marcarComoBorrados([id]); save(); renderGastos(); renderResumen(); toast('Gasto eliminado'); }
+function delGasto(id){ const r=D.gastos.find(g=>g.id===id); if(r&&bloquearSiCerrado(r.mes))return; D.gastos=D.gastos.filter(g=>g.id!==id); marcarComoBorrados([id]); save(); renderGastos(); renderResumen(); toast('Gasto eliminado'); }
 
 // ═══════════════════════════════
 // INGRESOS
@@ -4246,6 +4342,7 @@ function addIngreso(){
   const monto = parseFloat(gv('i-monto'))||0;
   const fecha = gv('i-fecha');
   if(!monto||!fecha){ alert('Completá los campos'); return; }
+  if(bloquearSiCerrado(fecha.slice(0,7))) return;
   D.ingresos.push({id:uid(),desc,monto,fecha,mes:fecha.slice(0,7)});
   save(); renderIngresos(); renderResumen(); toast('✓ Ingreso registrado');
   sv('i-monto',''); sv('i-desc','');
@@ -4264,7 +4361,7 @@ function renderIngresos(){
   const total = lista.reduce((s,x)=>s+x.monto,0);
   g('i-tfoot').innerHTML = `<tr><td colspan="2" style="font-weight:700">Total ingresos</td><td style="font-weight:700;color:#1A7A52">${fmt(total)}</td><td></td></tr>`;
 }
-function delIngreso(id){ D.ingresos=D.ingresos.filter(i=>i.id!==id); marcarComoBorrados([id]); save(); renderIngresos(); renderResumen(); toast('Ingreso eliminado'); }
+function delIngreso(id){ const r=D.ingresos.find(i=>i.id===id); if(r&&bloquearSiCerrado(r.mes))return; D.ingresos=D.ingresos.filter(i=>i.id!==id); marcarComoBorrados([id]); save(); renderIngresos(); renderResumen(); toast('Ingreso eliminado'); }
 
 // ═══════════════════════════════
 // CHEQUES
@@ -4274,6 +4371,7 @@ function addCheque(){
   const monto = parseFloat(gv('ch-monto'))||0;
   const fecha = gv('ch-fecha');
   if(!dest||!monto||!fecha){ alert('Completá los campos'); return; }
+  if(bloquearSiCerrado(fecha.slice(0,7))) return;
   D.cheques.push({id:uid(),dest,monto,fecha,mes:fecha.slice(0,7),nro:gv('ch-nro'),nota:gv('ch-nota'),cobrado:false});
   save(); renderCheques(); renderResumen(); toast('✓ Cheque registrado');
   sv('ch-dest',''); sv('ch-monto',''); sv('ch-nro',''); sv('ch-nota','');
@@ -4297,7 +4395,7 @@ function renderCheques(){
 function toggleCheque(id){
   const c=D.cheques.find(x=>x.id===id); if(c){c.cobrado=!c.cobrado; save(); renderCheques();}
 }
-function delCheque(id){ D.cheques=D.cheques.filter(c=>c.id!==id); marcarComoBorrados([id]); save(); renderCheques(); renderResumen(); toast('Cheque eliminado'); }
+function delCheque(id){ const r=D.cheques.find(c=>c.id===id); if(r&&bloquearSiCerrado(r.mes))return; D.cheques=D.cheques.filter(c=>c.id!==id); marcarComoBorrados([id]); save(); renderCheques(); renderResumen(); toast('Cheque eliminado'); }
 
 // ═══════════════════════════════
 // TRANSFERENCIAS Y COMPROBANTES
@@ -4315,6 +4413,7 @@ async function addTransferencia(){
 
   if(!benef){ toast('Ingresá a quién le transferiste'); return; }
   if(!fecha){ toast('Ingresá la fecha'); return; }
+  if(bloquearSiCerrado(fecha.slice(0,7))) return;
 
   const btn = g('tr-btn-guardar');
   const msg = g('tr-guardar-msg');
@@ -5479,6 +5578,7 @@ function updateHsExtra(id, val){
 }
 
 function toggleCFPago(tipo, id){
+  if(bloquearSiCerrado(mesSel)) return;
   if(tipo==='sueldo_sector'){
     // id = sector-semana
     const parts = id.split('-');
