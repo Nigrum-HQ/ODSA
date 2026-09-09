@@ -1209,28 +1209,42 @@ document.addEventListener('keydown', function(e){
 });
 
 var _undoStack = [];
+// "Último estado guardado conocido": es la foto del sistema ANTES del cambio
+// que se está por hacer. Se actualiza en cada save() DESPUÉS de apilar.
+var _ultimoEstadoConocido = null;
+// Bandera para que el sync de la nube y la restauración no ensucien la pila de deshacer.
+var _suspenderUndo = false;
+
 function pushUndo(){
-  _undoStack.push(JSON.stringify(D));
-  if(_undoStack.length>20) _undoStack.shift();
-  const btn = document.getElementById('btn-undo');
-  if(btn) btn.style.opacity='1';
+  // Guardamos en la pila el estado PREVIO (el último conocido), no el actual ya modificado.
+  if(_suspenderUndo) return;
+  if(_ultimoEstadoConocido !== null){
+    _undoStack.push(_ultimoEstadoConocido);
+    if(_undoStack.length>30) _undoStack.shift();
+    const btn = document.getElementById('btn-undo');
+    if(btn) btn.style.opacity='1';
+  }
 }
 function undoLast(){
   if(!_undoStack.length){ toast('Nada para deshacer'); return; }
   const prev = _undoStack.pop();
-  D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},mesesCerrados:[],ai_chat:[]}, JSON.parse(prev));
+  _suspenderUndo = true; // que el save() de abajo no vuelva a apilar
+  D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},mesesCerrados:[],ai_chat:[],historial_cambios:[]}, JSON.parse(prev));
+  _ultimoEstadoConocido = JSON.stringify(D);
   save();
+  _suspenderUndo = false;
   const btn = document.getElementById('btn-undo');
   if(btn) btn.style.opacity = _undoStack.length ? '1' : '0.4';
   // Re-renderizar la página activa
   const active = document.querySelector('.sitem.on');
   if(active) active.click();
-  toast('↩ Deshecho');
+  toast('↩ Cambio deshecho');
 }
 function save(){
-  pushUndo();
+  pushUndo(); // apila el estado PREVIO (_ultimoEstadoConocido) antes de sobrescribirlo
   D._ts = Date.now(); // marca de tiempo del ultimo cambio local, para evitar que un sync viejo pise un cambio nuevo
   const json = JSON.stringify(D);
+  _ultimoEstadoConocido = json; // ahora este pasa a ser el "último conocido" para el próximo cambio
   try{ localStorage.setItem(ODSA_KEY, json); }catch(e){}
   try{ sessionStorage.setItem(ODSA_KEY, json); }catch(e){}
   window._ODSA_BACKUP = json;
@@ -1323,6 +1337,9 @@ async function initApp(){
   document.body.appendChild(overlay);
   await load();
   overlay.remove();
+  // Punto de partida para "deshacer": el estado recién cargado es el "antes" del primer cambio
+  _ultimoEstadoConocido = JSON.stringify(D);
+  _undoStack = [];
   // Inicializar empleados si vacío
   if(!D.empleados.length){
     EMP_INIT.forEach(e => {
@@ -1522,6 +1539,9 @@ async function syncFromCloud(){
     D.ai_chat = mergedChat;
     if(nominaCambio || cloudTs > localTs){
       try{ localStorage.setItem(ODSA_KEY, JSON.stringify(D)); }catch(e){}
+      // El sync no es un cambio del usuario: actualizamos el baseline de "deshacer"
+      // para que no queden puntos de undo inconsistentes con datos de otra persona.
+      _ultimoEstadoConocido = JSON.stringify(D);
       // Re-render active page silently
       const active = document.querySelector('.sitem.on');
       if(active){ const page = active.getAttribute('data-page'); if(page) navPage(page); }
