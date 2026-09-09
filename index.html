@@ -193,6 +193,9 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
       <div class="sitem" data-page="ventas" onclick="navPage('ventas')"><span class="ico">⭐</span>Premios semana</div>
       <div class="sitem" data-page="externos" onclick="navPage('externos')"><span class="ico">👥</span>Vendedores ext.</div>
       <div class="sitem" data-page="fichabancaria" onclick="navPage('fichabancaria')"><span class="ico">🏦</span>Ficha bancaria</div>
+
+      <div class="ssep">Sistema</div>
+      <div class="sitem" data-page="backups" onclick="navPage('backups')"><span class="ico">🛡️</span>Copias de seguridad</div>
     </div>
 
     <div class="main">
@@ -804,6 +807,22 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
         <div id="tr-lista"></div>
       </div>
 
+      <!-- BACKUPS -->
+      <div id="page-backups" class="page">
+        <div class="page-title">Copias de seguridad</div>
+        <div class="page-sub">El sistema guarda una copia automática por día. También podés crear una manual cuando quieras.</div>
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+            <button class="btn btn-primary" id="bk-btn-crear" onclick="hacerBackupManual()">💾 Crear backup ahora</button>
+            <span style="font-size:13px;color:#8A9BAB">Se conservan las últimas 30 copias.</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Copias disponibles</div>
+          <div id="bk-lista"></div>
+        </div>
+      </div>
+
     </div><!-- end main -->
   </div><!-- end body -->
 </div><!-- end APP -->
@@ -1295,6 +1314,88 @@ async function initApp(){
   sv('i-fecha', hoy());
   sv('g-fecha', hoy());
   sv('ch-fecha', hoy());
+  sv('tr-fecha', hoy());
+  // Backup automático diario (crea una copia por día, en segundo plano)
+  hacerBackupAuto();
+}
+
+// ═══════════════════════════════
+// BACKUPS AUTOMÁTICOS
+// ═══════════════════════════════
+async function hacerBackupAuto(){
+  try{
+    await fetch('/api/backup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+      body: JSON.stringify({ data: JSON.stringify(D), auto: true })
+    });
+  }catch(e){ /* silencioso: si falla el backup no molestamos al usuario */ }
+}
+
+async function hacerBackupManual(){
+  const btn = g('bk-btn-crear');
+  if(btn){ btn.disabled = true; btn.textContent = 'Creando...'; }
+  try{
+    const r = await fetch('/api/backup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+      body: JSON.stringify({ data: JSON.stringify(D), auto: false })
+    });
+    const data = await r.json();
+    if(!r.ok || !data.ok){ toast('No se pudo crear el backup: ' + (data.error||'')); }
+    else { toast('✅ Backup creado'); renderBackups(); }
+  }catch(e){ toast('Error: ' + e.message); }
+  finally{ if(btn){ btn.disabled = false; btn.textContent = '💾 Crear backup ahora'; } }
+}
+
+async function renderBackups(){
+  const cont = g('bk-lista');
+  if(!cont) return;
+  cont.innerHTML = '<div class="empty" style="padding:20px;text-align:center;color:#8A9BAB">Cargando...</div>';
+  try{
+    const r = await fetch('/api/backup', { headers: { 'Authorization': 'Bearer ' + getToken() } });
+    const data = await r.json();
+    if(!r.ok || !data.ok){ cont.innerHTML = '<div class="empty" style="color:#C0392B;padding:20px">No se pudo cargar: '+(data.error||'')+'</div>'; return; }
+    const bks = data.backups || [];
+    if(!bks.length){ cont.innerHTML = '<div class="empty" style="padding:20px;text-align:center;color:#8A9BAB">Sin backups todavía</div>'; return; }
+    cont.innerHTML = `<div class="tw"><table>
+      <thead><tr><th>Fecha y hora</th><th>Origen</th><th></th></tr></thead>
+      <tbody>${bks.map(b=>{
+        const f = new Date(b.creado_en);
+        const fstr = f.toLocaleDateString('es-AR') + ' ' + f.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+        return `<tr>
+          <td>${fstr}</td>
+          <td><span class="badge ${b.origen==='auto'?'badge-gold':'badge-green'}">${b.origen==='auto'?'Automático':'Manual'}</span></td>
+          <td><button class="btn btn-sm" style="background:#1B3A6B;color:#fff" onclick="restaurarBackup('${b.id}')">Restaurar</button></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>`;
+  }catch(e){ cont.innerHTML = '<div class="empty" style="color:#C0392B;padding:20px">Error: '+e.message+'</div>'; }
+}
+
+async function restaurarBackup(id){
+  if(!confirm('⚠️ Restaurar este backup va a REEMPLAZAR todos los datos actuales por los de esa copia. Lo que hayas cargado después de ese backup se va a perder.\n\nSe va a crear un backup del estado actual antes de restaurar, por las dudas.\n\n¿Confirmás?')) return;
+  try{
+    // Primero, backup de seguridad del estado actual
+    await fetch('/api/backup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+      body: JSON.stringify({ data: JSON.stringify(D), auto: false })
+    });
+    // Traer el backup a restaurar
+    const r = await fetch('/api/backup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+      body: JSON.stringify({ accion: 'restaurar', id })
+    });
+    const data = await r.json();
+    if(!r.ok || !data.ok){ toast('No se pudo restaurar: ' + (data.error||'')); return; }
+    // Cargar los datos restaurados
+    D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},ai_chat:[],historial_cambios:[]}, JSON.parse(data.data));
+    save();
+    toast('✅ Backup restaurado');
+    setTimeout(()=>location.reload(), 1000);
+  }catch(e){ toast('Error: ' + e.message); }
 }
 
 // ═══════════════════════════════
@@ -1435,6 +1536,7 @@ function navPage(name){
   if(name==='ingresos') renderIngresos();
   if(name==='cheques') renderCheques();
   if(name==='transferencias') renderTransferencias();
+  if(name==='backups') renderBackups();
   if(name==='cashflow'){ initCFMes(); renderCashFlow(); }
 }
 function navTab(name){ navPage(name); }
