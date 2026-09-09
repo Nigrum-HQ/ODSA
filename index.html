@@ -5011,6 +5011,7 @@ function toggleSemana(s){
 
 function startEditMonto(e,tipo,id,montoActual){
   e.stopPropagation();
+  if(bloquearSiCerrado(mesSel)) return;
   const span=e.target;
   const input=document.createElement('input');
   input.type='text'; input.inputMode='decimal';
@@ -5225,6 +5226,7 @@ function restaurarValorHistorico(histId){
   abrirHistorialCambios();
 }
 function updateCFMonto(tipo,id,monto){
+  if(bloquearSiCerrado(mesSel)){ renderCashFlow(); return; }
   pushUndo();
   const TIPO_LABEL={gasto:'Gasto',sueldo:'Sueldo',adelanto:'Adelanto',comision:'Comisión',comision_lider:'Comisiones (equipo)'};
   if(tipo==='gasto'){
