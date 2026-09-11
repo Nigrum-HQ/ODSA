@@ -193,6 +193,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
       <div class="ssep">Ventas / Marketing</div>
       <div class="sitem" data-page="ventas" onclick="navPage('ventas')"><span class="ico">⭐</span>Premios semana</div>
       <div class="sitem" data-page="externos" onclick="navPage('externos')"><span class="ico">👥</span>Vendedores ext.</div>
+      <div class="sitem" data-page="ranking" onclick="navPage('ranking')"><span class="ico">🏆</span>Ranking vendedores</div>
       <div class="sitem" data-page="fichabancaria" onclick="navPage('fichabancaria')"><span class="ico">🏦</span>Ficha bancaria</div>
 
       <div class="ssep">Sistema</div>
@@ -566,6 +567,21 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
           </div>
         </div>
         <div id="ext-lista"></div>
+      </div>
+
+      <!-- RANKING VENDEDORES -->
+      <div id="page-ranking" class="page">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div class="page-title" style="margin-bottom:0">Ranking de vendedores</div>
+          <select id="rk-periodo" onchange="renderRanking()" style="padding:7px 14px;border-radius:8px;border:1.5px solid #D8E2EC;font-size:13px;font-family:inherit;background:#fff">
+            <option value="mes">Mes seleccionado</option>
+            <option value="anio">Todo el año</option>
+            <option value="todo">Histórico completo</option>
+          </select>
+        </div>
+        <div class="page-sub">Quién generó más comisiones — para premiar o analizar</div>
+        <div id="rk-podio" style="margin-bottom:20px"></div>
+        <div id="rk-tabla"></div>
       </div>
 
       <!-- GASTOS -->
@@ -1661,6 +1677,7 @@ function navPage(name){
   if(name==='adelantos'){ fillAdEmp(); renderAdelantos(); }
   if(name==='ventas'){ fillPremEmp(); renderPremios(); }
   if(name==='externos'){ fillExtSelects(); renderExternos(); }
+  if(name==='ranking') renderRanking();
   if(name==='fichabancaria'){ const tryR=(n)=>{ if(D.empleados.length>0||n>=20){renderFichaBancaria();}else{setTimeout(()=>tryR(n+1),300);} }; tryR(0); }
   if(name==='gastos') renderGastos();
   if(name==='ingresos') renderIngresos();
@@ -4422,6 +4439,78 @@ function addComision(){
 }
 if(!window._extCollapsed) window._extCollapsed={};
 function toggleExtLider(id){ window._extCollapsed[id]=!window._extCollapsed[id]; renderExternos(); }
+// ═══════════════════════════════
+// RANKING DE VENDEDORES
+// ═══════════════════════════════
+function renderRanking(){
+  const modo = gv('rk-periodo') || 'mes';
+  const anioSel = mesSel.slice(0,4);
+  const enPeriodo = (mesReg) => {
+    if(modo==='mes') return mesReg === mesSel;
+    if(modo==='anio') return (mesReg||'').startsWith(anioSel);
+    return true; // todo
+  };
+
+  // Sumar comisiones por vendedor (quien_id)
+  const porVendedor = {};
+  (D.comisiones||[]).filter(c=>enPeriodo(c.mes)).forEach(c=>{
+    if(!porVendedor[c.quien_id]) porVendedor[c.quien_id] = { total:0, cant:0, meses:new Set() };
+    porVendedor[c.quien_id].total += (c.total||0);
+    porVendedor[c.quien_id].cant += 1;
+    if(c.mes) porVendedor[c.quien_id].meses.add(c.mes);
+  });
+
+  const ranking = Object.entries(porVendedor).map(([id, d])=>{
+    const ext = (D.externos||[]).find(e=>e.id===id);
+    return {
+      nombre: ext ? ext.nombre : 'Vendedor sin identificar',
+      total: d.total,
+      cant: d.cant,
+      meses: d.meses.size,
+      promedio: d.meses.size ? d.total/d.meses.size : d.total
+    };
+  }).sort((a,b)=>b.total-a.total);
+
+  const podio = g('rk-podio');
+  const tabla = g('rk-tabla');
+
+  if(!ranking.length){
+    podio.innerHTML = '';
+    tabla.innerHTML = '<div class="card"><div class="empty" style="padding:30px;text-align:center;color:#8A9BAB">No hay comisiones en este período</div></div>';
+    return;
+  }
+
+  // Podio (top 3)
+  const medallas = ['🥇','🥈','🥉'];
+  const colores = ['#C9A84C','#9AA5B1','#CD7F32'];
+  podio.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px">' +
+    ranking.slice(0,3).map((r,i)=>
+      '<div class="card" style="text-align:center;border-top:4px solid '+colores[i]+'">'+
+        '<div style="font-size:36px;margin-bottom:4px">'+medallas[i]+'</div>'+
+        '<div style="font-weight:800;font-size:16px;color:#1a2332">'+r.nombre+'</div>'+
+        '<div style="font-weight:900;font-size:22px;color:'+colores[i]+';margin:6px 0">'+fmt(r.total)+'</div>'+
+        '<div style="font-size:12px;color:#8A9BAB">'+r.cant+' comisión'+(r.cant!==1?'es':'')+(r.meses>1?' · '+r.meses+' meses':'')+'</div>'+
+      '</div>'
+    ).join('') + '</div>';
+
+  // Tabla completa
+  const totalGeneral = ranking.reduce((s,r)=>s+r.total,0);
+  tabla.innerHTML = '<div class="card"><div class="card-title">Tabla completa</div><div class="tw"><table>'+
+    '<thead><tr><th style="width:40px">#</th><th>Vendedor</th><th style="text-align:right">Total comisiones</th><th style="text-align:center">Cant.</th><th style="text-align:right">Promedio/mes</th><th style="text-align:right">% del total</th></tr></thead>'+
+    '<tbody>'+ranking.map((r,i)=>
+      '<tr>'+
+        '<td style="font-weight:800;color:#8A9BAB">'+(i+1)+'</td>'+
+        '<td style="font-weight:600">'+r.nombre+'</td>'+
+        '<td style="text-align:right;font-weight:700;color:#B8943E">'+fmt(r.total)+'</td>'+
+        '<td style="text-align:center;color:#6B7E8F">'+r.cant+'</td>'+
+        '<td style="text-align:right;color:#6B7E8F">'+fmt(r.promedio)+'</td>'+
+        '<td style="text-align:right;color:#6B7E8F">'+(totalGeneral?Math.round(r.total/totalGeneral*100):0)+'%</td>'+
+      '</tr>'
+    ).join('')+'</tbody>'+
+    '<tfoot><tr class="subtotal-row"><td colspan="2">Total</td><td style="text-align:right">'+fmt(totalGeneral)+'</td><td></td><td></td><td style="text-align:right">100%</td></tr></tfoot>'+
+    '</table></div></div>';
+}
+
 function renderExternos(){
   // Llenar opciones del selector de mes
   const selMes = g('ext-filtro-mes');
