@@ -70,6 +70,55 @@ const TOOLS = [
       },
       required: ['tipo', 'busqueda']
     }
+  },
+  {
+    name: 'crear_cheque',
+    description: 'Crea un cheque emitido en el sistema.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        destinatario: { type: 'string', description: 'A quién se le da el cheque' },
+        monto: { type: 'number', description: 'Monto del cheque en pesos' },
+        fecha: { type: 'string', description: 'Fecha del cheque en formato YYYY-MM-DD. Si no se especifica, usar hoy.' },
+        numero: { type: 'string', description: 'Número de cheque, opcional' },
+        nota: { type: 'string', description: 'Nota opcional' }
+      },
+      required: ['destinatario', 'monto']
+    }
+  },
+  {
+    name: 'cerrar_mes',
+    description: 'Cierra (bloquea) un mes para que no se pueda editar. Usar cuando el usuario pide cerrar o bloquear un mes ya terminado.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        mes: { type: 'string', description: 'Mes a cerrar en formato YYYY-MM (ej: 2026-09). Si el usuario dice "septiembre", convertilo al formato con el año correcto.' }
+      },
+      required: ['mes']
+    }
+  },
+  {
+    name: 'reabrir_mes',
+    description: 'Reabre (desbloquea) un mes que estaba cerrado, para poder editarlo de nuevo.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        mes: { type: 'string', description: 'Mes a reabrir en formato YYYY-MM' }
+      },
+      required: ['mes']
+    }
+  },
+  {
+    name: 'marcar_sueldo_pagado',
+    description: 'Marca el sueldo de un empleado como pagado en un mes determinado.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        nombre_empleado: { type: 'string', description: 'Nombre del empleado' },
+        mes: { type: 'string', description: 'Mes en formato YYYY-MM. Si no se especifica, usar el mes que se está viendo.' }
+      },
+      required: ['nombre_empleado']
+    }
   }
 ];
 
@@ -108,7 +157,7 @@ El JSON también incluye "desglose_medio_de_pago_mes_actual" (total del mes) y, 
 Si te preguntan algo que no se puede responder con los datos que tenés, decilo con honestidad y sugerí dónde podrían mirarlo dentro del sistema (Sueldos, Gastos, Cash Flow, Análisis Financiero, Fichas, etc.) en vez de inventar.
 Podés dar consejos prácticos de gestión financiera, dejando en claro que no reemplazan a un contador o asesor financiero para decisiones grandes.
 
-ADEMÁS, ahora podés EJECUTAR ACCIONES reales sobre el sistema usando las herramientas disponibles: agregar_gasto, agregar_ingreso, agregar_adelanto, agregar_premio y eliminar_movimiento.
+ADEMÁS, ahora podés EJECUTAR ACCIONES reales sobre el sistema usando las herramientas disponibles: agregar_gasto, agregar_ingreso, agregar_adelanto, agregar_premio, eliminar_movimiento, crear_cheque, cerrar_mes, reabrir_mes y marcar_sueldo_pagado.
 - Usalas cuando el usuario te pida explícitamente cargar, agregar, registrar, borrar o eliminar algo de ese tipo.
 - Si falta un dato imprescindible (por ejemplo el monto, o a qué empleado corresponde un adelanto/premio, o qué gasto/ingreso hay que borrar), preguntáselo primero en un mensaje de texto normal en vez de inventarlo o de llamar a la herramienta con datos incompletos.
 - Si no te dan fecha, no hace falta que preguntes: se usa automáticamente la fecha de hoy.
