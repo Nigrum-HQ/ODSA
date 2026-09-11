@@ -4730,15 +4730,24 @@ function arcaEsNotaCredito(tipo){
   const cod = t.split('-')[0].trim().split(' ')[0];
   return ARCA_NC_CODES.includes(cod);
 }
+// Comprobantes tipo "A" (los únicos que discriminan IVA -> crédito/débito fiscal computable)
+const ARCA_CODIGOS_A = ['1','2','3','4','5','19','20','51','52','53','63','81','82','118','119','120'];
+function arcaEsTipoA(tipo){
+  const t = String(tipo||'').trim().toLowerCase();
+  if(t.includes(' a') && (t.includes('factura a')||t.includes('crédito a')||t.includes('credito a')||t.includes('débito a')||t.includes('debito a')||t.includes('liquidaci')||t.includes('recibo a'))) return true;
+  const cod = t.split('-')[0].trim().split(' ')[0];
+  return ARCA_CODIGOS_A.includes(cod);
+}
 
 function arcaTotalizar(filas){
-  const t = {n:0, nc:0, neto:0, iva:0, exento:0, nograv:0, otros:0, total:0, filas:[]};
+  const t = {n:0, nc:0, neto:0, iva:0, ivaA:0, netoA:0, exento:0, nograv:0, otros:0, total:0, filas:[]};
   filas.forEach(f=>{
     const total = arcaNum(arcaCampo(f, ['Imp. Total','Imp Total','Importe Total']));
     // Ignorar filas vacías o de totales
     if(total===0 && !arcaCampo(f,['Fecha','Fecha de Emisión'])) return;
     const tipo = arcaCampo(f,['Tipo','Tipo de Comprobante']);
     const esNC = arcaEsNotaCredito(tipo);
+    const esA = arcaEsTipoA(tipo);
     const signo = esNC ? -1 : 1;   // las notas de crédito restan
     const neto = arcaNum(arcaCampo(f, ['Imp. Neto Gravado Total','Neto Gravado Total']));
     const iva = arcaNum(arcaCampo(f, ['Total IVA']));
@@ -4747,9 +4756,11 @@ function arcaTotalizar(filas){
     const otros = arcaNum(arcaCampo(f, ['Otros Tributos']));
     t.n++; if(esNC) t.nc++;
     t.neto+=signo*neto; t.iva+=signo*iva; t.exento+=signo*exento; t.nograv+=signo*nograv; t.otros+=signo*otros; t.total+=signo*total;
+    // IVA computable: SOLO comprobantes tipo A (B y C no discriminan IVA)
+    if(esA){ t.ivaA += signo*iva; t.netoA += signo*neto; }
     t.filas.push({
       fecha: arcaCampo(f,['Fecha','Fecha de Emisión']),
-      tipo, esNC,
+      tipo, esNC, esA,
       contraparte: arcaCampo(f,['Denominación Emisor','Denominación Receptor','Denominacion']),
       neto: signo*neto, iva: signo*iva, exento: signo*exento, total: signo*total
     });
@@ -4785,18 +4796,20 @@ function renderArca(){
   if(!cont) return;
   if(!_arcaVentas && !_arcaCompras){ cont.innerHTML=''; return; }
 
-  const v = _arcaVentas || {n:0,nc:0,neto:0,iva:0,exento:0,nograv:0,total:0};
-  const c = _arcaCompras || {n:0,nc:0,neto:0,iva:0,exento:0,nograv:0,total:0};
-  const saldoIva = v.iva - c.iva;
+  const v = _arcaVentas || {n:0,nc:0,neto:0,iva:0,ivaA:0,netoA:0,exento:0,nograv:0,total:0};
+  const c = _arcaCompras || {n:0,nc:0,neto:0,iva:0,ivaA:0,netoA:0,exento:0,nograv:0,total:0};
+  // El saldo de IVA se calcula con el IVA COMPUTABLE (solo comprobantes A)
+  const saldoIva = v.ivaA - c.ivaA;
 
   let html = '';
 
   // Bloque de saldo IVA (lo más importante)
   html += '<div class="card" style="border-left:4px solid #C9A84C">'+
     '<div class="card-title">Resultado IVA del período</div>'+
+    '<div style="font-size:12px;color:#8A9BAB;margin-bottom:12px">Solo se computa el IVA de comprobantes tipo A (Factura A y Nota de Crédito A). Las Facturas B y C no discriminan IVA.</div>'+
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px">'+
-      '<div class="kpi-card"><div class="kpi-label">IVA Débito (ventas)</div><div class="kpi-val red">'+fmt(v.iva)+'</div></div>'+
-      '<div class="kpi-card"><div class="kpi-label">IVA Crédito (compras)</div><div class="kpi-val green">'+fmt(c.iva)+'</div></div>'+
+      '<div class="kpi-card"><div class="kpi-label">IVA Débito (ventas A)</div><div class="kpi-val red">'+fmt(v.ivaA)+'</div></div>'+
+      '<div class="kpi-card"><div class="kpi-label">IVA Crédito (compras A)</div><div class="kpi-val green">'+fmt(c.ivaA)+'</div></div>'+
       '<div class="kpi-card" style="background:'+(saldoIva>0?'#FDECEA':'#EAF6EF')+'"><div class="kpi-label">Saldo IVA '+(saldoIva>0?'A PAGAR':'A FAVOR')+'</div><div class="kpi-val" style="color:'+(saldoIva>0?'#C0392B':'#1A7A52')+'">'+fmt(Math.abs(saldoIva))+'</div></div>'+
     '</div></div>';
 
@@ -4808,7 +4821,7 @@ function renderArca(){
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">'+
         '<div class="kpi-card"><div class="kpi-label">Total facturado</div><div class="kpi-val blue">'+fmt(v.total)+'</div></div>'+
         '<div class="kpi-card"><div class="kpi-label">Neto gravado</div><div class="kpi-val">'+fmt(v.neto)+'</div></div>'+
-        '<div class="kpi-card"><div class="kpi-label">IVA</div><div class="kpi-val">'+fmt(v.iva)+'</div></div>'+
+        '<div class="kpi-card"><div class="kpi-label">IVA débito (A)</div><div class="kpi-val red">'+fmt(v.ivaA)+'</div></div>'+
         '<div class="kpi-card"><div class="kpi-label">Exentos</div><div class="kpi-val">'+fmt(v.exento)+'</div></div>'+
       '</div></div>';
   }
@@ -4820,9 +4833,9 @@ function renderArca(){
       '<button class="btn btn-primary" onclick="exportarArca(\'compras\')">⬇ Descargar Excel</button></div>'+
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">'+
         '<div class="kpi-card"><div class="kpi-label">Total compras</div><div class="kpi-val blue">'+fmt(c.total)+'</div></div>'+
-        '<div class="kpi-card"><div class="kpi-label">Neto gravado</div><div class="kpi-val">'+fmt(c.neto)+'</div></div>'+
-        '<div class="kpi-card"><div class="kpi-label">IVA</div><div class="kpi-val">'+fmt(c.iva)+'</div></div>'+
-        '<div class="kpi-card"><div class="kpi-label">Exentos</div><div class="kpi-val">'+fmt(c.exento)+'</div></div>'+
+        '<div class="kpi-card"><div class="kpi-label">Neto gravado (A)</div><div class="kpi-val">'+fmt(c.netoA)+'</div></div>'+
+        '<div class="kpi-card"><div class="kpi-label">IVA crédito computable (A)</div><div class="kpi-val green">'+fmt(c.ivaA)+'</div></div>'+
+        '<div class="kpi-card"><div class="kpi-label">IVA total (todos)</div><div class="kpi-val" style="color:#8A9BAB">'+fmt(c.iva)+'</div></div>'+
       '</div></div>';
   }
 
