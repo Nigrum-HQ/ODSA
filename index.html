@@ -2408,7 +2408,7 @@ function aiBorrarHistorial(){
 
 // Texto de bienvenida (primera vez, sin historial guardado)
 function aiMensajeBienvenida(){
-  aiAgregarMensaje('assistant', '¡Hola! Soy tu asistente financiero. Puedo ver todos los datos cargados en ODSA (sueldos, empleados, gastos, ingresos, cash flow, etc.) y contestarte preguntas sobre tu situación económica. También puedo cargar cosas por vos si me lo pedís:\n\n• "Agregá un gasto de $50.000 en insumos"\n• "Registrá un ingreso de $120.000 de hoy"\n• "Cargá un adelanto de $30.000 para Juan"\n• "Poné un premio de $10.000 para Noe en la semana 2"\n• "Borrá el gasto de viandas del 21/07"\n\nSiempre te voy a mostrar la acción antes de ejecutarla, para que la confirmes vos. La conversación es compartida con tu compañero/a de trabajo. ¿Qué necesitás?');
+  aiAgregarMensaje('assistant', '¡Hola! Soy tu asistente financiero. Puedo ver todos los datos cargados en ODSA (sueldos, empleados, gastos, ingresos, cash flow, etc.) y contestarte preguntas sobre tu situación económica. También puedo cargar cosas por vos si me lo pedís:\n\n• "Agregá un gasto de $50.000 en insumos"\n• "Registrá un ingreso de $120.000 de hoy"\n• "Cargá un adelanto de $30.000 para Juan"\n• "Poné un premio de $10.000 para Noe en la semana 2"\n• "Borrá el gasto de viandas del 21/07"\n• "Creá un cheque de $200.000 para el proveedor X"\n• "Marcá el sueldo de Juan como pagado"\n• "Cerrá el mes de septiembre"\n\nSiempre te voy a mostrar la acción antes de ejecutarla, para que la confirmes vos. La conversación es compartida con tu compañero/a de trabajo. ¿Qué necesitás?');
 }
 
 function renderAsistente(){
@@ -2475,6 +2475,14 @@ function aiDescribirAccion(tb){
       const etiquetaTipo = {gasto:'gasto', ingreso:'ingreso', adelanto:'adelanto', premio:'premio'}[n.tipo] || n.tipo;
       return {titulo:'Eliminar '+etiquetaTipo, detalle: match ? aiDescribirRegistro(n.tipo, match) : ('No identificado: "'+(n.busqueda||'')+'"')};
     }
+    case 'crear_cheque':
+      return {titulo:'Crear cheque', detalle:(n.destinatario||'—')+' · '+montoTxt+' · '+fd(n.fecha||hoy())};
+    case 'cerrar_mes':
+      return {titulo:'🔒 Cerrar mes', detalle: n.mes ? mesLabel(n.mes) : '—'};
+    case 'reabrir_mes':
+      return {titulo:'🔓 Reabrir mes', detalle: n.mes ? mesLabel(n.mes) : '—'};
+    case 'marcar_sueldo_pagado':
+      return {titulo:'Marcar sueldo pagado', detalle:(n.nombre_empleado||'—')+(n.mes?' · '+mesLabel(n.mes):' · '+mesLabel(mesSel))};
     default:
       return {titulo: tb.name, detalle: JSON.stringify(n)};
   }
@@ -2608,6 +2616,35 @@ function aiEjecutarAccion(nombreTool, input){
       else return 'No se pudo eliminar: tipo de registro no reconocido ("'+input.tipo+'").';
       return 'Eliminado: '+descripcionBorrado+'.';
     }
+    if(nombreTool === 'crear_cheque'){
+      const fecha = input.fecha || hoy();
+      if(mesEstaCerrado(fecha.slice(0,7))) return 'No se pudo crear: '+mesLabel(fecha.slice(0,7))+' está cerrado.';
+      const rec = {id:uid(), dest:(input.destinatario||'—').trim(), monto:Number(input.monto)||0, fecha, mes:fecha.slice(0,7), nro:input.numero||'', nota:input.nota||'', cobrado:false};
+      D.cheques.push(rec); save(); renderCheques(); renderResumen();
+      return 'Cheque creado: '+rec.dest+' — '+fmt(rec.monto)+' (vence/fecha '+fd(rec.fecha)+').';
+    }
+    if(nombreTool === 'cerrar_mes'){
+      const mm = input.mes;
+      if(!mm || !/^\d{4}-\d{2}$/.test(mm)) return 'Mes inválido. Usá formato YYYY-MM (ej: 2026-09).';
+      if(!D.mesesCerrados) D.mesesCerrados = [];
+      if(D.mesesCerrados.includes(mm)) return mesLabel(mm)+' ya estaba cerrado.';
+      D.mesesCerrados.push(mm); save();
+      return '🔒 '+mesLabel(mm)+' cerrado. Ya no se puede editar hasta reabrirlo.';
+    }
+    if(nombreTool === 'reabrir_mes'){
+      const mm = input.mes;
+      if(!mm) return 'Falta el mes.';
+      D.mesesCerrados = (D.mesesCerrados||[]).filter(x=>x!==mm); save();
+      return '🔓 '+mesLabel(mm)+' reabierto.';
+    }
+    if(nombreTool === 'marcar_sueldo_pagado'){
+      const {match} = aiResolverEmpleado(input.nombre_empleado);
+      if(!match) return 'No se encontró al empleado "'+(input.nombre_empleado||'')+'".';
+      const mm = input.mes || mesSel;
+      if(mesEstaCerrado(mm)) return 'No se pudo: '+mesLabel(mm)+' está cerrado.';
+      setNominaEmp(match.id, mm, 'pagado', true); save(); renderEmpleados(); renderCashFlow();
+      return '✓ Sueldo de '+match.nombre+' marcado como PAGADO en '+mesLabel(mm)+'.';
+    }
     return 'Acción no reconocida.';
   }catch(e){
     return 'Error al ejecutar la acción: '+e.message;
@@ -2657,7 +2694,7 @@ function aiProcesarToolUses(toolBlocks){
   const pendientesConfirmar = [];
 
   toolBlocks.forEach(tb=>{
-    if(tb.name === 'agregar_adelanto' || tb.name === 'agregar_premio'){
+    if(tb.name === 'agregar_adelanto' || tb.name === 'agregar_premio' || tb.name === 'marcar_sueldo_pagado'){
       const {match, candidatos} = aiResolverEmpleado(tb.input && tb.input.nombre_empleado);
       if(!match){
         resultadosPrevios[tb.id] = candidatos.length
