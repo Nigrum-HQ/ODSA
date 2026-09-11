@@ -167,6 +167,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
       <button id="btn-undo" onclick="undoLast()" title="Deshacer último cambio" style="background:rgba(255,255,255,.1);border:none;border-radius:8px;color:#fff;font-size:18px;cursor:pointer;padding:5px 12px;opacity:0.4;transition:.2s" >↩</button>
       <button onclick="abrirHistorialCambios()" title="Ver historial de cambios de montos" style="background:rgba(255,255,255,.1);border:none;border-radius:8px;color:#fff;font-size:14px;cursor:pointer;padding:5px 12px">🕘 Historial</button>
       <button class="btn-export" onclick="exportarAAbesa()">↑ Exportar a ABESA</button>
+      <button id="btn-dark" class="btn-export" style="background:linear-gradient(135deg,#4a4a6a,#2d2d4a);min-width:44px" onclick="toggleDark()" title="Modo oscuro / claro">🌙</button>
       <button id="btn-privado" class="btn-export" style="background:linear-gradient(135deg,#4a4a6a,#2d2d4a);min-width:44px" onclick="togglePrivado()" title="Ocultar/mostrar números">👁</button>
       <button class="btn-salir" onclick="salir()">Salir</button>
     </div>
@@ -6268,9 +6269,34 @@ body.privado-mode [data-privado] {
   user-select: none;
   pointer-events: none;
 }
+
+/* ═══ MODO OSCURO ═══
+   Invierte los colores de toda la app (claro -> oscuro) y luego re-invierte
+   imágenes, canvas y emojis para que sigan viéndose con sus colores reales. */
+html.dark-mode { filter: invert(1) hue-rotate(180deg); background:#0e0e0e; }
+html.dark-mode img,
+html.dark-mode canvas,
+html.dark-mode video,
+html.dark-mode svg,
+html.dark-mode [style*="background-image"],
+html.dark-mode .no-invert { filter: invert(1) hue-rotate(180deg); }
+/* Los emojis (que son texto) también se re-invierten para verse normales */
+html.dark-mode .emoji-fix { filter: invert(1) hue-rotate(180deg); display:inline-block; }
 </style>
 <script>
 let privadoActivo = false;
+
+function toggleDark(){
+  const on = !document.documentElement.classList.contains('dark-mode');
+  document.documentElement.classList.toggle('dark-mode', on);
+  try{ localStorage.setItem('odsa_dark', on ? '1' : '0'); }catch(e){}
+  const btn = document.getElementById('btn-dark');
+  if(btn) btn.textContent = on ? '☀️' : '🌙';
+}
+// Aplicar preferencia guardada al cargar
+(function(){
+  try{ if(localStorage.getItem('odsa_dark')==='1') document.documentElement.classList.add('dark-mode'); }catch(e){}
+})();
 
 function togglePrivado(){
   privadoActivo = !privadoActivo;
