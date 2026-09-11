@@ -1769,6 +1769,10 @@ function buscarPersona(){
   });
   // 6) Transferencias (por texto beneficiario)
   const transferencias = (window._trAll||[]).filter(t=>matchNombre(t.beneficiario) && enPeriodo(t.mes));
+  // 6b) Gastos por descripción o categoría
+  const gastos = (D.gastos||[]).filter(gg=>(matchNombre(gg.desc) || matchNombre(gg.cat)) && enPeriodo(gg.mes));
+  // 6c) Ingresos por descripción
+  const ingresos = (D.ingresos||[]).filter(i=>matchNombre(i.desc) && enPeriodo(i.mes));
 
   // 7) Sueldos: si es empleado, sumar su sueldo del mes actual (o de todos los meses si "todo")
   let sueldoInfo = null;
@@ -1783,7 +1787,7 @@ function buscarPersona(){
     }
   }
 
-  const nada = !empleados.length && !externos.length && !adelantos.length && !premios.length && !comisiones.length && !transferencias.length;
+  const nada = !empleados.length && !externos.length && !adelantos.length && !premios.length && !comisiones.length && !transferencias.length && !gastos.length && !ingresos.length;
   if(nada){
     cont.innerHTML = '<div class="card"><div class="empty" style="padding:30px;text-align:center;color:#8A9BAB">No se encontró nada para "'+q+'"</div></div>';
     return;
@@ -1793,7 +1797,9 @@ function buscarPersona(){
   const totalPremios = premios.reduce((s,p)=>s+(p.monto||0),0);
   const totalComisiones = comisiones.reduce((s,c)=>s+(c.total||0),0);
   const totalTransf = transferencias.reduce((s,t)=>s+(Number(t.monto)||0),0);
-  const granTotal = (sueldoInfo?sueldoInfo.total:0) + totalAdelantos + totalPremios + totalComisiones + totalTransf;
+  const totalGastos = gastos.reduce((s,gg)=>s+(gg.monto||0),0);
+  const totalIngresos = ingresos.reduce((s,i)=>s+(i.monto||0),0);
+  const granTotal = (sueldoInfo?sueldoInfo.total:0) + totalAdelantos + totalPremios + totalComisiones + totalTransf + totalGastos;
 
   let html = '';
 
@@ -1816,6 +1822,8 @@ function buscarPersona(){
   if(totalPremios) html += '<div class="kpi-card"><div class="kpi-label">Premios</div><div class="kpi-val gold">'+fmt(totalPremios)+'</div></div>';
   if(totalComisiones) html += '<div class="kpi-card"><div class="kpi-label">Comisiones</div><div class="kpi-val gold">'+fmt(totalComisiones)+'</div></div>';
   if(totalTransf) html += '<div class="kpi-card"><div class="kpi-label">Transferencias</div><div class="kpi-val red">'+fmt(totalTransf)+'</div></div>';
+  if(totalGastos) html += '<div class="kpi-card"><div class="kpi-label">Gastos</div><div class="kpi-val red">'+fmt(totalGastos)+'</div></div>';
+  if(totalIngresos) html += '<div class="kpi-card"><div class="kpi-label">Ingresos</div><div class="kpi-val green">'+fmt(totalIngresos)+'</div></div>';
   html += '<div class="kpi-card" style="background:#1B3A6B"><div class="kpi-label" style="color:rgba(255,255,255,.7)">Total general</div><div class="kpi-val" style="color:#fff">'+fmt(granTotal)+'</div></div>';
   html += '</div>';
 
@@ -1831,6 +1839,12 @@ function buscarPersona(){
   html += tabla('Transferencias', transferencias.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).map(t=>
     '<tr><td>'+fd(t.fecha)+'</td><td><span class="badge badge-gold">'+(t.tipo||'—')+'</span></td><td style="color:#8A9BAB">'+(t.concepto||'')+'</td><td style="text-align:right;font-weight:700;color:#C0392B">'+fmt(t.monto)+'</td>'+
     (t.archivo_url?'<td><a href="'+t.archivo_url+'" target="_blank" style="color:#1B3A6B;font-weight:700">📎</a></td>':'<td></td>')+'</tr>'));
+
+  html += tabla('Gastos', gastos.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).map(gg=>
+    '<tr><td>'+fd(gg.fecha)+'</td><td>'+(gg.desc||'')+'</td><td style="color:#8A9BAB">'+(CATS[gg.cat]||gg.cat||'')+'</td><td style="text-align:right;font-weight:700;color:#C0392B">'+fmt(gg.monto)+'</td></tr>'));
+
+  html += tabla('Ingresos', ingresos.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).map(i=>
+    '<tr><td>'+fd(i.fecha)+'</td><td>'+(i.desc||'')+'</td><td style="text-align:right;font-weight:700;color:#1A7A52">'+fmt(i.monto)+'</td></tr>'));
 
   cont.innerHTML = html;
 }
