@@ -110,25 +110,27 @@ const TOOLS = [
   },
   {
     name: 'marcar_sueldo_pagado',
-    description: 'Marca el sueldo de un empleado como pagado en un mes determinado.',
+    description: 'Marca el sueldo de un empleado como pagado o pendiente en un mes determinado.',
     input_schema: {
       type: 'object',
       properties: {
         nombre_empleado: { type: 'string', description: 'Nombre del empleado' },
-        mes: { type: 'string', description: 'Mes en formato YYYY-MM. Si no se especifica, usar el mes que se está viendo.' }
+        mes: { type: 'string', description: 'Mes en formato YYYY-MM. Si no se especifica, usar el mes que se está viendo.' },
+        pagado: { type: 'boolean', description: 'true para marcar como pagado (default), false para volver a marcar como pendiente' }
       },
       required: ['nombre_empleado']
     }
   },
   {
     name: 'marcar_gasto_pagado',
-    description: 'Marca un gasto ya cargado (como Cargas Sociales, Alquiler, Servicios, etc.) como pagado. Se busca por descripción dentro del mes.',
+    description: 'Marca un gasto ya cargado (como Cargas Sociales, Alquiler, Servicios, etc.) como pagado o pendiente. Se busca por descripción dentro del mes.',
     input_schema: {
       type: 'object',
       properties: {
         busqueda: { type: 'string', description: 'Descripción del gasto a marcar (ej: "Cargas Sociales", "Alquiler")' },
         mes: { type: 'string', description: 'Mes en formato YYYY-MM. Si no se especifica, usar el mes que se está viendo.' },
-        monto: { type: 'number', description: 'Monto exacto, si se conoce, para desambiguar si hay varios gastos parecidos' }
+        monto: { type: 'number', description: 'Monto exacto, si se conoce, para desambiguar si hay varios gastos parecidos' },
+        pagado: { type: 'boolean', description: 'true para marcar como pagado (default), false para volver a marcar como pendiente' }
       },
       required: ['busqueda']
     }
