@@ -1456,6 +1456,8 @@ async function initApp(){
   sv('tr-fecha', hoy());
   // Backup automático diario (crea una copia por día, en segundo plano)
   hacerBackupAuto();
+  // Resumen del día (una vez por día, al entrar)
+  setTimeout(mostrarResumenDelDia, 600);
 }
 
 // ═══════════════════════════════
@@ -2003,7 +2005,70 @@ function renderPendientes(){
     '</div></div>';
 }
 
+// ═══════════════════════════════
+// RESUMEN DEL DÍA (bienvenida)
+// ═══════════════════════════════
+function calcularPendientesResumen(m){
+  const alertas = [];
+  let sueldosPend = 0, sueldosPendMonto = 0;
+  D.empleados.forEach(e=>{ const n = getNominaEmp(e, m); if((n.sueldo+(n.hsExtra||0))>0 && !n.pagado){ sueldosPend++; sueldosPendMonto += (n.sueldo+(n.hsExtra||0)); } });
+  if(sueldosPend>0) alertas.push({icono:'💼', txt:sueldosPend+' sueldo'+(sueldosPend!==1?'s':'')+' sin pagar', monto:sueldosPendMonto});
+  const comPend = (D.comisiones||[]).filter(c=>c.mes===m && !c.pagado);
+  if(comPend.length) alertas.push({icono:'🤝', txt:comPend.length+' comisión'+(comPend.length!==1?'es':'')+' sin pagar', monto:comPend.reduce((s,c)=>s+(c.total||0),0)});
+  const adPend = (D.adelantos||[]).filter(a=>a.mes===m && !a.pagado);
+  if(adPend.length) alertas.push({icono:'💵', txt:adPend.length+' adelanto'+(adPend.length!==1?'s':'')+' sin pagar', monto:adPend.reduce((s,a)=>s+(a.monto||0),0)});
+  const gasPend = (D.gastos||[]).filter(gg=>gg.mes===m && !gg.pagado);
+  if(gasPend.length) alertas.push({icono:'🧾', txt:gasPend.length+' gasto'+(gasPend.length!==1?'s':'')+' sin pagar', monto:gasPend.reduce((s,gg)=>s+(gg.monto||0),0)});
+  const chPend = (D.cheques||[]).filter(c=>c.mes===m && !c.cobrado);
+  if(chPend.length) alertas.push({icono:'🏦', txt:chPend.length+' cheque'+(chPend.length!==1?'s':'')+' pendiente'+(chPend.length!==1?'s':''), monto:chPend.reduce((s,c)=>s+(c.monto||0),0)});
+  return alertas;
+}
+
+function mostrarResumenDelDia(){
+  // Solo una vez por día
+  const hoyStr = new Date().toISOString().slice(0,10);
+  try{ if(localStorage.getItem('odsa_resumen_dia') === hoyStr) return; }catch(e){}
+
+  const h = new Date().getHours();
+  const saludo = h<12 ? '¡Buenos días!' : (h<19 ? '¡Buenas tardes!' : '¡Buenas noches!');
+  const m = mes(); // mes actual real
+  const alertas = calcularPendientesResumen(m);
+  const totalPend = alertas.reduce((s,a)=>s+a.monto,0);
+
+  let cuerpo = '';
+  if(!alertas.length){
+    cuerpo = '<div style="background:#EAF6EF;border-radius:10px;padding:14px;color:#166534;font-weight:700;text-align:center">✅ No tenés pagos pendientes en '+mesLabel(m)+'. ¡Todo al día!</div>';
+  } else {
+    cuerpo = '<div style="font-size:13.5px;color:#6B7E8F;margin-bottom:10px">Esto es lo que tenés pendiente en '+mesLabel(m)+':</div>'+
+      alertas.map(a=>'<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F0F4F8"><span style="font-size:18px">'+a.icono+'</span><span style="flex:1;font-weight:600;font-size:13.5px">'+a.txt+'</span><span style="font-weight:800;color:#C0392B">'+fmt(a.monto)+'</span></div>').join('')+
+      '<div style="display:flex;justify-content:space-between;padding-top:12px;margin-top:4px;font-weight:800"><span>Total pendiente</span><span style="color:#C0392B">'+fmt(totalPend)+'</span></div>';
+  }
+
+  const overlay = document.createElement('div');
+  overlay.id = 'resumen-dia-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,25,35,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.innerHTML = '<div style="background:#fff;border-radius:16px;max-width:460px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,.4);overflow:hidden">'+
+    '<div style="background:linear-gradient(135deg,#0F1923,#1B2D42);padding:22px 24px;color:#fff">'+
+      '<div style="font-size:11px;font-weight:800;letter-spacing:2px;color:#C9A84C;text-transform:uppercase">Resumen del día</div>'+
+      '<div style="font-size:22px;font-weight:800;margin-top:4px">'+saludo+'</div>'+
+      '<div style="font-size:13px;color:rgba(255,255,255,.6)">'+new Date().toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'})+'</div>'+
+    '</div>'+
+    '<div style="padding:20px 24px">'+cuerpo+'</div>'+
+    '<div style="padding:0 24px 20px;display:flex;gap:10px">'+
+      '<button onclick="cerrarResumenDia()" style="flex:1;background:#1B3A6B;color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;cursor:pointer;font-size:14px">Entendido</button>'+
+      '<button onclick="cerrarResumenDia(); navPage(\'asistente\')" style="background:#fff;color:#1B3A6B;border:1.5px solid #D8E2EC;border-radius:10px;padding:11px 16px;font-weight:700;cursor:pointer;font-size:14px">🤖 Preguntar al asistente</button>'+
+    '</div>'+
+  '</div>';
+  document.body.appendChild(overlay);
+  try{ localStorage.setItem('odsa_resumen_dia', hoyStr); }catch(e){}
+}
+function cerrarResumenDia(){
+  const o = document.getElementById('resumen-dia-overlay');
+  if(o) o.remove();
+}
+
 function renderResumen(){
+
   const _wrap = g('res-periodo-wrap'); if(_wrap && !_wrap.innerHTML) _wrap.innerHTML = periodoSelectorHTML('res');
   const d = new Date(mesSel+'-01T00:00:00');
   const m = mesSel;
