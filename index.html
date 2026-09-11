@@ -125,6 +125,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
 .premio-row:last-child{border-bottom:none}
 
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -184,6 +185,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
       <div class="ssep">Administración</div>
       <div class="sitem" data-page="empleados" onclick="navPage('empleados')"><span class="ico">💰</span>Sueldos</div>
       <div class="sitem" data-page="costoemp" onclick="navPage('costoemp')"><span class="ico">📊</span>Costo por empleado</div>
+      <div class="sitem" data-page="arca" onclick="navPage('arca')"><span class="ico">🧾</span>IVA / ARCA</div>
       <div class="sitem" data-page="adelantos" onclick="navPage('adelantos')"><span class="ico">💵</span>Adelantos</div>
       <div class="sitem" data-page="gastos" onclick="navPage('gastos')"><span class="ico">💳</span>Gastos</div>
       <div class="sitem" data-page="ingresos" onclick="navPage('ingresos')"><span class="ico">📥</span>Ingresos</div>
@@ -442,6 +444,29 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
         <div class="page-sub">Lo que cuesta de verdad cada persona: sueldo + hs.extra + adelantos + premios del mes</div>
         <div id="ce-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px"></div>
         <div id="ce-tabla"></div>
+      </div>
+
+      <!-- IVA / ARCA -->
+      <div id="page-arca" class="page">
+        <div class="page-title">IVA / ARCA — Compras y Ventas</div>
+        <div class="page-sub">Subí los Excel/CSV de "Mis Comprobantes" de ARCA (emitidos y recibidos) y el sistema te calcula facturación, IVA y saldo</div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+          <div class="card">
+            <div class="card-title">📤 Ventas (Comprobantes Emitidos)</div>
+            <div style="font-size:13px;color:#6B7E8F;margin-bottom:12px">Archivo CSV o Excel de comprobantes emitidos que descargás de ARCA.</div>
+            <input id="arca-ventas-file" type="file" accept=".csv,.xlsx,.xls" onchange="procesarArcaVentas()">
+            <div id="arca-ventas-msg" style="margin-top:8px;font-size:12.5px;color:#8A9BAB"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">📥 Compras (Comprobantes Recibidos)</div>
+            <div style="font-size:13px;color:#6B7E8F;margin-bottom:12px">Archivo CSV o Excel de comprobantes recibidos que descargás de ARCA.</div>
+            <input id="arca-compras-file" type="file" accept=".csv,.xlsx,.xls" onchange="procesarArcaCompras()">
+            <div id="arca-compras-msg" style="margin-top:8px;font-size:12.5px;color:#8A9BAB"></div>
+          </div>
+        </div>
+
+        <div id="arca-resumen"></div>
       </div>
 
       <!-- ADELANTOS -->
@@ -1733,6 +1758,7 @@ function navPage(name){
   if(name==='asistente') renderAsistente();
   if(name==='empleados'){ renderEmpleados(); }
   if(name==='costoemp') renderCostoEmpleado();
+  if(name==='arca') renderArca();
   if(name==='adelantos'){ fillAdEmp(); renderAdelantos(); }
   if(name==='ventas'){ fillPremEmp(); renderPremios(); }
   if(name==='externos'){ fillExtSelects(); renderExternos(); }
@@ -4618,6 +4644,192 @@ function addComision(){
 }
 if(!window._extCollapsed) window._extCollapsed={};
 function toggleExtLider(id){ window._extCollapsed[id]=!window._extCollapsed[id]; renderExternos(); }
+// ═══════════════════════════════
+// IVA / ARCA — Compras y Ventas
+// ═══════════════════════════════
+let _arcaVentas = null;   // {n, neto, iva, exento, nograv, otros, total, filas:[]}
+let _arcaCompras = null;
+
+function arcaNum(x){
+  if(x===null || x===undefined || x==='') return 0;
+  let s = String(x).replace('$','').trim();
+  if(s.indexOf(',')>=0){ s = s.replace(/\./g,'').replace(',','.'); } // formato AR: 1.234,56
+  const f = parseFloat(s);
+  return isNaN(f) ? 0 : f;
+}
+
+// Lee un archivo (csv o xlsx) y devuelve un array de objetos {header: valor}
+function arcaLeerArchivo(file){
+  return new Promise((resolve, reject)=>{
+    const nombre = file.name.toLowerCase();
+    const reader = new FileReader();
+    if(nombre.endsWith('.csv')){
+      reader.onload = ()=>{
+        try{
+          const texto = reader.result;
+          const lineas = texto.split(/\r?\n/).filter(l=>l.trim());
+          const delim = (lineas[0].split(';').length > lineas[0].split(',').length) ? ';' : ',';
+          const heads = lineas[0].split(delim).map(h=>h.replace(/^"|"$/g,'').trim());
+          const filas = lineas.slice(1).map(l=>{
+            const celdas = l.split(delim).map(c=>c.replace(/^"|"$/g,''));
+            const o = {}; heads.forEach((h,i)=>o[h]=celdas[i]); return o;
+          });
+          resolve(filas);
+        }catch(e){ reject(e); }
+      };
+      reader.onerror = ()=>reject(new Error('No se pudo leer el CSV'));
+      reader.readAsText(file, 'utf-8');
+    } else {
+      reader.onload = ()=>{
+        try{
+          if(typeof XLSX === 'undefined'){ reject(new Error('La librería de Excel no cargó. Revisá tu conexión y recargá.')); return; }
+          const wb = XLSX.read(reader.result, {type:'array'});
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          // Detectar la fila de encabezado: ARCA a veces tiene un título en la fila 1
+          let json = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:''});
+          // Buscar fila que contenga "Fecha" y "Imp. Total" o "Total IVA"
+          let hi = 0;
+          for(let i=0;i<Math.min(json.length,5);i++){
+            const fila = json[i].map(x=>String(x).toLowerCase());
+            if(fila.some(c=>c.includes('fecha')) && fila.some(c=>c.includes('total'))){ hi=i; break; }
+          }
+          const heads = json[hi].map(h=>String(h).trim());
+          const filas = json.slice(hi+1).filter(r=>r.some(c=>c!=='')).map(r=>{
+            const o={}; heads.forEach((h,i)=>o[h]=r[i]); return o;
+          });
+          resolve(filas);
+        }catch(e){ reject(e); }
+      };
+      reader.onerror = ()=>reject(new Error('No se pudo leer el Excel'));
+      reader.readAsArrayBuffer(file);
+    }
+  });
+}
+
+// Busca un valor por varios nombres de columna posibles (ventas y compras difieren un poco)
+function arcaCampo(fila, nombres){
+  for(const n of nombres){
+    for(const k of Object.keys(fila)){
+      if(k.toLowerCase().trim() === n.toLowerCase().trim()) return fila[k];
+    }
+  }
+  // match parcial
+  for(const n of nombres){
+    for(const k of Object.keys(fila)){
+      if(k.toLowerCase().includes(n.toLowerCase())) return fila[k];
+    }
+  }
+  return '';
+}
+
+function arcaTotalizar(filas){
+  const t = {n:0, neto:0, iva:0, exento:0, nograv:0, otros:0, total:0, filas:[]};
+  filas.forEach(f=>{
+    const total = arcaNum(arcaCampo(f, ['Imp. Total','Imp Total','Importe Total']));
+    // Ignorar filas vacías o de totales
+    if(total===0 && !arcaCampo(f,['Fecha','Fecha de Emisión'])) return;
+    const neto = arcaNum(arcaCampo(f, ['Imp. Neto Gravado Total','Neto Gravado Total']));
+    const iva = arcaNum(arcaCampo(f, ['Total IVA']));
+    const exento = arcaNum(arcaCampo(f, ['Imp. Op. Exentas','Op. Exentas']));
+    const nograv = arcaNum(arcaCampo(f, ['Imp. Neto No Gravado','Neto No Gravado']));
+    const otros = arcaNum(arcaCampo(f, ['Otros Tributos']));
+    t.n++; t.neto+=neto; t.iva+=iva; t.exento+=exento; t.nograv+=nograv; t.otros+=otros; t.total+=total;
+    t.filas.push({
+      fecha: arcaCampo(f,['Fecha','Fecha de Emisión']),
+      tipo: arcaCampo(f,['Tipo','Tipo de Comprobante']),
+      contraparte: arcaCampo(f,['Denominación Emisor','Denominación Receptor','Denominacion']),
+      neto, iva, exento, total
+    });
+  });
+  return t;
+}
+
+async function procesarArcaVentas(){
+  const file = g('arca-ventas-file').files[0];
+  if(!file) return;
+  g('arca-ventas-msg').textContent = 'Procesando...';
+  try{
+    const filas = await arcaLeerArchivo(file);
+    _arcaVentas = arcaTotalizar(filas);
+    g('arca-ventas-msg').innerHTML = '<span style="color:#1A7A52;font-weight:700">✓ '+_arcaVentas.n+' comprobantes leídos</span>';
+    renderArca();
+  }catch(e){ g('arca-ventas-msg').innerHTML = '<span style="color:#C0392B">Error: '+e.message+'</span>'; }
+}
+async function procesarArcaCompras(){
+  const file = g('arca-compras-file').files[0];
+  if(!file) return;
+  g('arca-compras-msg').textContent = 'Procesando...';
+  try{
+    const filas = await arcaLeerArchivo(file);
+    _arcaCompras = arcaTotalizar(filas);
+    g('arca-compras-msg').innerHTML = '<span style="color:#1A7A52;font-weight:700">✓ '+_arcaCompras.n+' comprobantes leídos</span>';
+    renderArca();
+  }catch(e){ g('arca-compras-msg').innerHTML = '<span style="color:#C0392B">Error: '+e.message+'</span>'; }
+}
+
+function renderArca(){
+  const cont = g('arca-resumen');
+  if(!cont) return;
+  if(!_arcaVentas && !_arcaCompras){ cont.innerHTML=''; return; }
+
+  const v = _arcaVentas || {n:0,neto:0,iva:0,exento:0,nograv:0,total:0};
+  const c = _arcaCompras || {n:0,neto:0,iva:0,exento:0,nograv:0,total:0};
+  const saldoIva = v.iva - c.iva;
+
+  let html = '';
+
+  // Bloque de saldo IVA (lo más importante)
+  html += '<div class="card" style="border-left:4px solid #C9A84C">'+
+    '<div class="card-title">Resultado IVA del período</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px">'+
+      '<div class="kpi-card"><div class="kpi-label">IVA Débito (ventas)</div><div class="kpi-val red">'+fmt(v.iva)+'</div></div>'+
+      '<div class="kpi-card"><div class="kpi-label">IVA Crédito (compras)</div><div class="kpi-val green">'+fmt(c.iva)+'</div></div>'+
+      '<div class="kpi-card" style="background:'+(saldoIva>0?'#FDECEA':'#EAF6EF')+'"><div class="kpi-label">Saldo IVA '+(saldoIva>0?'A PAGAR':'A FAVOR')+'</div><div class="kpi-val" style="color:'+(saldoIva>0?'#C0392B':'#1A7A52')+'">'+fmt(Math.abs(saldoIva))+'</div></div>'+
+    '</div></div>';
+
+  // Detalle ventas
+  if(_arcaVentas){
+    html += '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">'+
+      '<div class="card-title" style="margin-bottom:0">📤 Ventas — '+v.n+' comprobantes</div>'+
+      '<button class="btn btn-primary" onclick="exportarArca(\'ventas\')">⬇ Descargar Excel</button></div>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">'+
+        '<div class="kpi-card"><div class="kpi-label">Total facturado</div><div class="kpi-val blue">'+fmt(v.total)+'</div></div>'+
+        '<div class="kpi-card"><div class="kpi-label">Neto gravado</div><div class="kpi-val">'+fmt(v.neto)+'</div></div>'+
+        '<div class="kpi-card"><div class="kpi-label">IVA</div><div class="kpi-val">'+fmt(v.iva)+'</div></div>'+
+        '<div class="kpi-card"><div class="kpi-label">Exentos</div><div class="kpi-val">'+fmt(v.exento)+'</div></div>'+
+      '</div></div>';
+  }
+
+  // Detalle compras
+  if(_arcaCompras){
+    html += '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">'+
+      '<div class="card-title" style="margin-bottom:0">📥 Compras — '+c.n+' comprobantes</div>'+
+      '<button class="btn btn-primary" onclick="exportarArca(\'compras\')">⬇ Descargar Excel</button></div>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">'+
+        '<div class="kpi-card"><div class="kpi-label">Total compras</div><div class="kpi-val blue">'+fmt(c.total)+'</div></div>'+
+        '<div class="kpi-card"><div class="kpi-label">Neto gravado</div><div class="kpi-val">'+fmt(c.neto)+'</div></div>'+
+        '<div class="kpi-card"><div class="kpi-label">IVA</div><div class="kpi-val">'+fmt(c.iva)+'</div></div>'+
+        '<div class="kpi-card"><div class="kpi-label">Exentos</div><div class="kpi-val">'+fmt(c.exento)+'</div></div>'+
+      '</div></div>';
+  }
+
+  cont.innerHTML = html;
+}
+
+function exportarArca(cual){
+  const datos = cual==='ventas' ? _arcaVentas : _arcaCompras;
+  if(!datos){ toast('No hay datos'); return; }
+  if(typeof XLSX === 'undefined'){ toast('Librería Excel no disponible'); return; }
+  const aoa = [['Fecha','Tipo','Contraparte','Neto Gravado','IVA','Exentos','Total']];
+  datos.filas.forEach(f=>aoa.push([f.fecha, f.tipo, f.contraparte, f.neto, f.iva, f.exento, f.total]));
+  aoa.push([]);
+  aoa.push(['TOTALES','','', datos.neto, datos.iva, datos.exento, datos.total]);
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, cual==='ventas'?'Ventas':'Compras');
+  XLSX.writeFile(wb, 'ODSA_ARCA_'+cual+'_'+(new Date().toISOString().slice(0,10))+'.xlsx');
+}
+
 // ═══════════════════════════════
 // COSTO REAL POR EMPLEADO
 // ═══════════════════════════════
