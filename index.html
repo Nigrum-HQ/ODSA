@@ -466,6 +466,12 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
           </div>
         </div>
 
+        <div id="arca-filtro" style="margin-bottom:16px;display:none">
+          <div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:0">
+            <span style="font-weight:700;font-size:13.5px">📅 Filtrar por mes:</span>
+            <select id="arca-mes-sel" onchange="renderArca()" style="padding:8px 14px;border-radius:8px;border:1.5px solid #D8E2EC;font-size:13px;font-family:inherit;background:#fff"></select>
+          </div>
+        </div>
         <div id="arca-resumen"></div>
       </div>
 
@@ -4657,6 +4663,17 @@ function arcaNum(x){
   const f = parseFloat(s);
   return isNaN(f) ? 0 : f;
 }
+// Extrae el mes YYYY-MM de una fecha en cualquier formato de ARCA
+// (soporta "2026-08-01", "01/08/2026", "1/8/2026")
+function arcaMesDe(fecha){
+  const s = String(fecha||'').trim();
+  if(!s) return '';
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); // YYYY-MM-DD
+  if(m) return m[1]+'-'+m[2];
+  m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/); // DD/MM/YYYY
+  if(m) return m[3]+'-'+String(m[2]).padStart(2,'0');
+  return '';
+}
 
 // Lee un archivo (csv o xlsx) y devuelve un array de objetos {header: valor}
 function arcaLeerArchivo(file){
@@ -4791,13 +4808,50 @@ async function procesarArcaCompras(){
   }catch(e){ g('arca-compras-msg').innerHTML = '<span style="color:#C0392B">Error: '+e.message+'</span>'; }
 }
 
+// Re-totaliza un dataset ya cargado, filtrando por mes (YYYY-MM) o 'todos'
+function arcaFiltrarPorMes(datos, mesFiltro){
+  if(!datos) return null;
+  if(!mesFiltro || mesFiltro==='todos') return datos;
+  const t = {n:0, nc:0, neto:0, iva:0, ivaA:0, netoA:0, exento:0, nograv:0, otros:0, total:0, filas:[]};
+  datos.filas.forEach(f=>{
+    if(arcaMesDe(f.fecha) !== mesFiltro) return;
+    const esNC = f.esNC, esA = f.esA;
+    t.n++; if(esNC) t.nc++;
+    t.neto+=f.neto; t.iva+=f.iva; t.exento+=f.exento; t.total+=f.total;
+    if(esA){ t.ivaA += f.iva; t.netoA += f.neto; }
+    t.filas.push(f);
+  });
+  return t;
+}
+
+// Junta todos los meses presentes en ventas y compras
+function arcaMesesDisponibles(){
+  const meses = new Set();
+  [_arcaVentas, _arcaCompras].forEach(d=>{
+    if(d) d.filas.forEach(f=>{ const m=arcaMesDe(f.fecha); if(m) meses.add(m); });
+  });
+  return [...meses].sort().reverse();
+}
+
 function renderArca(){
   const cont = g('arca-resumen');
   if(!cont) return;
-  if(!_arcaVentas && !_arcaCompras){ cont.innerHTML=''; return; }
+  if(!_arcaVentas && !_arcaCompras){ cont.innerHTML=''; g('arca-filtro').style.display='none'; return; }
 
-  const v = _arcaVentas || {n:0,nc:0,neto:0,iva:0,ivaA:0,netoA:0,exento:0,nograv:0,total:0};
-  const c = _arcaCompras || {n:0,nc:0,neto:0,iva:0,ivaA:0,netoA:0,exento:0,nograv:0,total:0};
+  // Poblar el selector de meses (una vez que hay datos)
+  const meses = arcaMesesDisponibles();
+  const sel = g('arca-mes-sel');
+  const filtroActual = sel ? sel.value : 'todos';
+  if(sel){
+    const opts = ['<option value="todos">Todos los meses</option>'].concat(meses.map(m=>'<option value="'+m+'">'+mesLabel(m)+'</option>'));
+    const nuevoHtml = opts.join('');
+    if(sel.innerHTML !== nuevoHtml){ sel.innerHTML = nuevoHtml; if([...sel.options].some(o=>o.value===filtroActual)) sel.value = filtroActual; }
+    g('arca-filtro').style.display = meses.length>1 ? 'block' : 'none';
+  }
+  const mesFiltro = sel ? sel.value : 'todos';
+
+  const v = arcaFiltrarPorMes(_arcaVentas, mesFiltro) || {n:0,nc:0,neto:0,iva:0,ivaA:0,netoA:0,exento:0,nograv:0,total:0};
+  const c = arcaFiltrarPorMes(_arcaCompras, mesFiltro) || {n:0,nc:0,neto:0,iva:0,ivaA:0,netoA:0,exento:0,nograv:0,total:0};
   // El saldo de IVA se calcula con el IVA COMPUTABLE (solo comprobantes A)
   const saldoIva = v.ivaA - c.ivaA;
 
