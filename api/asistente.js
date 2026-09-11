@@ -119,6 +119,19 @@ const TOOLS = [
       },
       required: ['nombre_empleado']
     }
+  },
+  {
+    name: 'marcar_gasto_pagado',
+    description: 'Marca un gasto ya cargado (como Cargas Sociales, Alquiler, Servicios, etc.) como pagado. Se busca por descripción dentro del mes.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        busqueda: { type: 'string', description: 'Descripción del gasto a marcar (ej: "Cargas Sociales", "Alquiler")' },
+        mes: { type: 'string', description: 'Mes en formato YYYY-MM. Si no se especifica, usar el mes que se está viendo.' },
+        monto: { type: 'number', description: 'Monto exacto, si se conoce, para desambiguar si hay varios gastos parecidos' }
+      },
+      required: ['busqueda']
+    }
   }
 ];
 
@@ -157,7 +170,7 @@ El JSON también incluye "desglose_medio_de_pago_mes_actual" (total del mes) y, 
 Si te preguntan algo que no se puede responder con los datos que tenés, decilo con honestidad y sugerí dónde podrían mirarlo dentro del sistema (Sueldos, Gastos, Cash Flow, Análisis Financiero, Fichas, etc.) en vez de inventar.
 Podés dar consejos prácticos de gestión financiera, dejando en claro que no reemplazan a un contador o asesor financiero para decisiones grandes.
 
-ADEMÁS, ahora podés EJECUTAR ACCIONES reales sobre el sistema usando las herramientas disponibles: agregar_gasto, agregar_ingreso, agregar_adelanto, agregar_premio, eliminar_movimiento, crear_cheque, cerrar_mes, reabrir_mes y marcar_sueldo_pagado.
+ADEMÁS, ahora podés EJECUTAR ACCIONES reales sobre el sistema usando las herramientas disponibles: agregar_gasto, agregar_ingreso, agregar_adelanto, agregar_premio, eliminar_movimiento, crear_cheque, cerrar_mes, reabrir_mes, marcar_sueldo_pagado y marcar_gasto_pagado.
 - Usalas cuando el usuario te pida explícitamente cargar, agregar, registrar, borrar o eliminar algo de ese tipo.
 - Si falta un dato imprescindible (por ejemplo el monto, o a qué empleado corresponde un adelanto/premio, o qué gasto/ingreso hay que borrar), preguntáselo primero en un mensaje de texto normal en vez de inventarlo o de llamar a la herramienta con datos incompletos.
 - Si no te dan fecha, no hace falta que preguntes: se usa automáticamente la fecha de hoy.
