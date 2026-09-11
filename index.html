@@ -606,6 +606,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
         <div class="tabs">
           <button class="tab on" onclick="tabGastos('reales',this)">Gastos del mes</button>
           <button class="tab" onclick="tabGastos('proyeccion',this)">📋 Proyección próxima semana</button>
+          <button class="tab" onclick="tabGastos('fijos',this)">🔁 Gastos fijos</button>
         </div>
 
         <div id="gastos-reales">
@@ -648,6 +649,46 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
           </table></div>
         </div>
         </div><!-- end gastos-reales -->
+
+        <!-- GASTOS FIJOS -->
+        <div id="gastos-fijos" style="display:none">
+          <div class="card">
+            <div class="card-title">🔁 Definir gastos fijos</div>
+            <div class="page-sub" style="margin-bottom:14px">Cargá acá los gastos que se repiten todos los meses (alquiler, servicios, etc.). Después, en cualquier mes, con un botón los agregás todos de una — sin recargarlos a mano.</div>
+            <div class="frow frow-4">
+              <div class="fg"><label>Descripción</label><input id="gf-desc" placeholder="Alquiler, luz..."></div>
+              <div class="fg"><label>Categoría</label><select id="gf-cat">
+                <option value="alquiler">Alquiler</option>
+                <option value="servicios">Servicios (luz/gas/tel)</option>
+                <option value="arca">ARCA / Impuestos</option>
+                <option value="publicidad">Publicidad</option>
+                <option value="sistemas">Sistemas / Software</option>
+                <option value="insumos">Insumos / Oficina</option>
+                <option value="otro">Otro</option>
+              </select></div>
+              <div class="fg"><label>Monto ($)</label><input id="gf-monto" type="number" placeholder="0"></div>
+              <div class="fg"><label>Medio de pago</label><select id="gf-medio">
+                <option value="transferencia">Transferencia</option>
+                <option value="efectivo">Efectivo</option>
+              </select></div>
+            </div>
+            <div class="frow frow-2">
+              <div class="fg"><label>Día del mes (aprox.)</label><input id="gf-dia" type="number" min="1" max="28" placeholder="1" value="1"></div>
+              <div class="fg"><label>Semana de pago</label><select id="gf-sem">
+                <option value="1">Semana 1</option><option value="2">Semana 2</option>
+                <option value="3">Semana 3</option><option value="4">Semana 4</option>
+              </select></div>
+            </div>
+            <button class="btn btn-primary" onclick="addGastoFijo()">+ Agregar gasto fijo</button>
+          </div>
+          <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+              <div class="card-title" style="margin-bottom:0">Gastos fijos definidos</div>
+              <button class="btn btn-primary" id="gf-btn-aplicar" onclick="aplicarGastosFijos()">📥 Cargar en el mes actual</button>
+            </div>
+            <div id="gf-lista"></div>
+          </div>
+        </div>
 
         <!-- PROYECCIÓN -->
         <div id="gastos-proyeccion" style="display:none">
@@ -1045,6 +1086,7 @@ let D = {
   cf_ingresos: [],
   semPagoSectores: {},
   mesesCerrados: [], // meses bloqueados (formato YYYY-MM); no se pueden editar sin reabrir
+  gastosFijos: [], // plantillas de gastos recurrentes para aplicar cada mes
   ai_chat: [], // conversacion con el Asistente IA, compartida entre todos los usuarios
   historial_cambios: [] // historial permanente de ediciones de montos (Cash Flow, sueldos, comisiones, etc.)
 };
@@ -1278,7 +1320,7 @@ function undoLast(){
   if(!_undoStack.length){ toast('Nada para deshacer'); return; }
   const prev = _undoStack.pop();
   _suspenderUndo = true; // que el save() de abajo no vuelva a apilar
-  D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},mesesCerrados:[],ai_chat:[],historial_cambios:[]}, JSON.parse(prev));
+  D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},mesesCerrados:[],gastosFijos:[],ai_chat:[],historial_cambios:[]}, JSON.parse(prev));
   _ultimoEstadoConocido = JSON.stringify(D);
   save();
   _suspenderUndo = false;
@@ -1317,7 +1359,7 @@ async function load(){
   try{
     if(raw){
       const saved = JSON.parse(raw);
-      D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},mesesCerrados:[],ai_chat:[],historial_cambios:[]}, saved);
+      D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},mesesCerrados:[],gastosFijos:[],ai_chat:[],historial_cambios:[]}, saved);
     }
   }catch(e){}
 }
@@ -1487,7 +1529,7 @@ async function restaurarBackup(id){
     const data = await r.json();
     if(!r.ok || !data.ok){ toast('No se pudo restaurar: ' + (data.error||'')); return; }
     // Cargar los datos restaurados
-    D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},mesesCerrados:[],ai_chat:[],historial_cambios:[]}, JSON.parse(data.data));
+    D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},mesesCerrados:[],gastosFijos:[],ai_chat:[],historial_cambios:[]}, JSON.parse(data.data));
     save();
     toast('✅ Backup restaurado');
     setTimeout(()=>location.reload(), 1000);
@@ -4981,7 +5023,83 @@ function tabGastos(tab, btn){
   btn.classList.add('on');
   g('gastos-reales').style.display = tab==='reales'?'block':'none';
   g('gastos-proyeccion').style.display = tab==='proyeccion'?'block':'none';
+  g('gastos-fijos').style.display = tab==='fijos'?'block':'none';
   if(tab==='proyeccion') renderProyeccion();
+  if(tab==='fijos') renderGastosFijos();
+}
+
+// ═══════════════════════════════
+// GASTOS FIJOS / RECURRENTES
+// ═══════════════════════════════
+function addGastoFijo(){
+  const desc = (gv('gf-desc')||'').trim();
+  const monto = parseFloat(gv('gf-monto'))||0;
+  if(!desc){ toast('Ingresá la descripción'); return; }
+  if(!D.gastosFijos) D.gastosFijos = [];
+  D.gastosFijos.push({
+    id: uid(), desc, cat: gv('gf-cat'), monto,
+    medio: gv('gf-medio'), dia: parseInt(gv('gf-dia'))||1, sem: parseInt(gv('gf-sem'))||1
+  });
+  save();
+  sv('gf-desc',''); sv('gf-monto','');
+  renderGastosFijos();
+  toast('✓ Gasto fijo agregado');
+}
+function delGastoFijo(id){
+  if(!confirm('¿Eliminar este gasto fijo? (no borra los que ya cargaste en los meses)')) return;
+  D.gastosFijos = (D.gastosFijos||[]).filter(f=>f.id!==id);
+  save();
+  renderGastosFijos();
+}
+function renderGastosFijos(){
+  const cont = g('gf-lista');
+  if(!cont) return;
+  const fijos = D.gastosFijos||[];
+  if(!fijos.length){ cont.innerHTML = '<div class="empty" style="padding:20px;text-align:center;color:#8A9BAB">No hay gastos fijos definidos todavía</div>'; return; }
+  const totalMensual = fijos.reduce((s,f)=>s+(f.monto||0),0);
+  cont.innerHTML = '<div class="tw"><table>'+
+    '<thead><tr><th>Descripción</th><th>Categoría</th><th>Día</th><th>Medio</th><th style="text-align:right">Monto</th><th></th></tr></thead>'+
+    '<tbody>'+fijos.map(f=>
+      '<tr><td style="font-weight:600">'+f.desc+'</td>'+
+      '<td><span class="badge badge-gray">'+(CATS[f.cat]||f.cat)+'</span></td>'+
+      '<td style="color:#8A9BAB">'+(f.dia||1)+'</td>'+
+      '<td style="color:#8A9BAB">'+(f.medio==='efectivo'?'💵 Efectivo':'🏦 Transf.')+'</td>'+
+      '<td style="text-align:right;font-weight:700;color:#C0392B">'+fmt(f.monto)+'</td>'+
+      '<td><button class="del-btn" onclick="delGastoFijo(\''+f.id+'\')">🗑</button></td></tr>'
+    ).join('')+'</tbody>'+
+    '<tfoot><tr class="subtotal-row"><td colspan="4">Total fijo mensual</td><td style="text-align:right">'+fmt(totalMensual)+'</td><td></td></tr></tfoot>'+
+    '</table></div>';
+}
+function aplicarGastosFijos(){
+  const fijos = D.gastosFijos||[];
+  if(!fijos.length){ toast('No hay gastos fijos definidos'); return; }
+  if(mesEstaCerrado(mesSel)){ toast('🔒 '+mesLabel(mesSel)+' está cerrado'); return; }
+
+  // Detectar cuáles ya están cargados este mes (por descripción) para no duplicar
+  const yaEnMes = new Set(D.gastos.filter(g=>g.mes===mesSel).map(g=>(g.desc||'').toLowerCase().trim()));
+  const aplicar = fijos.filter(f=>!yaEnMes.has((f.desc||'').toLowerCase().trim()));
+  const yaEstaban = fijos.length - aplicar.length;
+
+  if(!aplicar.length){
+    toast('Todos los gastos fijos ya están cargados en '+mesLabel(mesSel));
+    return;
+  }
+
+  const totalAplicar = aplicar.reduce((s,f)=>s+(f.monto||0),0);
+  if(!confirm('Se van a agregar '+aplicar.length+' gasto(s) fijo(s) a '+mesLabel(mesSel)+' por '+fmt(totalAplicar)+'.'+
+    (yaEstaban?'\n\n('+yaEstaban+' ya estaban cargados y se saltean para no duplicar.)':'')+'\n\n¿Confirmás?')) return;
+
+  aplicar.forEach(f=>{
+    const dia = String(f.dia||1).padStart(2,'0');
+    const fecha = mesSel + '-' + dia;
+    D.gastos.push({
+      id: uid(), desc: f.desc, cat: f.cat, monto: f.monto, fecha, mes: mesSel,
+      nota: 'Gasto fijo', pagado: false, semPago: f.sem||1, medio: f.medio||'transferencia'
+    });
+  });
+  save();
+  renderGastos(); renderResumen(); renderCashFlow();
+  toast('✅ '+aplicar.length+' gasto(s) fijo(s) cargado(s) en '+mesLabel(mesSel));
 }
 
 // ═══════════════════════════════
