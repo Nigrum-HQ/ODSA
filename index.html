@@ -182,6 +182,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
 
       <div class="ssep">Administración</div>
       <div class="sitem" data-page="empleados" onclick="navPage('empleados')"><span class="ico">💰</span>Sueldos</div>
+      <div class="sitem" data-page="costoemp" onclick="navPage('costoemp')"><span class="ico">📊</span>Costo por empleado</div>
       <div class="sitem" data-page="adelantos" onclick="navPage('adelantos')"><span class="ico">💵</span>Adelantos</div>
       <div class="sitem" data-page="gastos" onclick="navPage('gastos')"><span class="ico">💳</span>Gastos</div>
       <div class="sitem" data-page="ingresos" onclick="navPage('ingresos')"><span class="ico">📥</span>Ingresos</div>
@@ -429,6 +430,17 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
             <button class="btn btn-primary" onclick="addEmpleado()">+ Agregar empleado</button>
           </div>
         </div>
+      </div>
+
+      <!-- COSTO POR EMPLEADO -->
+      <div id="page-costoemp" class="page">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div class="page-title" style="margin-bottom:0">Costo real por empleado</div>
+          <div id="ce-periodo-wrap"></div>
+        </div>
+        <div class="page-sub">Lo que cuesta de verdad cada persona: sueldo + hs.extra + adelantos + premios del mes</div>
+        <div id="ce-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px"></div>
+        <div id="ce-tabla"></div>
       </div>
 
       <!-- ADELANTOS -->
@@ -1157,6 +1169,7 @@ function actualizarLabelsMes(){
   const resWrap = g('res-periodo-wrap'); if(resWrap) resWrap.innerHTML = periodoSelectorHTML('res');
   const anWrap = g('analisis-periodo-wrap'); if(anWrap) anWrap.innerHTML = periodoSelectorHTML('analisis');
   const adWrap = g('ad-periodo-wrap'); if(adWrap) adWrap.innerHTML = periodoSelectorHTML('ad');
+  const ceWrap = g('ce-periodo-wrap'); if(ceWrap) ceWrap.innerHTML = periodoSelectorHTML('ce');
   const trWrap = g('tr-periodo-wrap'); if(trWrap) trWrap.innerHTML = periodoSelectorHTML('tr');
   const cfSel = g('cf-mes'); if(cfSel && [...cfSel.options].some(o=>o.value===mesSel)) cfSel.value = mesSel;
   const extSel = g('ext-filtro-mes'); if(extSel && [...extSel.options].some(o=>o.value===mesSel)) extSel.value = mesSel;
@@ -1674,6 +1687,7 @@ function navPage(name){
   if(name==='buscador'){ sv('bp-nombre',''); g('bp-resultado').innerHTML=''; cargarTransferenciasParaBuscador(); }
   if(name==='asistente') renderAsistente();
   if(name==='empleados'){ renderEmpleados(); }
+  if(name==='costoemp') renderCostoEmpleado();
   if(name==='adelantos'){ fillAdEmp(); renderAdelantos(); }
   if(name==='ventas'){ fillPremEmp(); renderPremios(); }
   if(name==='externos'){ fillExtSelects(); renderExternos(); }
@@ -4439,6 +4453,58 @@ function addComision(){
 }
 if(!window._extCollapsed) window._extCollapsed={};
 function toggleExtLider(id){ window._extCollapsed[id]=!window._extCollapsed[id]; renderExternos(); }
+// ═══════════════════════════════
+// COSTO REAL POR EMPLEADO
+// ═══════════════════════════════
+function renderCostoEmpleado(){
+  const _wrap = g('ce-periodo-wrap'); if(_wrap && !_wrap.innerHTML) _wrap.innerHTML = periodoSelectorHTML('ce');
+  const m = mesSel;
+
+  const filas = D.empleados.map(e=>{
+    const n = getNominaEmp(e, m);
+    const sueldo = n.sueldo || 0;
+    const hsExtra = n.hsExtra || 0;
+    const adelantos = (D.adelantos||[]).filter(a=>a.emp_id===e.id && a.mes===m).reduce((s,a)=>s+(a.monto||0),0);
+    const premios = (D.premios||[]).filter(p=>p.emp_id===e.id && p.mes===m).reduce((s,p)=>s+(p.monto||0),0);
+    const total = sueldo + hsExtra + premios; // costo real (adelantos son parte del sueldo, no se suman aparte)
+    return { nombre:e.nombre, sector: SECTORES[e.sector]||e.sector||'', sueldo, hsExtra, adelantos, premios, total, pagado:n.pagado };
+  }).filter(f=>f.total>0 || f.adelantos>0).sort((a,b)=>b.total-a.total);
+
+  // KPIs
+  const totalGeneral = filas.reduce((s,f)=>s+f.total,0);
+  const promedio = filas.length ? totalGeneral/filas.length : 0;
+  const masCaro = filas[0];
+  g('ce-kpis').innerHTML =
+    '<div class="kpi-card"><div class="kpi-label">Costo total nómina ('+mesLabel(m)+')</div><div class="kpi-val red">'+fmt(totalGeneral)+'</div></div>'+
+    '<div class="kpi-card"><div class="kpi-label">Empleados con costo</div><div class="kpi-val blue">'+filas.length+'</div></div>'+
+    '<div class="kpi-card"><div class="kpi-label">Costo promedio</div><div class="kpi-val gold">'+fmt(promedio)+'</div></div>'+
+    (masCaro?'<div class="kpi-card"><div class="kpi-label">Mayor costo</div><div class="kpi-val" style="font-size:15px;color:#1a2332">'+masCaro.nombre+' · '+fmt(masCaro.total)+'</div></div>':'');
+
+  if(!filas.length){
+    g('ce-tabla').innerHTML = '<div class="card"><div class="empty" style="padding:30px;text-align:center;color:#8A9BAB">Sin datos de costo para '+mesLabel(m)+'</div></div>';
+    return;
+  }
+
+  g('ce-tabla').innerHTML = '<div class="card"><div class="card-title">Detalle por empleado</div><div class="tw"><table>'+
+    '<thead><tr><th>Empleado</th><th>Sector</th><th style="text-align:right">Sueldo</th><th style="text-align:right">Hs.extra/com.</th><th style="text-align:right">Premios</th><th style="text-align:right">Costo total</th><th style="text-align:right">Adelantos</th><th style="text-align:center">Estado</th></tr></thead>'+
+    '<tbody>'+filas.map(f=>
+      '<tr>'+
+        '<td style="font-weight:600">'+f.nombre+'</td>'+
+        '<td style="color:#8A9BAB">'+f.sector+'</td>'+
+        '<td style="text-align:right">'+fmt(f.sueldo)+'</td>'+
+        '<td style="text-align:right;color:#6B7E8F">'+(f.hsExtra?fmt(f.hsExtra):'—')+'</td>'+
+        '<td style="text-align:right;color:#6B7E8F">'+(f.premios?fmt(f.premios):'—')+'</td>'+
+        '<td style="text-align:right;font-weight:800;color:#C0392B">'+fmt(f.total)+'</td>'+
+        '<td style="text-align:right;color:#B8943E">'+(f.adelantos?fmt(f.adelantos):'—')+'</td>'+
+        '<td style="text-align:center"><span class="badge '+(f.pagado?'badge-green':'badge-gold')+'">'+(f.pagado?'Pagado':'Pendiente')+'</span></td>'+
+      '</tr>'
+    ).join('')+'</tbody>'+
+    '<tfoot><tr class="subtotal-row"><td colspan="5">Total nómina</td><td style="text-align:right">'+fmt(totalGeneral)+'</td><td colspan="2"></td></tr></tfoot>'+
+    '</table></div>'+
+    '<div style="font-size:12px;color:#8A9BAB;margin-top:10px">Nota: los adelantos se muestran aparte porque son parte del sueldo (no se suman al costo total, ya están incluidos en el sueldo).</div>'+
+    '</div>';
+}
+
 // ═══════════════════════════════
 // RANKING DE VENDEDORES
 // ═══════════════════════════════
