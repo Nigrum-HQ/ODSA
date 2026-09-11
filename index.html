@@ -176,6 +176,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
     <div class="sidebar">
       <div class="ssep">General</div>
       <div class="sitem on" data-page="resumen" onclick="navPage('resumen')"><span class="ico">📊</span>Resumen</div>
+      <div class="sitem" data-page="buscador" onclick="navPage('buscador')"><span class="ico">🔍</span>Buscar persona</div>
       <div class="sitem" data-page="analisis" onclick="navPage('analisis')"><span class="ico">📈</span>Análisis Financiero</div>
       <div class="sitem" data-page="asistente" onclick="navPage('asistente')"><span class="ico">🤖</span>Asistente IA</div>
 
@@ -263,6 +264,22 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
             <tbody id="res-desglose"></tbody>
           </table>
         </div>
+      </div>
+
+      <!-- BUSCADOR POR PERSONA -->
+      <div id="page-buscador" class="page">
+        <div class="page-title">Buscar persona</div>
+        <div class="page-sub">Escribí un nombre y mirá todo lo que se le pagó: sueldos, adelantos, comisiones y transferencias</div>
+        <div class="card">
+          <div class="frow frow-2">
+            <div class="fg"><label>Nombre</label><input id="bp-nombre" placeholder="Escribí un nombre..." oninput="buscarPersona()"></div>
+            <div class="fg"><label>Período</label><select id="bp-periodo" onchange="buscarPersona()">
+              <option value="todo">Todos los meses</option>
+              <option value="mes">Solo el mes seleccionado</option>
+            </select></div>
+          </div>
+        </div>
+        <div id="bp-resultado"></div>
       </div>
 
       <!-- ANALISIS FINANCIERO -->
@@ -1635,6 +1652,7 @@ function navPage(name){
   const s = document.querySelector('[data-page="'+name+'"]'); if(s) s.classList.add('on');
   if(name==='resumen') renderResumen();
   if(name==='analisis') renderAnalisis();
+  if(name==='buscador'){ sv('bp-nombre',''); g('bp-resultado').innerHTML=''; cargarTransferenciasParaBuscador(); }
   if(name==='asistente') renderAsistente();
   if(name==='empleados'){ renderEmpleados(); }
   if(name==='adelantos'){ fillAdEmp(); renderAdelantos(); }
@@ -1710,6 +1728,118 @@ function calcResumenFor(m){
   return {mes:m,totalSueldos,totalPremios,totalComisiones,totalGastos,totalCheques,totalIngresos,totalEgresos,resultado:totalIngresos-totalEgresos};
 }
 function calcResumen(){ return calcResumenFor(mesSel); }
+
+// ═══════════════════════════════
+// BUSCADOR POR PERSONA
+// ═══════════════════════════════
+function buscarPersona(){
+  const q = (gv('bp-nombre')||'').toLowerCase().trim();
+  const soloMes = gv('bp-periodo') === 'mes';
+  const cont = g('bp-resultado');
+  if(!q){ cont.innerHTML = ''; return; }
+
+  const enPeriodo = (mesReg) => !soloMes || mesReg === mesSel;
+  const matchNombre = (nombre) => (nombre||'').toLowerCase().includes(q);
+
+  // 1) Empleados que matchean
+  const empleados = D.empleados.filter(e=>matchNombre(e.nombre));
+  // 2) Externos que matchean
+  const externos = (D.externos||[]).filter(e=>matchNombre(e.nombre));
+  // ids para cruzar
+  const empIds = new Set(empleados.map(e=>e.id));
+  const extIds = new Set(externos.map(e=>e.id));
+
+  // 3) Adelantos (por emp_id de empleados que matchean, o si el nombre del empleado matchea)
+  const adelantos = (D.adelantos||[]).filter(a=>{
+    const emp = D.empleados.find(e=>e.id===a.emp_id);
+    return emp && matchNombre(emp.nombre) && enPeriodo(a.mes);
+  });
+  // 4) Premios
+  const premios = (D.premios||[]).filter(p=>{
+    const emp = D.empleados.find(e=>e.id===p.emp_id);
+    return emp && matchNombre(emp.nombre) && enPeriodo(p.mes);
+  });
+  // 5) Comisiones (externos)
+  const comisiones = (D.comisiones||[]).filter(c=>{
+    const ext = (D.externos||[]).find(e=>e.id===c.quien_id);
+    return ext && matchNombre(ext.nombre) && enPeriodo(c.mes);
+  });
+  // 6) Transferencias (por texto beneficiario)
+  const transferencias = (window._trAll||[]).filter(t=>matchNombre(t.beneficiario) && enPeriodo(t.mes));
+
+  // 7) Sueldos: si es empleado, sumar su sueldo del mes actual (o de todos los meses si "todo")
+  let sueldoInfo = null;
+  if(empleados.length){
+    if(soloMes){
+      const total = empleados.reduce((s,e)=>{ const n=getNominaEmp(e,mesSel); return s+(n.sueldo+(n.hsExtra||0)); },0);
+      sueldoInfo = { label: 'Sueldo ('+mesLabel(mesSel)+')', total };
+    } else {
+      // sumar sueldo base como referencia mensual
+      const totalBase = empleados.reduce((s,e)=>s+(e.sueldo||0),0);
+      sueldoInfo = { label: 'Sueldo base mensual (ficha)', total: totalBase };
+    }
+  }
+
+  const nada = !empleados.length && !externos.length && !adelantos.length && !premios.length && !comisiones.length && !transferencias.length;
+  if(nada){
+    cont.innerHTML = '<div class="card"><div class="empty" style="padding:30px;text-align:center;color:#8A9BAB">No se encontró nada para "'+q+'"</div></div>';
+    return;
+  }
+
+  const totalAdelantos = adelantos.reduce((s,a)=>s+(a.monto||0),0);
+  const totalPremios = premios.reduce((s,p)=>s+(p.monto||0),0);
+  const totalComisiones = comisiones.reduce((s,c)=>s+(c.total||0),0);
+  const totalTransf = transferencias.reduce((s,t)=>s+(Number(t.monto)||0),0);
+  const granTotal = (sueldoInfo?sueldoInfo.total:0) + totalAdelantos + totalPremios + totalComisiones + totalTransf;
+
+  let html = '';
+
+  // Ficha(s) de la persona
+  const fichas = [...empleados.map(e=>({...e, _t:'Empleado'})), ...externos.map(e=>({...e, _t:'Vendedor externo'}))];
+  if(fichas.length){
+    html += '<div class="card"><div class="card-title">Ficha</div>' + fichas.map(f=>{
+      const secTxt = f.sector ? (SECTORES[f.sector]||f.sector) : (f.rol||'');
+      return '<div style="padding:8px 0;border-bottom:1px solid #F0F4F8"><b>'+f.nombre+'</b> <span class="badge badge-gold">'+f._t+'</span>'+
+        (secTxt?' <span style="color:#8A9BAB">· '+secTxt+'</span>':'')+
+        (f.cbu?'<div style="font-size:12px;color:#8A9BAB;margin-top:2px">CBU: '+f.cbu+(f.banco?' · '+f.banco:'')+'</div>':'')+
+        '</div>';
+    }).join('') + '</div>';
+  }
+
+  // KPIs
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:20px">';
+  if(sueldoInfo) html += '<div class="kpi-card"><div class="kpi-label">'+sueldoInfo.label+'</div><div class="kpi-val blue">'+fmt(sueldoInfo.total)+'</div></div>';
+  if(totalAdelantos) html += '<div class="kpi-card"><div class="kpi-label">Adelantos</div><div class="kpi-val gold">'+fmt(totalAdelantos)+'</div></div>';
+  if(totalPremios) html += '<div class="kpi-card"><div class="kpi-label">Premios</div><div class="kpi-val gold">'+fmt(totalPremios)+'</div></div>';
+  if(totalComisiones) html += '<div class="kpi-card"><div class="kpi-label">Comisiones</div><div class="kpi-val gold">'+fmt(totalComisiones)+'</div></div>';
+  if(totalTransf) html += '<div class="kpi-card"><div class="kpi-label">Transferencias</div><div class="kpi-val red">'+fmt(totalTransf)+'</div></div>';
+  html += '<div class="kpi-card" style="background:#1B3A6B"><div class="kpi-label" style="color:rgba(255,255,255,.7)">Total general</div><div class="kpi-val" style="color:#fff">'+fmt(granTotal)+'</div></div>';
+  html += '</div>';
+
+  // Detalle de cada categoría
+  const tabla = (titulo, filas) => filas.length ? '<div class="card" style="margin-bottom:16px"><div class="card-title">'+titulo+'</div><div class="tw"><table><tbody>'+filas.join('')+'</tbody></table></div></div>' : '';
+
+  html += tabla('Adelantos', adelantos.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).map(a=>
+    '<tr><td>'+fd(a.fecha)+'</td><td style="color:#8A9BAB">'+(a.mes||'')+'</td><td style="text-align:right;font-weight:700;color:#B8943E">'+fmt(a.monto)+'</td></tr>'));
+  html += tabla('Premios', premios.map(p=>
+    '<tr><td style="color:#8A9BAB">'+(p.mes||'')+(p.sem?' · Sem '+p.sem:'')+'</td><td>'+(p.concepto||'Premio')+'</td><td style="text-align:right;font-weight:700;color:#B8943E">'+fmt(p.monto)+'</td></tr>'));
+  html += tabla('Comisiones', comisiones.sort((a,b)=>(b.mes||'').localeCompare(a.mes||'')).map(c=>
+    '<tr><td style="color:#8A9BAB">'+(c.mes||'')+(c.sem?' · Sem '+c.sem:'')+'</td><td>'+(c.met||'')+'</td><td style="text-align:right;font-weight:700;color:#B8943E">'+fmt(c.total)+'</td></tr>'));
+  html += tabla('Transferencias', transferencias.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).map(t=>
+    '<tr><td>'+fd(t.fecha)+'</td><td><span class="badge badge-gold">'+(t.tipo||'—')+'</span></td><td style="color:#8A9BAB">'+(t.concepto||'')+'</td><td style="text-align:right;font-weight:700;color:#C0392B">'+fmt(t.monto)+'</td>'+
+    (t.archivo_url?'<td><a href="'+t.archivo_url+'" target="_blank" style="color:#1B3A6B;font-weight:700">📎</a></td>':'<td></td>')+'</tr>'));
+
+  cont.innerHTML = html;
+}
+
+// Cargar todas las transferencias una vez, para que el buscador las cruce sin pedir por mes
+async function cargarTransferenciasParaBuscador(){
+  try{
+    const r = await fetch('/api/listComprobantes', { headers: { 'Authorization': 'Bearer ' + getToken() } });
+    const data = await r.json();
+    if(r.ok && data.ok) window._trAll = data.comprobantes || [];
+  }catch(e){ window._trAll = []; }
+}
 
 function renderResumen(){
   const _wrap = g('res-periodo-wrap'); if(_wrap && !_wrap.innerHTML) _wrap.innerHTML = periodoSelectorHTML('res');
