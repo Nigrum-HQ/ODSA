@@ -4722,23 +4722,36 @@ function arcaCampo(fila, nombres){
   return '';
 }
 
+// Códigos ARCA de Notas de Crédito (restan). Incluye A/B/C y variantes.
+const ARCA_NC_CODES = ['3','8','13','20','21','53','110','112','113','119','120'];
+function arcaEsNotaCredito(tipo){
+  const t = String(tipo||'').trim().toLowerCase();
+  if(t.includes('crédito') || t.includes('credito')) return true;
+  const cod = t.split('-')[0].trim().split(' ')[0];
+  return ARCA_NC_CODES.includes(cod);
+}
+
 function arcaTotalizar(filas){
-  const t = {n:0, neto:0, iva:0, exento:0, nograv:0, otros:0, total:0, filas:[]};
+  const t = {n:0, nc:0, neto:0, iva:0, exento:0, nograv:0, otros:0, total:0, filas:[]};
   filas.forEach(f=>{
     const total = arcaNum(arcaCampo(f, ['Imp. Total','Imp Total','Importe Total']));
     // Ignorar filas vacías o de totales
     if(total===0 && !arcaCampo(f,['Fecha','Fecha de Emisión'])) return;
+    const tipo = arcaCampo(f,['Tipo','Tipo de Comprobante']);
+    const esNC = arcaEsNotaCredito(tipo);
+    const signo = esNC ? -1 : 1;   // las notas de crédito restan
     const neto = arcaNum(arcaCampo(f, ['Imp. Neto Gravado Total','Neto Gravado Total']));
     const iva = arcaNum(arcaCampo(f, ['Total IVA']));
     const exento = arcaNum(arcaCampo(f, ['Imp. Op. Exentas','Op. Exentas']));
     const nograv = arcaNum(arcaCampo(f, ['Imp. Neto No Gravado','Neto No Gravado']));
     const otros = arcaNum(arcaCampo(f, ['Otros Tributos']));
-    t.n++; t.neto+=neto; t.iva+=iva; t.exento+=exento; t.nograv+=nograv; t.otros+=otros; t.total+=total;
+    t.n++; if(esNC) t.nc++;
+    t.neto+=signo*neto; t.iva+=signo*iva; t.exento+=signo*exento; t.nograv+=signo*nograv; t.otros+=signo*otros; t.total+=signo*total;
     t.filas.push({
       fecha: arcaCampo(f,['Fecha','Fecha de Emisión']),
-      tipo: arcaCampo(f,['Tipo','Tipo de Comprobante']),
+      tipo, esNC,
       contraparte: arcaCampo(f,['Denominación Emisor','Denominación Receptor','Denominacion']),
-      neto, iva, exento, total
+      neto: signo*neto, iva: signo*iva, exento: signo*exento, total: signo*total
     });
   });
   return t;
@@ -4751,7 +4764,7 @@ async function procesarArcaVentas(){
   try{
     const filas = await arcaLeerArchivo(file);
     _arcaVentas = arcaTotalizar(filas);
-    g('arca-ventas-msg').innerHTML = '<span style="color:#1A7A52;font-weight:700">✓ '+_arcaVentas.n+' comprobantes leídos</span>';
+    g('arca-ventas-msg').innerHTML = '<span style="color:#1A7A52;font-weight:700">✓ '+_arcaVentas.n+' comprobantes leídos'+(_arcaVentas.nc?' ('+_arcaVentas.nc+' notas de crédito restadas)':'')+'</span>';
     renderArca();
   }catch(e){ g('arca-ventas-msg').innerHTML = '<span style="color:#C0392B">Error: '+e.message+'</span>'; }
 }
@@ -4762,7 +4775,7 @@ async function procesarArcaCompras(){
   try{
     const filas = await arcaLeerArchivo(file);
     _arcaCompras = arcaTotalizar(filas);
-    g('arca-compras-msg').innerHTML = '<span style="color:#1A7A52;font-weight:700">✓ '+_arcaCompras.n+' comprobantes leídos</span>';
+    g('arca-compras-msg').innerHTML = '<span style="color:#1A7A52;font-weight:700">✓ '+_arcaCompras.n+' comprobantes leídos'+(_arcaCompras.nc?' ('+_arcaCompras.nc+' notas de crédito restadas)':'')+'</span>';
     renderArca();
   }catch(e){ g('arca-compras-msg').innerHTML = '<span style="color:#C0392B">Error: '+e.message+'</span>'; }
 }
@@ -4772,8 +4785,8 @@ function renderArca(){
   if(!cont) return;
   if(!_arcaVentas && !_arcaCompras){ cont.innerHTML=''; return; }
 
-  const v = _arcaVentas || {n:0,neto:0,iva:0,exento:0,nograv:0,total:0};
-  const c = _arcaCompras || {n:0,neto:0,iva:0,exento:0,nograv:0,total:0};
+  const v = _arcaVentas || {n:0,nc:0,neto:0,iva:0,exento:0,nograv:0,total:0};
+  const c = _arcaCompras || {n:0,nc:0,neto:0,iva:0,exento:0,nograv:0,total:0};
   const saldoIva = v.iva - c.iva;
 
   let html = '';
@@ -4790,7 +4803,7 @@ function renderArca(){
   // Detalle ventas
   if(_arcaVentas){
     html += '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">'+
-      '<div class="card-title" style="margin-bottom:0">📤 Ventas — '+v.n+' comprobantes</div>'+
+      '<div class="card-title" style="margin-bottom:0">📤 Ventas — '+v.n+' comprobantes'+(v.nc?' · '+v.nc+' NC restadas':'')+'</div>'+
       '<button class="btn btn-primary" onclick="exportarArca(\'ventas\')">⬇ Descargar Excel</button></div>'+
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">'+
         '<div class="kpi-card"><div class="kpi-label">Total facturado</div><div class="kpi-val blue">'+fmt(v.total)+'</div></div>'+
@@ -4803,7 +4816,7 @@ function renderArca(){
   // Detalle compras
   if(_arcaCompras){
     html += '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">'+
-      '<div class="card-title" style="margin-bottom:0">📥 Compras — '+c.n+' comprobantes</div>'+
+      '<div class="card-title" style="margin-bottom:0">📥 Compras — '+c.n+' comprobantes'+(c.nc?' · '+c.nc+' NC restadas':'')+'</div>'+
       '<button class="btn btn-primary" onclick="exportarArca(\'compras\')">⬇ Descargar Excel</button></div>'+
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">'+
         '<div class="kpi-card"><div class="kpi-label">Total compras</div><div class="kpi-val blue">'+fmt(c.total)+'</div></div>'+
