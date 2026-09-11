@@ -226,6 +226,9 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
           </div>
         </div>
 
+        <!-- PANEL DE PENDIENTES -->
+        <div id="res-pendientes" style="margin-bottom:20px"></div>
+
         <!-- KPI GRID -->
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px" id="res-kpis"></div>
 
@@ -1841,11 +1844,83 @@ async function cargarTransferenciasParaBuscador(){
   }catch(e){ window._trAll = []; }
 }
 
+// ═══════════════════════════════
+// PANEL DE PENDIENTES (inicio)
+// ═══════════════════════════════
+function renderPendientes(){
+  const cont = g('res-pendientes');
+  if(!cont) return;
+  const m = mesSel;
+  const alertas = [];
+
+  // 1) Sueldos sin pagar este mes
+  let sueldosPend = 0, sueldosPendMonto = 0;
+  D.empleados.forEach(e=>{
+    const n = getNominaEmp(e, m);
+    if((n.sueldo+(n.hsExtra||0))>0 && !n.pagado){ sueldosPend++; sueldosPendMonto += (n.sueldo+(n.hsExtra||0)); }
+  });
+  if(sueldosPend>0) alertas.push({
+    icono:'💼', color:'#1B3A6B', bg:'#EEF3FA',
+    texto: sueldosPend+' sueldo'+(sueldosPend!==1?'s':'')+' sin pagar',
+    monto: sueldosPendMonto, pagina:'sueldos'
+  });
+
+  // 2) Comisiones pendientes este mes
+  const comPend = (D.comisiones||[]).filter(c=>c.mes===m && !c.pagado);
+  if(comPend.length>0) alertas.push({
+    icono:'🤝', color:'#B8943E', bg:'#FBF6E9',
+    texto: comPend.length+' comisión'+(comPend.length!==1?'es':'')+' sin pagar',
+    monto: comPend.reduce((s,c)=>s+(c.total||0),0), pagina:'cashflow'
+  });
+
+  // 3) Adelantos pendientes este mes
+  const adPend = (D.adelantos||[]).filter(a=>a.mes===m && !a.pagado);
+  if(adPend.length>0) alertas.push({
+    icono:'💵', color:'#B8943E', bg:'#FBF6E9',
+    texto: adPend.length+' adelanto'+(adPend.length!==1?'s':'')+' sin pagar',
+    monto: adPend.reduce((s,a)=>s+(a.monto||0),0), pagina:'adelantos'
+  });
+
+  // 4) Gastos pendientes este mes
+  const gasPend = (D.gastos||[]).filter(gg=>gg.mes===m && !gg.pagado);
+  if(gasPend.length>0) alertas.push({
+    icono:'🧾', color:'#C0392B', bg:'#FDECEA',
+    texto: gasPend.length+' gasto'+(gasPend.length!==1?'s':'')+' sin pagar',
+    monto: gasPend.reduce((s,gg)=>s+(gg.monto||0),0), pagina:'gastos'
+  });
+
+  // 5) Cheques sin acreditar este mes
+  const chPend = (D.cheques||[]).filter(c=>c.mes===m && !c.cobrado);
+  if(chPend.length>0) alertas.push({
+    icono:'🏦', color:'#7D6608', bg:'#FEF9E7',
+    texto: chPend.length+' cheque'+(chPend.length!==1?'s':'')+' pendiente'+(chPend.length!==1?'s':''),
+    monto: chPend.reduce((s,c)=>s+(c.monto||0),0), pagina:'cheques'
+  });
+
+  if(!alertas.length){
+    cont.innerHTML = '<div style="background:#EAF6EF;border:1px solid #B7E0C9;border-radius:14px;padding:16px 20px;color:#166534;font-weight:700">✅ Todo al día en '+mesLabel(m)+' — no hay pagos pendientes.</div>';
+    return;
+  }
+
+  cont.innerHTML = '<div style="background:#fff;border-radius:14px;padding:18px 20px;box-shadow:0 1px 3px rgba(0,0,0,.06);border-left:4px solid #C9A84C">'+
+    '<div style="font-size:14px;font-weight:800;color:#1a2332;margin-bottom:14px">📋 Pendientes de '+mesLabel(m)+'</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">'+
+    alertas.map(a=>
+      '<div onclick="navPage(\''+a.pagina+'\')" style="cursor:pointer;background:'+a.bg+';border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;transition:transform .1s" onmouseover="this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.transform=\'\'">'+
+        '<div style="font-size:22px">'+a.icono+'</div>'+
+        '<div><div style="font-weight:700;color:'+a.color+';font-size:13.5px">'+a.texto+'</div>'+
+        '<div style="font-weight:800;color:'+a.color+';font-size:15px">'+fmt(a.monto)+'</div></div>'+
+      '</div>'
+    ).join('')+
+    '</div></div>';
+}
+
 function renderResumen(){
   const _wrap = g('res-periodo-wrap'); if(_wrap && !_wrap.innerHTML) _wrap.innerHTML = periodoSelectorHTML('res');
   const d = new Date(mesSel+'-01T00:00:00');
   const m = mesSel;
   g('res-sub').textContent = 'Resumen de '+MES[d.getMonth()]+' '+d.getFullYear();
+  renderPendientes();
 
   const r = calcResumen();
 
