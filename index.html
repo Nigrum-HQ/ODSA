@@ -188,6 +188,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
       <div class="sitem" data-page="arca" onclick="navPage('arca')"><span class="ico">🧾</span>IVA / ARCA</div>
       <div class="sitem" data-page="adelantos" onclick="navPage('adelantos')"><span class="ico">💵</span>Adelantos</div>
       <div class="sitem" data-page="gastos" onclick="navPage('gastos')"><span class="ico">💳</span>Gastos</div>
+      <div class="sitem" data-page="oficina" onclick="navPage('oficina')"><span class="ico">🧴</span>Oficina</div>
       <div class="sitem" data-page="ingresos" onclick="navPage('ingresos')"><span class="ico">📥</span>Ingresos</div>
       <div class="sitem" data-page="cheques" onclick="navPage('cheques')"><span class="ico">🏦</span>Cheques</div>
       <div class="sitem" data-page="transferencias" onclick="navPage('transferencias')"><span class="ico">🧾</span>Transferencias</div>
@@ -832,6 +833,33 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
         </div>
       </div>
 
+      <!-- OFICINA (insumos: limpieza, desayuno, varios) -->
+      <div id="page-oficina" class="page">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div class="page-title" style="margin-bottom:0">Oficina — Insumos</div>
+          <div id="of-periodo-wrap"></div>
+        </div>
+        <div class="page-sub">Gastos chicos del día a día (limpieza, desayunos, varios). Cuentan como gasto en el total del mes.</div>
+
+        <div class="card">
+          <div class="card-title">Anotar producto</div>
+          <div class="frow frow-4">
+            <div class="fg"><label>Producto / descripción</label><input id="of-desc" placeholder="Café, lavandina, servilletas..."></div>
+            <div class="fg"><label>Tipo</label><select id="of-tipo">
+              <option value="Limpieza">Limpieza</option>
+              <option value="Desayuno">Desayuno</option>
+              <option value="Varios">Varios</option>
+            </select></div>
+            <div class="fg"><label>Importe ($)</label><input id="of-monto" type="number" placeholder="0"></div>
+            <div class="fg"><label>Fecha</label><input id="of-fecha" type="date"></div>
+          </div>
+          <button class="btn btn-primary" onclick="addOficina()">+ Anotar</button>
+        </div>
+
+        <div id="of-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px"></div>
+        <div id="of-lista"></div>
+      </div>
+
       <!-- INGRESOS -->
       <div id="page-ingresos" class="page">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
@@ -1261,6 +1289,7 @@ function actualizarLabelsMes(){
   const resWrap = g('res-periodo-wrap'); if(resWrap) resWrap.innerHTML = periodoSelectorHTML('res');
   const anWrap = g('analisis-periodo-wrap'); if(anWrap) anWrap.innerHTML = periodoSelectorHTML('analisis');
   const adWrap = g('ad-periodo-wrap'); if(adWrap) adWrap.innerHTML = periodoSelectorHTML('ad');
+  const ofWrap = g('of-periodo-wrap'); if(ofWrap) ofWrap.innerHTML = periodoSelectorHTML('of');
   const ceWrap = g('ce-periodo-wrap'); if(ceWrap) ceWrap.innerHTML = periodoSelectorHTML('ce');
   const trWrap = g('tr-periodo-wrap'); if(trWrap) trWrap.innerHTML = periodoSelectorHTML('tr');
   const cfSel = g('cf-mes'); if(cfSel && [...cfSel.options].some(o=>o.value===mesSel)) cfSel.value = mesSel;
@@ -1299,7 +1328,7 @@ const gv  = id => g(id)?g(id).value:'';
 const sv  = (id,v) => { if(g(id)) g(id).value=v; };
 const MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const SECTORES = {yamaha:'Yamaha',operadoras:'Operadoras',turnos:'Turnos',administracion:'Administración',sistemas:'Sistemas',limpieza:'Limpieza',kinebs:'Kinebs',fichas:'Fichas',publicidad:'Publicidad',simple_speed:'Simple Speed',otro:'Otro'};
-const CATS = {alquiler:'Alquiler',servicios:'Servicios',arca:'ARCA/Impuestos',publicidad:'Publicidad',sistemas:'Sistemas',insumos:'Insumos',otro:'Otro'};
+const CATS = {alquiler:'Alquiler',servicios:'Servicios',arca:'ARCA/Impuestos',publicidad:'Publicidad',sistemas:'Sistemas',insumos:'Insumos',oficina:'Oficina',otro:'Otro'};
 
 function toast(msg){
   const t=g('toast'); t.textContent=msg; t.style.display='block';
@@ -1788,6 +1817,7 @@ function navPage(name){
   if(name==='externos'){ fillExtSelects(); renderExternos(); }
   if(name==='ranking') renderRanking();
   if(name==='fichabancaria'){ const tryR=(n)=>{ if(D.empleados.length>0||n>=20){renderFichaBancaria();}else{setTimeout(()=>tryR(n+1),300);} }; tryR(0); }
+  if(name==='oficina'){ renderOficina(); if(!gv('of-fecha')) sv('of-fecha', hoy()); }
   if(name==='gastos'){ renderGastos(); if(!gv('gpdf-desde')) sv('gpdf-desde', mesSel); if(!gv('gpdf-hasta')) sv('gpdf-hasta', mesSel); }
   if(name==='ingresos') renderIngresos();
   if(name==='cheques') renderCheques();
@@ -5156,6 +5186,79 @@ function editComision(id){
 // ═══════════════════════════════
 // GASTOS
 // ═══════════════════════════════
+// ═══════════════════════════════
+// OFICINA — Insumos (limpieza, desayuno, varios)
+// Se guardan como gastos normales (cat 'oficina') para que cuenten en el total.
+// ═══════════════════════════════
+function addOficina(){
+  const desc = (gv('of-desc')||'').trim();
+  const monto = parseFloat(gv('of-monto'))||0;
+  let fecha = gv('of-fecha') || hoy();
+  const tipo = gv('of-tipo') || 'Varios';
+  if(!desc){ toast('Ingresá el producto'); return; }
+  if(!monto){ toast('Ingresá el importe'); return; }
+  const m = fecha.slice(0,7);
+  if(bloquearSiCerrado(m)) return;
+  D.gastos.push({
+    id: uid(), desc, cat: 'oficina', subtipo: tipo, monto, fecha, mes: m,
+    nota: 'Oficina · '+tipo, pagado: true, semPago: null, medio: 'efectivo'
+  });
+  save();
+  sv('of-desc',''); sv('of-monto','');
+  renderOficina(); renderResumen(); renderCashFlow();
+  toast('✓ Anotado en Oficina');
+}
+
+function renderOficina(){
+  const _wrap = g('of-periodo-wrap'); if(_wrap && !_wrap.innerHTML) _wrap.innerHTML = periodoSelectorHTML('of');
+  const m = mesSel;
+  const lista = (D.gastos||[]).filter(g=>g.cat==='oficina' && g.mes===m)
+    .sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
+
+  const total = lista.reduce((s,g)=>s+(g.monto||0),0);
+  // Totales por subtipo
+  const porTipo = {};
+  lista.forEach(g=>{ const t=g.subtipo||'Varios'; porTipo[t]=(porTipo[t]||0)+(g.monto||0); });
+
+  g('of-kpis').innerHTML =
+    '<div class="kpi-card"><div class="kpi-label">Total Oficina ('+mesLabel(m)+')</div><div class="kpi-val red">'+fmt(total)+'</div></div>'+
+    Object.entries(porTipo).map(([t,v])=>'<div class="kpi-card"><div class="kpi-label">'+t+'</div><div class="kpi-val gold">'+fmt(v)+'</div></div>').join('');
+
+  if(!lista.length){
+    g('of-lista').innerHTML = '<div class="card"><div class="empty" style="padding:30px;text-align:center;color:#8A9BAB">Sin anotaciones de oficina en '+mesLabel(m)+'</div></div>';
+    return;
+  }
+
+  // Agrupado por tipo
+  const tipos = {};
+  lista.forEach(g=>{ const t=g.subtipo||'Varios'; if(!tipos[t]) tipos[t]=[]; tipos[t].push(g); });
+
+  g('of-lista').innerHTML = Object.entries(tipos).map(([t,items])=>{
+    const subtotal = items.reduce((s,g)=>s+(g.monto||0),0);
+    const filas = items.map(g=>'<tr>'+
+      '<td>'+fd(g.fecha)+'</td>'+
+      '<td style="font-weight:600">'+(g.desc||'')+'</td>'+
+      '<td style="text-align:right;font-weight:700;color:#C0392B">'+fmt(g.monto)+'</td>'+
+      '<td><button class="del-btn" onclick="delOficina(\''+g.id+'\')">🗑</button></td>'+
+    '</tr>').join('');
+    return '<div class="card" style="margin-bottom:16px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">'+
+        '<div class="card-title" style="margin-bottom:0">'+t+'</div>'+
+        '<div style="font-weight:800;color:#C0392B">Subtotal: '+fmt(subtotal)+'</div></div>'+
+      '<div class="tw"><table><thead><tr><th>Fecha</th><th>Producto</th><th style="text-align:right">Importe</th><th></th></tr></thead><tbody>'+filas+'</tbody></table></div>'+
+    '</div>';
+  }).join('');
+}
+
+function delOficina(id){
+  const r = D.gastos.find(g=>g.id===id);
+  if(r && bloquearSiCerrado(r.mes)) return;
+  if(!confirm('¿Eliminar esta anotación de oficina?')) return;
+  D.gastos = D.gastos.filter(g=>g.id!==id);
+  marcarComoBorrados([id]);
+  save(); renderOficina(); renderResumen(); renderCashFlow(); toast('Eliminado');
+}
+
 // ═══════════════════════════════
 // EXPORTAR SUELDOS A PDF (resumen por sector)
 // ═══════════════════════════════
