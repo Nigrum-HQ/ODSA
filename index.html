@@ -642,6 +642,15 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
         </div>
 
         <div id="gastos-reales">
+        <div class="card" style="border-left:4px solid #C9A84C">
+          <div class="card-title">📄 Exportar gastos a PDF</div>
+          <div style="font-size:13px;color:#6B7E8F;margin-bottom:12px">Elegí el rango de meses y generá un PDF con el detalle de gastos y los totales por categoría.</div>
+          <div class="frow frow-3" style="align-items:end">
+            <div class="fg"><label>Desde (mes)</label><input id="gpdf-desde" type="month"></div>
+            <div class="fg"><label>Hasta (mes)</label><input id="gpdf-hasta" type="month"></div>
+            <div class="fg"><button class="btn btn-primary" onclick="exportarGastosPDF()" style="width:100%">📄 Generar PDF</button></div>
+          </div>
+        </div>
         <div class="card">
           <div class="card-title">Registrar gasto</div>
           <div class="frow frow-4">
@@ -1770,7 +1779,7 @@ function navPage(name){
   if(name==='externos'){ fillExtSelects(); renderExternos(); }
   if(name==='ranking') renderRanking();
   if(name==='fichabancaria'){ const tryR=(n)=>{ if(D.empleados.length>0||n>=20){renderFichaBancaria();}else{setTimeout(()=>tryR(n+1),300);} }; tryR(0); }
-  if(name==='gastos') renderGastos();
+  if(name==='gastos'){ renderGastos(); if(!gv('gpdf-desde')) sv('gpdf-desde', mesSel); if(!gv('gpdf-hasta')) sv('gpdf-hasta', mesSel); }
   if(name==='ingresos') renderIngresos();
   if(name==='cheques') renderCheques();
   if(name==='transferencias') renderTransferencias();
@@ -5138,6 +5147,78 @@ function editComision(id){
 // ═══════════════════════════════
 // GASTOS
 // ═══════════════════════════════
+// ═══════════════════════════════
+// EXPORTAR GASTOS A PDF
+// ═══════════════════════════════
+function exportarGastosPDF(){
+  let desde = gv('gpdf-desde');
+  let hasta = gv('gpdf-hasta');
+  if(!desde) desde = mesSel;
+  if(!hasta) hasta = mesSel;
+  if(desde > hasta){ const t=desde; desde=hasta; hasta=t; } // por si los invierte
+
+  // Filtrar gastos en el rango [desde, hasta] (comparación de string YYYY-MM funciona)
+  const lista = (D.gastos||[]).filter(g=>g.mes>=desde && g.mes<=hasta)
+    .sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
+
+  if(!lista.length){ toast('No hay gastos en ese rango de meses'); return; }
+
+  const totalGeneral = lista.reduce((s,g)=>s+(g.monto||0),0);
+
+  // Totales por categoría
+  const porCat = {};
+  lista.forEach(g=>{ const c = CATS[g.cat]||g.cat||'Otro'; porCat[c] = (porCat[c]||0)+(g.monto||0); });
+  const catsOrden = Object.entries(porCat).sort((a,b)=>b[1]-a[1]);
+
+  const labelDesde = mesLabel(desde);
+  const labelHasta = mesLabel(hasta);
+  const tituloPeriodo = desde===hasta ? labelDesde : (labelDesde+' a '+labelHasta);
+
+  const filas = lista.map(g=>'<tr>'+
+    '<td>'+fd(g.fecha)+'</td>'+
+    '<td>'+(g.desc||'')+'</td>'+
+    '<td style="color:#6B7E8F;font-size:11px">'+(CATS[g.cat]||g.cat||'')+'</td>'+
+    '<td style="text-align:center">'+(g.medio==='efectivo'?'Efectivo':'Transf.')+'</td>'+
+    '<td style="text-align:center">'+(g.pagado?'✓ Pagado':'Pendiente')+'</td>'+
+    '<td style="text-align:right;font-weight:600">'+fmt(g.monto)+'</td>'+
+  '</tr>').join('');
+
+  const filasCat = catsOrden.map(([c,v])=>'<tr>'+
+    '<td>'+c+'</td>'+
+    '<td style="text-align:right;font-weight:600">'+fmt(v)+'</td>'+
+    '<td style="text-align:right;color:#6B7E8F">'+(totalGeneral?Math.round(v/totalGeneral*100):0)+'%</td>'+
+  '</tr>').join('');
+
+  const win = window.open('','_blank');
+  win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Gastos '+tituloPeriodo+'</title>'+
+    '<style>'+
+    'body{font-family:Arial,sans-serif;color:#1a2332;padding:30px;max-width:900px;margin:0 auto}'+
+    'h1{font-size:22px;margin:0 0 4px}'+
+    '.sub{color:#6B7E8F;font-size:13px;margin-bottom:20px}'+
+    'table{width:100%;border-collapse:collapse;margin-bottom:24px;font-size:12.5px}'+
+    'th{background:#1B3A6B;color:#fff;padding:8px 10px;text-align:left;font-size:11px}'+
+    'td{padding:7px 10px;border-bottom:1px solid #eee}'+
+    'tr:nth-child(even) td{background:#F8FAFC}'+
+    '.tot{background:#F0F4F8;font-weight:800;font-size:14px}'+
+    '.seccion{font-size:15px;font-weight:800;color:#1B3A6B;margin:20px 0 10px}'+
+    '.print-btn{padding:10px 22px;background:#1B3A6B;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:16px}'+
+    '@media print{.print-btn{display:none}}'+
+    '</style></head><body>'+
+    '<button class="print-btn" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>'+
+    '<h1>ODSA — Gastos</h1>'+
+    '<div class="sub">Período: '+tituloPeriodo+' · '+lista.length+' gastos · Generado el '+new Date().toLocaleDateString('es-AR')+'</div>'+
+    '<div class="seccion">Totales por categoría</div>'+
+    '<table><thead><tr><th>Categoría</th><th style="text-align:right">Total</th><th style="text-align:right">%</th></tr></thead><tbody>'+filasCat+
+    '<tr class="tot"><td>TOTAL GENERAL</td><td style="text-align:right">'+fmt(totalGeneral)+'</td><td style="text-align:right">100%</td></tr>'+
+    '</tbody></table>'+
+    '<div class="seccion">Detalle de gastos</div>'+
+    '<table><thead><tr><th>Fecha</th><th>Descripción</th><th>Categoría</th><th style="text-align:center">Medio</th><th style="text-align:center">Estado</th><th style="text-align:right">Monto</th></tr></thead><tbody>'+filas+
+    '<tr class="tot"><td colspan="5">TOTAL</td><td style="text-align:right">'+fmt(totalGeneral)+'</td></tr>'+
+    '</tbody></table>'+
+    '</body></html>');
+  win.document.close();
+}
+
 function addGasto(){
   const desc = gv('g-desc').trim();
   const monto = parseFloat(gv('g-monto'))||0;
