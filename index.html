@@ -5237,9 +5237,15 @@ function exportarGastosPDF(){
   if(!hasta) hasta = mesSel;
   if(desde > hasta){ const t=desde; desde=hasta; hasta=t; } // por si los invierte
 
-  // Filtrar gastos en el rango [desde, hasta] (comparación de string YYYY-MM funciona)
-  const lista = (D.gastos||[]).filter(g=>g.mes>=desde && g.mes<=hasta)
-    .sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
+  // Filtrar gastos en el rango [desde, hasta] (comparación de string YYYY-MM funciona).
+  // Excluimos los que son "adelantos" (empiezan con "adelanto"), porque ya se
+  // descuentan en la nómina de Sueldos y contarlos acá los duplicaría.
+  const lista = (D.gastos||[]).filter(g=>{
+    if(g.mes<desde || g.mes>hasta) return false;
+    const d = (g.desc||'').toLowerCase().trim();
+    if(d.startsWith('adelanto')) return false;
+    return true;
+  }).sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
 
   if(!lista.length){ toast('No hay gastos en ese rango de meses'); return; }
 
