@@ -5263,11 +5263,34 @@ function exportarGastosPDF(){
     '<td style="text-align:right;font-weight:600">'+fmt(g.monto)+'</td>'+
   '</tr>').join('');
 
-  const filasCat = catsOrden.map(([c,v])=>'<tr>'+
-    '<td>'+c+'</td>'+
-    '<td style="text-align:right;font-weight:600">'+fmt(v)+'</td>'+
-    '<td style="text-align:right;color:#6B7E8F">'+(totalGeneral?Math.round(v/totalGeneral*100):0)+'%</td>'+
-  '</tr>').join('');
+  // Sub-desglose de la categoría "Otro" agrupado por descripción (para que no
+  // quede un bloque genérico gigante sin saber qué contiene)
+  const otrosPorDesc = {};
+  lista.forEach(g=>{
+    const c = CATS[g.cat]||g.cat||'Otro';
+    if(c === 'Otro'){
+      const d = (g.desc||'Sin descripción').trim();
+      otrosPorDesc[d] = (otrosPorDesc[d]||0) + (g.monto||0);
+    }
+  });
+  const otrosOrden = Object.entries(otrosPorDesc).sort((a,b)=>b[1]-a[1]);
+
+  const filasCat = catsOrden.map(([c,v])=>{
+    let fila = '<tr>'+
+      '<td style="font-weight:600">'+c+'</td>'+
+      '<td style="text-align:right;font-weight:600">'+fmt(v)+'</td>'+
+      '<td style="text-align:right;color:#6B7E8F">'+(totalGeneral?Math.round(v/totalGeneral*100):0)+'%</td>'+
+    '</tr>';
+    // Si es "Otro", agregamos el desglose por descripción debajo, con sangría
+    if(c === 'Otro' && otrosOrden.length){
+      fila += otrosOrden.map(([d,vv])=>'<tr>'+
+        '<td style="padding-left:28px;color:#6B7E8F;font-size:11.5px">↳ '+d+'</td>'+
+        '<td style="text-align:right;color:#6B7E8F;font-size:11.5px">'+fmt(vv)+'</td>'+
+        '<td></td>'+
+      '</tr>').join('');
+    }
+    return fila;
+  }).join('');
 
   const win = window.open('','_blank');
   win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Gastos '+tituloPeriodo+'</title>'+
