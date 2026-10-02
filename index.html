@@ -5210,7 +5210,7 @@ function addOficina(){
 }
 
 function renderOficina(){
-  const _wrap = g('of-periodo-wrap'); if(_wrap && !_wrap.innerHTML) _wrap.innerHTML = periodoSelectorHTML('of');
+  const _wrap = g('of-periodo-wrap'); if(_wrap) _wrap.innerHTML = periodoSelectorHTML('of');
   const m = mesSel;
   const lista = (D.gastos||[]).filter(g=>g.cat==='oficina' && g.mes===m)
     .sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
