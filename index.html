@@ -1297,7 +1297,7 @@ function actualizarLabelsMes(){
 }
 function renderTodoElPeriodo(){
   renderEmpleados(); renderGastos(); renderPremios(); renderIngresos(); renderCheques();
-  renderCashFlow(); renderExternos(); renderResumen(); renderAnalisis(); renderAdelantos();
+  renderCashFlow(); renderExternos(); renderResumen(); renderAnalisis(); renderAdelantos(); renderOficina();
   // Transferencias hace una llamada de red, así que solo la refrescamos si esa página está abierta
   const pageTr = g('page-transferencias');
   if(pageTr && pageTr.classList.contains('on')) renderTransferencias();
