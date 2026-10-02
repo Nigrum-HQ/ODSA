@@ -1296,11 +1296,20 @@ function actualizarLabelsMes(){
   const extSel = g('ext-filtro-mes'); if(extSel && [...extSel.options].some(o=>o.value===mesSel)) extSel.value = mesSel;
 }
 function renderTodoElPeriodo(){
-  renderEmpleados(); renderGastos(); renderPremios(); renderIngresos(); renderCheques();
-  renderCashFlow(); renderExternos(); renderResumen(); renderAnalisis(); renderAdelantos(); renderOficina();
-  // Transferencias hace una llamada de red, así que solo la refrescamos si esa página está abierta
+  const _safe = (fn, nombre) => { try{ fn(); }catch(e){ console.error('Error en', nombre, e); } };
+  _safe(renderEmpleados,'renderEmpleados');
+  _safe(renderGastos,'renderGastos');
+  _safe(renderPremios,'renderPremios');
+  _safe(renderIngresos,'renderIngresos');
+  _safe(renderCheques,'renderCheques');
+  _safe(renderCashFlow,'renderCashFlow');
+  _safe(renderExternos,'renderExternos');
+  _safe(renderResumen,'renderResumen');
+  _safe(renderAnalisis,'renderAnalisis');
+  _safe(renderAdelantos,'renderAdelantos');
+  _safe(renderOficina,'renderOficina');
   const pageTr = g('page-transferencias');
-  if(pageTr && pageTr.classList.contains('on')) renderTransferencias();
+  if(pageTr && pageTr.classList.contains('on')) _safe(renderTransferencias,'renderTransferencias');
 }
 function cambiarMesSel(delta){
   mesSel = shiftMes(mesSel, delta);
