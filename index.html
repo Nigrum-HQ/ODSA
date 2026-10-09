@@ -1151,7 +1151,7 @@ function mergeArrayById(localArr, cloudArr, preferLocal){
   });
   return out;
 }
-const COLECCIONES_A_FUSIONAR = ['gastos','comisiones','adelantos','externos','premios','ingresos','cheques','empleados','cf_ingresos','historial_cambios'];
+const COLECCIONES_A_FUSIONAR = ['gastos','comisiones','adelantos','externos','premios','ingresos','cheques','empleados','cf_ingresos','historial_cambios','propiedades'];
 
 let _sbSaveTimeout = null;
 let _sbSaveFails = 0;
@@ -5306,7 +5306,7 @@ function addPropiedad(){
   D.propiedades.push({
     id: uid(), nombre, inquilino, alquiler, proxAumento,
     proxAumentoMonto: 0,
-    servicios: PROP_SERVICIOS_BASE.map(s=>({nombre:s, alDia:false, vence:''})),
+    servicios: PROP_SERVICIOS_BASE.map(s=>({nombre:s, alDia:false, vence:'', monto:0})),
     pagos: {} // mes YYYY-MM -> true/false (alquiler cobrado)
   });
   save();
@@ -5318,6 +5318,7 @@ function addPropiedad(){
 function delPropiedad(id){
   if(!confirm('¿Eliminar esta propiedad y todos sus datos? No se puede deshacer.')) return;
   D.propiedades = (D.propiedades||[]).filter(p=>p.id!==id);
+  marcarComoBorrados([id]);
   save(); renderPropiedades(); toast('Propiedad eliminada');
 }
 
