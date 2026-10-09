@@ -5306,7 +5306,7 @@ function addPropiedad(){
   D.propiedades.push({
     id: uid(), nombre, inquilino, alquiler, proxAumento,
     proxAumentoMonto: 0,
-    servicios: PROP_SERVICIOS_BASE.map(s=>({nombre:s, alDia:false, vence:'', monto:0})),
+    servicios: PROP_SERVICIOS_BASE.map(s=>({nombre:s, porMes:{}})),
     pagos: {} // mes YYYY-MM -> true/false (alquiler cobrado)
   });
   save();
@@ -5348,22 +5348,39 @@ function setPropCampo(id, campo, valor){
 }
 
 // --- Servicios ---
+// Monto, estado y vencimiento de cada servicio se guardan POR MES (s.porMes['YYYY-MM']),
+// así cada mes arranca en cero y se carga el importe actualizado.
+// Los datos cargados antes de este cambio (un solo valor fijo) quedan en Octubre 2026.
+const SERV_MES_LEGACY = '2026-10';
+function servMigrar(s){
+  if(!s.porMes){
+    s.porMes = {};
+    if(s.monto || s.alDia || s.vence){
+      s.porMes[SERV_MES_LEGACY] = {monto: parseFloat(s.monto)||0, alDia: !!s.alDia, vence: s.vence||''};
+    }
+    delete s.monto; delete s.alDia; delete s.vence;
+  }
+  return s;
+}
+function servMes(s, m){ servMigrar(s); return s.porMes[m] || {monto:0, alDia:false, vence:''}; }
+function servMesW(s, m){ servMigrar(s); if(!s.porMes[m]) s.porMes[m] = {monto:0, alDia:false, vence:''}; return s.porMes[m]; }
 function toggleServicio(propId, idx){
   const p = (D.propiedades||[]).find(x=>x.id===propId);
   if(!p || !p.servicios[idx]) return;
-  p.servicios[idx].alDia = !p.servicios[idx].alDia;
+  const sm = servMesW(p.servicios[idx], mesSel);
+  sm.alDia = !sm.alDia;
   save(); renderPropiedades();
 }
 function setServicioVence(propId, idx, valor){
   const p = (D.propiedades||[]).find(x=>x.id===propId);
   if(!p || !p.servicios[idx]) return;
-  p.servicios[idx].vence = valor;
+  servMesW(p.servicios[idx], mesSel).vence = valor;
   save();
 }
 function setServicioMonto(propId, idx, valor){
   const p = (D.propiedades||[]).find(x=>x.id===propId);
   if(!p || !p.servicios[idx]) return;
-  p.servicios[idx].monto = parseFloat(valor)||0;
+  servMesW(p.servicios[idx], mesSel).monto = parseFloat(valor)||0;
   save(); renderPropiedades();
 }
 function addServicio(propId){
@@ -5371,7 +5388,7 @@ function addServicio(propId){
   if(!p) return;
   const nombre = prompt('Nombre del nuevo servicio:');
   if(!nombre || !nombre.trim()) return;
-  p.servicios.push({nombre:nombre.trim(), alDia:false, vence:'', monto:0});
+  p.servicios.push({nombre:nombre.trim(), porMes:{}});
   save(); renderPropiedades();
 }
 function delServicio(propId, idx){
@@ -5455,9 +5472,9 @@ function renderPropiedades(){
     '</div>' : '';
   cont.innerHTML = avisoAumentosMes(props, mesSel) + botonesTodas + props.map(p=>{
     const est = aumentoEstado(p.proxAumento);
-    const serviciosAlDia = p.servicios.filter(s=>s.alDia).length;
-    const totalServicios = p.servicios.reduce((t,s)=>t+(parseFloat(s.monto)||0),0);
-    const filasServ = p.servicios.map((s,idx)=>
+    const serviciosAlDia = p.servicios.filter(s=>servMes(s,mesSel).alDia).length;
+    const totalServicios = p.servicios.reduce((t,s)=>t+(parseFloat(servMes(s,mesSel).monto)||0),0);
+    const filasServ = p.servicios.map((s0,idx)=>{ const s = Object.assign({nombre:s0.nombre}, servMes(s0,mesSel)); return (
       '<tr>'+
         '<td>'+s.nombre+'</td>'+
         '<td style="text-align:right"><input type="number" placeholder="0" value="'+(s.monto||'')+'" onblur="setServicioMonto(\''+p.id+'\','+idx+',this.value)" style="width:120px;padding:4px 8px;border:1px solid #D8E2EC;border-radius:6px;font-size:13px;text-align:right"></td>'+
@@ -5465,7 +5482,7 @@ function renderPropiedades(){
         '<td style="text-align:center"><input type="date" value="'+(s.vence||'')+'" onchange="setServicioVence(\''+p.id+'\','+idx+',this.value)" style="padding:4px 8px;border:1px solid #D8E2EC;border-radius:6px;font-size:12px"></td>'+
         '<td style="text-align:right"><button class="del-btn" onclick="delServicio(\''+p.id+'\','+idx+')">🗑</button></td>'+
       '</tr>'
-    ).join('');
+    ); }).join('');
 
     const min = !!propMin[p.id];
     const escA = v => String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
@@ -5505,7 +5522,7 @@ function renderPropiedades(){
         '</div>'+
       '</div>'+
       // Servicios
-      '<div style="font-size:13px;font-weight:800;color:#1a2332;margin-bottom:8px">Servicios ('+serviciosAlDia+'/'+p.servicios.length+' al día'+(totalServicios>0?' · Total: '+fmt(totalServicios):'')+')</div>'+
+      '<div style="font-size:13px;font-weight:800;color:#1a2332;margin-bottom:8px">Servicios de '+mesLabel(mesSel)+' ('+serviciosAlDia+'/'+p.servicios.length+' al día'+(totalServicios>0?' · Total: '+fmt(totalServicios):'')+')</div>'+
       '<div class="tw"><table><thead><tr><th>Servicio</th><th style="text-align:right">Monto</th><th style="text-align:center">Estado</th><th style="text-align:center">Vence</th><th></th></tr></thead><tbody>'+filasServ+'</tbody></table></div>'+
       '<button class="btn btn-sm" style="margin-top:8px;background:#fff;color:#1B3A6B;border:1px solid #D8E2EC" onclick="addServicio(\''+p.id+'\')">+ Agregar servicio</button>'+
     '</div>');
