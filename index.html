@@ -5401,6 +5401,16 @@ function aumentoEstado(proxAumento){
   return {txt:'Próximo aumento: '+fd(proxAumento), color:'#6B7E8F', urgente:false};
 }
 
+// Recordatorio: propiedades que tienen el aumento programado en el mes elegido
+function avisoAumentosMes(props, m){
+  const aumentosMes = (props||[]).filter(p=>p.proxAumento && p.proxAumento.slice(0,7)===m);
+  if(!aumentosMes.length) return '';
+  return '<div style="background:#FBF6E9;border:1px solid #E8D9A8;border-radius:12px;padding:14px 18px;margin-bottom:16px">'+
+    '<div style="font-weight:800;color:#B8943E;font-size:14px;margin-bottom:6px">🔔 En '+mesLabel(m)+' toca aumento de alquiler</div>'+
+    aumentosMes.map(p=>'<div style="font-size:13px;color:#7D6608;padding:2px 0">• <b>'+p.nombre+'</b> ('+(p.inquilino||'—')+') — aumenta el '+fd(p.proxAumento)+'. Alquiler actual: '+fmt(p.alquiler)+(p.proxAumentoMonto>0?' → nuevo: '+fmt(p.proxAumentoMonto):' · todavía no cargaste el nuevo monto')+'</div>').join('')+
+  '</div>';
+}
+
 function renderPropiedades(){
   const _wrap = g('prop-periodo-wrap'); if(_wrap) _wrap.innerHTML = periodoSelectorHTML('prop');
   const cont = g('prop-lista');
@@ -5411,7 +5421,7 @@ function renderPropiedades(){
     return;
   }
 
-  cont.innerHTML = props.map(p=>{
+  cont.innerHTML = avisoAumentosMes(props, mesSel) + props.map(p=>{
     const est = aumentoEstado(p.proxAumento);
     const serviciosAlDia = p.servicios.filter(s=>s.alDia).length;
     const totalServicios = p.servicios.reduce((t,s)=>t+(parseFloat(s.monto)||0),0);
@@ -5474,12 +5484,7 @@ function renderPropMes(){
     '<div class="kpi-card"><div class="kpi-label">Pendiente</div><div class="kpi-val red">'+fmt(totalEsperado-totalCobrado)+'</div></div>'+
     '<div class="kpi-card"><div class="kpi-label">Propiedades cobradas</div><div class="kpi-val gold">'+cobrados.length+' / '+props.length+'</div></div>';
 
-  // Recordatorio: propiedades que tienen el aumento programado en este mes
-  const aumentosMes = props.filter(p=>p.proxAumento && p.proxAumento.slice(0,7)===m);
-  const avisoMes = aumentosMes.length ? '<div style="background:#FBF6E9;border:1px solid #E8D9A8;border-radius:12px;padding:14px 18px;margin-bottom:16px">'+
-    '<div style="font-weight:800;color:#B8943E;font-size:14px;margin-bottom:6px">🔔 Este mes toca aumento de alquiler</div>'+
-    aumentosMes.map(p=>'<div style="font-size:13px;color:#7D6608;padding:2px 0">• <b>'+p.nombre+'</b> ('+(p.inquilino||'—')+') — aumenta el '+fd(p.proxAumento)+'. Alquiler actual: '+fmt(p.alquiler)+(p.proxAumentoMonto>0?' → nuevo: '+fmt(p.proxAumentoMonto):' · todavía no cargaste el nuevo monto')+'</div>').join('')+
-  '</div>' : '';
+  const avisoMes = avisoAumentosMes(props, m);
 
   cont.innerHTML = avisoMes + '<div class="card"><div class="card-title">Cobro de alquileres — '+mesLabel(m)+'</div>'+
     '<div class="tw"><table><thead><tr><th>Propiedad</th><th>Inquilino</th><th style="text-align:right">Alquiler</th><th style="text-align:center">Estado</th></tr></thead><tbody>'+
