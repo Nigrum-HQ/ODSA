@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1790944665-render-safe -->
+<!-- v1791551927-propiedades -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -189,6 +189,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
       <div class="sitem" data-page="adelantos" onclick="navPage('adelantos')"><span class="ico">💵</span>Adelantos</div>
       <div class="sitem" data-page="gastos" onclick="navPage('gastos')"><span class="ico">💳</span>Gastos</div>
       <div class="sitem" data-page="oficina" onclick="navPage('oficina')"><span class="ico">🧴</span>Oficina</div>
+      <div class="sitem" data-page="propiedades" onclick="navPage('propiedades')"><span class="ico">🏠</span>Propiedades</div>
       <div class="sitem" data-page="ingresos" onclick="navPage('ingresos')"><span class="ico">📥</span>Ingresos</div>
       <div class="sitem" data-page="cheques" onclick="navPage('cheques')"><span class="ico">🏦</span>Cheques</div>
       <div class="sitem" data-page="transferencias" onclick="navPage('transferencias')"><span class="ico">🧾</span>Transferencias</div>
@@ -860,6 +861,41 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
         <div id="of-lista"></div>
       </div>
 
+      <!-- PROPIEDADES -->
+      <div id="page-propiedades" class="page">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div class="page-title" style="margin-bottom:0">Propiedades en alquiler</div>
+          <div id="prop-periodo-wrap"></div>
+        </div>
+        <div class="page-sub">Alquileres, servicios y aumentos de tus propiedades. (Separado del resto del sistema)</div>
+
+        <div class="tabs">
+          <button class="tab on" onclick="tabProp('fichas',this)">🏠 Propiedades</button>
+          <button class="tab" onclick="tabProp('mes',this)">📅 Vista del mes</button>
+        </div>
+
+        <!-- VISTA FICHAS -->
+        <div id="prop-fichas">
+          <div class="card">
+            <div class="card-title">Agregar propiedad</div>
+            <div class="frow frow-4">
+              <div class="fg"><label>Nombre / dirección</label><input id="prop-nombre" placeholder="Depto Av. Siempreviva 742"></div>
+              <div class="fg"><label>Inquilino</label><input id="prop-inquilino" placeholder="Nombre del inquilino"></div>
+              <div class="fg"><label>Alquiler mensual ($)</label><input id="prop-alquiler" type="number" placeholder="0"></div>
+              <div class="fg"><label>Próximo aumento (fecha)</label><input id="prop-prox-aumento" type="date"></div>
+            </div>
+            <button class="btn btn-primary" onclick="addPropiedad()">+ Agregar propiedad</button>
+          </div>
+          <div id="prop-lista"></div>
+        </div>
+
+        <!-- VISTA MES -->
+        <div id="prop-mes" style="display:none">
+          <div id="prop-mes-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px"></div>
+          <div id="prop-mes-lista"></div>
+        </div>
+      </div>
+
       <!-- INGRESOS -->
       <div id="page-ingresos" class="page">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
@@ -1165,6 +1201,7 @@ let D = {
   semPagoSectores: {},
   mesesCerrados: [], // meses bloqueados (formato YYYY-MM); no se pueden editar sin reabrir
   gastosFijos: [], // plantillas de gastos recurrentes para aplicar cada mes
+  propiedades: [], // propiedades en alquiler (inquilino, alquiler, servicios, aumentos, pagos)
   ai_chat: [], // conversacion con el Asistente IA, compartida entre todos los usuarios
   historial_cambios: [] // historial permanente de ediciones de montos (Cash Flow, sueldos, comisiones, etc.)
 };
@@ -1290,6 +1327,7 @@ function actualizarLabelsMes(){
   const anWrap = g('analisis-periodo-wrap'); if(anWrap) anWrap.innerHTML = periodoSelectorHTML('analisis');
   const adWrap = g('ad-periodo-wrap'); if(adWrap) adWrap.innerHTML = periodoSelectorHTML('ad');
   const ofWrap = g('of-periodo-wrap'); if(ofWrap) ofWrap.innerHTML = periodoSelectorHTML('of');
+  const propWrap = g('prop-periodo-wrap'); if(propWrap) propWrap.innerHTML = periodoSelectorHTML('prop');
   const ceWrap = g('ce-periodo-wrap'); if(ceWrap) ceWrap.innerHTML = periodoSelectorHTML('ce');
   const trWrap = g('tr-periodo-wrap'); if(trWrap) trWrap.innerHTML = periodoSelectorHTML('tr');
   const cfSel = g('cf-mes'); if(cfSel && [...cfSel.options].some(o=>o.value===mesSel)) cfSel.value = mesSel;
@@ -1308,6 +1346,7 @@ function renderTodoElPeriodo(){
   _safe(renderAnalisis,'renderAnalisis');
   _safe(renderAdelantos,'renderAdelantos');
   _safe(renderOficina,'renderOficina');
+  _safe(()=>{ const pp=g('page-propiedades'); if(pp && pp.classList.contains('on')){ renderPropiedades(); renderPropMes(); } },'renderPropiedades');
   const pageTr = g('page-transferencias');
   if(pageTr && pageTr.classList.contains('on')) _safe(renderTransferencias,'renderTransferencias');
 }
@@ -1408,7 +1447,7 @@ function undoLast(){
   if(!_undoStack.length){ toast('Nada para deshacer'); return; }
   const prev = _undoStack.pop();
   _suspenderUndo = true; // que el save() de abajo no vuelva a apilar
-  D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},mesesCerrados:[],gastosFijos:[],ai_chat:[],historial_cambios:[]}, JSON.parse(prev));
+  D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},mesesCerrados:[],gastosFijos:[],propiedades:[],ai_chat:[],historial_cambios:[]}, JSON.parse(prev));
   _ultimoEstadoConocido = JSON.stringify(D);
   save();
   _suspenderUndo = false;
@@ -1447,7 +1486,7 @@ async function load(){
   try{
     if(raw){
       const saved = JSON.parse(raw);
-      D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},mesesCerrados:[],gastosFijos:[],ai_chat:[],historial_cambios:[]}, saved);
+      D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},mesesCerrados:[],gastosFijos:[],propiedades:[],ai_chat:[],historial_cambios:[]}, saved);
     }
   }catch(e){}
 }
@@ -1619,7 +1658,7 @@ async function restaurarBackup(id){
     const data = await r.json();
     if(!r.ok || !data.ok){ toast('No se pudo restaurar: ' + (data.error||'')); return; }
     // Cargar los datos restaurados
-    D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},mesesCerrados:[],gastosFijos:[],ai_chat:[],historial_cambios:[]}, JSON.parse(data.data));
+    D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},mesesCerrados:[],gastosFijos:[],propiedades:[],ai_chat:[],historial_cambios:[]}, JSON.parse(data.data));
     save();
     toast('✅ Backup restaurado');
     setTimeout(()=>location.reload(), 1000);
@@ -1827,6 +1866,7 @@ function navPage(name){
   if(name==='ranking') renderRanking();
   if(name==='fichabancaria'){ const tryR=(n)=>{ if(D.empleados.length>0||n>=20){renderFichaBancaria();}else{setTimeout(()=>tryR(n+1),300);} }; tryR(0); }
   if(name==='oficina'){ renderOficina(); if(!gv('of-fecha')) sv('of-fecha', hoy()); }
+  if(name==='propiedades') renderPropiedades();
   if(name==='gastos'){ renderGastos(); if(!gv('gpdf-desde')) sv('gpdf-desde', mesSel); if(!gv('gpdf-hasta')) sv('gpdf-hasta', mesSel); }
   if(name==='ingresos') renderIngresos();
   if(name==='cheques') renderCheques();
@@ -2076,22 +2116,46 @@ function renderPendientes(){
     monto: chPend.reduce((s,c)=>s+(c.monto||0),0), pagina:'cheques'
   });
 
-  if(!alertas.length){
+  // 6) Aumentos de alquiler próximos o vencidos (aviso, sin monto)
+  const aumentosProx = (D.propiedades||[]).filter(p=>{
+    if(!p.proxAumento) return false;
+    const hoy2 = new Date(); hoy2.setHours(0,0,0,0);
+    const fa = new Date(p.proxAumento+'T00:00:00');
+    const dias = Math.round((fa-hoy2)/(1000*60*60*24));
+    return dias <= 15;
+  });
+  // Aviso de aumentos (se arma aparte, es un bloque de texto, no una tarjeta con monto)
+  let avisoAumentos = '';
+  if(aumentosProx.length>0){
+    avisoAumentos = '<div onclick="navPage(\'propiedades\')" style="cursor:pointer;background:#FBF6E9;border:1px solid #E8D9A8;border-radius:12px;padding:14px 18px;margin-top:12px">'+
+      '<div style="font-weight:800;color:#B8943E;font-size:13.5px;margin-bottom:6px">🏠 Aumentos de alquiler por aplicar</div>'+
+      aumentosProx.map(p=>{
+        const est = aumentoEstado(p.proxAumento);
+        return '<div style="font-size:13px;color:#7D6608;padding:2px 0">• '+p.nombre+' — '+(est?est.txt:'')+'</div>';
+      }).join('')+
+    '</div>';
+  }
+
+  if(!alertas.length && aumentosProx.length===0){
     cont.innerHTML = '<div style="background:#EAF6EF;border:1px solid #B7E0C9;border-radius:14px;padding:16px 20px;color:#166534;font-weight:700">✅ Todo al día en '+mesLabel(m)+' — no hay pagos pendientes.</div>';
     return;
   }
 
-  cont.innerHTML = '<div style="background:#fff;border-radius:14px;padding:18px 20px;box-shadow:0 1px 3px rgba(0,0,0,.06);border-left:4px solid #C9A84C">'+
-    '<div style="font-size:14px;font-weight:800;color:#1a2332;margin-bottom:14px">📋 Pendientes de '+mesLabel(m)+'</div>'+
-    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">'+
-    alertas.map(a=>
-      '<div onclick="navPage(\''+a.pagina+'\')" style="cursor:pointer;background:'+a.bg+';border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;transition:transform .1s" onmouseover="this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.transform=\'\'">'+
-        '<div style="font-size:22px">'+a.icono+'</div>'+
-        '<div><div style="font-weight:700;color:'+a.color+';font-size:13.5px">'+a.texto+'</div>'+
-        '<div style="font-weight:800;color:'+a.color+';font-size:15px">'+fmt(a.monto)+'</div></div>'+
-      '</div>'
-    ).join('')+
-    '</div></div>';
+  let htmlPanel = '';
+  if(alertas.length){
+    htmlPanel = '<div style="background:#fff;border-radius:14px;padding:18px 20px;box-shadow:0 1px 3px rgba(0,0,0,.06);border-left:4px solid #C9A84C">'+
+      '<div style="font-size:14px;font-weight:800;color:#1a2332;margin-bottom:14px">📋 Pendientes de '+mesLabel(m)+'</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">'+
+      alertas.map(a=>
+        '<div onclick="navPage(\''+a.pagina+'\')" style="cursor:pointer;background:'+a.bg+';border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;transition:transform .1s" onmouseover="this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.transform=\'\'">'+
+          '<div style="font-size:22px">'+a.icono+'</div>'+
+          '<div><div style="font-weight:700;color:'+a.color+';font-size:13.5px">'+a.texto+'</div>'+
+          '<div style="font-weight:800;color:'+a.color+';font-size:15px">'+fmt(a.monto)+'</div></div>'+
+        '</div>'
+      ).join('')+
+      '</div></div>';
+  }
+  cont.innerHTML = htmlPanel + avisoAumentos;
 }
 
 // ═══════════════════════════════
@@ -5216,6 +5280,203 @@ function addOficina(){
   sv('of-desc',''); sv('of-monto','');
   renderOficina(); renderResumen(); renderCashFlow();
   toast('✓ Anotado en Oficina');
+}
+
+// ═══════════════════════════════
+// PROPIEDADES EN ALQUILER
+// ═══════════════════════════════
+const PROP_SERVICIOS_BASE = ['Luz','Gas','Agua','Expensas','ABL/Municipal'];
+
+function tabProp(tab, btn){
+  document.querySelectorAll('#page-propiedades .tab').forEach(t=>t.classList.remove('on'));
+  btn.classList.add('on');
+  g('prop-fichas').style.display = tab==='fichas'?'block':'none';
+  g('prop-mes').style.display = tab==='mes'?'block':'none';
+  if(tab==='mes') renderPropMes();
+  else renderPropiedades();
+}
+
+function addPropiedad(){
+  const nombre = (gv('prop-nombre')||'').trim();
+  const inquilino = (gv('prop-inquilino')||'').trim();
+  const alquiler = parseFloat(gv('prop-alquiler'))||0;
+  const proxAumento = gv('prop-prox-aumento') || '';
+  if(!nombre){ toast('Ingresá el nombre o dirección'); return; }
+  if(!D.propiedades) D.propiedades = [];
+  D.propiedades.push({
+    id: uid(), nombre, inquilino, alquiler, proxAumento,
+    proxAumentoMonto: 0,
+    servicios: PROP_SERVICIOS_BASE.map(s=>({nombre:s, alDia:false, vence:''})),
+    pagos: {} // mes YYYY-MM -> true/false (alquiler cobrado)
+  });
+  save();
+  sv('prop-nombre',''); sv('prop-inquilino',''); sv('prop-alquiler','');
+  renderPropiedades();
+  toast('✓ Propiedad agregada');
+}
+
+function delPropiedad(id){
+  if(!confirm('¿Eliminar esta propiedad y todos sus datos? No se puede deshacer.')) return;
+  D.propiedades = (D.propiedades||[]).filter(p=>p.id!==id);
+  save(); renderPropiedades(); toast('Propiedad eliminada');
+}
+
+// --- Aumentos ---
+function aplicarAumento(id){
+  const p = (D.propiedades||[]).find(x=>x.id===id);
+  if(!p) return;
+  if(!p.proxAumentoMonto || p.proxAumentoMonto<=0){ toast('Primero cargá el nuevo monto del aumento'); return; }
+  if(!confirm('¿Aplicar el aumento?\n\nAlquiler actual: '+fmt(p.alquiler)+'\nNuevo alquiler: '+fmt(p.proxAumentoMonto)+'\n\nLa próxima fecha de aumento se correrá 3 meses.')) return;
+  p.alquiler = p.proxAumentoMonto;
+  p.proxAumentoMonto = 0;
+  // correr la fecha 3 meses
+  if(p.proxAumento){
+    const d = new Date(p.proxAumento+'T00:00:00');
+    d.setMonth(d.getMonth()+3);
+    p.proxAumento = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  save(); renderPropiedades(); toast('✓ Aumento aplicado');
+}
+function setPropCampo(id, campo, valor){
+  const p = (D.propiedades||[]).find(x=>x.id===id);
+  if(!p) return;
+  if(campo==='alquiler'||campo==='proxAumentoMonto') valor = parseFloat(valor)||0;
+  p[campo] = valor;
+  save();
+  if(campo==='proxAumento' || campo==='proxAumentoMonto') renderPropiedades();
+}
+
+// --- Servicios ---
+function toggleServicio(propId, idx){
+  const p = (D.propiedades||[]).find(x=>x.id===propId);
+  if(!p || !p.servicios[idx]) return;
+  p.servicios[idx].alDia = !p.servicios[idx].alDia;
+  save(); renderPropiedades();
+}
+function setServicioVence(propId, idx, valor){
+  const p = (D.propiedades||[]).find(x=>x.id===propId);
+  if(!p || !p.servicios[idx]) return;
+  p.servicios[idx].vence = valor;
+  save();
+}
+function addServicio(propId){
+  const p = (D.propiedades||[]).find(x=>x.id===propId);
+  if(!p) return;
+  const nombre = prompt('Nombre del nuevo servicio:');
+  if(!nombre || !nombre.trim()) return;
+  p.servicios.push({nombre:nombre.trim(), alDia:false, vence:''});
+  save(); renderPropiedades();
+}
+function delServicio(propId, idx){
+  const p = (D.propiedades||[]).find(x=>x.id===propId);
+  if(!p) return;
+  p.servicios.splice(idx,1);
+  save(); renderPropiedades();
+}
+
+// --- Pago de alquiler por mes ---
+function togglePagoAlquiler(propId, m){
+  const p = (D.propiedades||[]).find(x=>x.id===propId);
+  if(!p) return;
+  if(!p.pagos) p.pagos = {};
+  p.pagos[m] = !p.pagos[m];
+  save(); renderPropiedades(); renderPropMes();
+}
+
+// --- Avisa si un aumento está cerca (dentro de 15 días) o vencido ---
+function aumentoEstado(proxAumento){
+  if(!proxAumento) return null;
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const fa = new Date(proxAumento+'T00:00:00');
+  const dias = Math.round((fa - hoy)/(1000*60*60*24));
+  if(dias < 0) return {txt:'Aumento vencido hace '+Math.abs(dias)+' días', color:'#C0392B', urgente:true};
+  if(dias <= 15) return {txt:'Aumento en '+dias+' día'+(dias!==1?'s':''), color:'#B8943E', urgente:true};
+  return {txt:'Próximo aumento: '+fd(proxAumento), color:'#6B7E8F', urgente:false};
+}
+
+function renderPropiedades(){
+  const _wrap = g('prop-periodo-wrap'); if(_wrap) _wrap.innerHTML = periodoSelectorHTML('prop');
+  const cont = g('prop-lista');
+  if(!cont) return;
+  const props = D.propiedades || [];
+  if(!props.length){
+    cont.innerHTML = '<div class="card"><div class="empty" style="padding:30px;text-align:center;color:#8A9BAB">Sin propiedades cargadas todavía</div></div>';
+    return;
+  }
+
+  cont.innerHTML = props.map(p=>{
+    const est = aumentoEstado(p.proxAumento);
+    const serviciosAlDia = p.servicios.filter(s=>s.alDia).length;
+    const filasServ = p.servicios.map((s,idx)=>
+      '<tr>'+
+        '<td>'+s.nombre+'</td>'+
+        '<td style="text-align:center"><span class="badge '+(s.alDia?'badge-green':'badge-gold')+'" style="cursor:pointer" onclick="toggleServicio(\''+p.id+'\','+idx+')">'+(s.alDia?'✓ Al día':'Pendiente')+'</span></td>'+
+        '<td style="text-align:center"><input type="date" value="'+(s.vence||'')+'" onchange="setServicioVence(\''+p.id+'\','+idx+',this.value)" style="padding:4px 8px;border:1px solid #D8E2EC;border-radius:6px;font-size:12px"></td>'+
+        '<td style="text-align:right"><button class="del-btn" onclick="delServicio(\''+p.id+'\','+idx+')">🗑</button></td>'+
+      '</tr>'
+    ).join('');
+
+    return '<div class="card" style="margin-bottom:18px'+(est&&est.urgente?';border-left:4px solid '+est.color:'')+'">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:14px">'+
+        '<div><div class="card-title" style="margin-bottom:2px">🏠 '+p.nombre+'</div>'+
+          '<div style="font-size:13px;color:#6B7E8F">Inquilino: '+(p.inquilino||'—')+'</div></div>'+
+        '<button class="del-btn" onclick="delPropiedad(\''+p.id+'\')">🗑 Eliminar</button>'+
+      '</div>'+
+      // Alquiler y aumento
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:14px">'+
+        '<div class="kpi-card"><div class="kpi-label">Alquiler actual</div>'+
+          '<input type="number" value="'+(p.alquiler||0)+'" onblur="setPropCampo(\''+p.id+'\',\'alquiler\',this.value)" style="width:100%;font-size:18px;font-weight:800;color:#1A7A52;border:none;background:transparent;border-bottom:1px solid #E4EAF0"></div>'+
+        '<div class="kpi-card"'+(est&&est.urgente?' style="background:'+(est.color==='#C0392B'?'#FDECEA':'#FBF6E9')+'"':'')+'>'+
+          '<div class="kpi-label">'+(est?est.txt:'Sin aumento programado')+'</div>'+
+          '<input type="date" value="'+(p.proxAumento||'')+'" onchange="setPropCampo(\''+p.id+'\',\'proxAumento\',this.value)" style="width:100%;font-size:13px;border:none;background:transparent;border-bottom:1px solid #E4EAF0;margin-top:4px"></div>'+
+        '<div class="kpi-card"><div class="kpi-label">Nuevo monto (aumento)</div>'+
+          '<input type="number" placeholder="0" value="'+(p.proxAumentoMonto||'')+'" onblur="setPropCampo(\''+p.id+'\',\'proxAumentoMonto\',this.value)" style="width:100%;font-size:16px;font-weight:700;border:none;background:transparent;border-bottom:1px solid #E4EAF0">'+
+          (p.proxAumentoMonto>0?'<button class="btn btn-sm btn-primary" style="margin-top:6px;width:100%" onclick="aplicarAumento(\''+p.id+'\')">Aplicar aumento</button>':'')+
+        '</div>'+
+      '</div>'+
+      // Servicios
+      '<div style="font-size:13px;font-weight:800;color:#1a2332;margin-bottom:8px">Servicios ('+serviciosAlDia+'/'+p.servicios.length+' al día)</div>'+
+      '<div class="tw"><table><thead><tr><th>Servicio</th><th style="text-align:center">Estado</th><th style="text-align:center">Vence</th><th></th></tr></thead><tbody>'+filasServ+'</tbody></table></div>'+
+      '<button class="btn btn-sm" style="margin-top:8px;background:#fff;color:#1B3A6B;border:1px solid #D8E2EC" onclick="addServicio(\''+p.id+'\')">+ Agregar servicio</button>'+
+    '</div>';
+  }).join('');
+}
+
+function renderPropMes(){
+  const _wrap = g('prop-periodo-wrap'); if(_wrap) _wrap.innerHTML = periodoSelectorHTML('prop');
+  const m = mesSel;
+  const props = D.propiedades || [];
+  const kpis = g('prop-mes-kpis');
+  const cont = g('prop-mes-lista');
+
+  if(!props.length){
+    kpis.innerHTML = '';
+    cont.innerHTML = '<div class="card"><div class="empty" style="padding:30px;text-align:center;color:#8A9BAB">Sin propiedades cargadas</div></div>';
+    return;
+  }
+
+  const totalEsperado = props.reduce((s,p)=>s+(p.alquiler||0),0);
+  const cobrados = props.filter(p=>p.pagos && p.pagos[m]);
+  const totalCobrado = cobrados.reduce((s,p)=>s+(p.alquiler||0),0);
+
+  kpis.innerHTML =
+    '<div class="kpi-card"><div class="kpi-label">A cobrar ('+mesLabel(m)+')</div><div class="kpi-val blue">'+fmt(totalEsperado)+'</div></div>'+
+    '<div class="kpi-card"><div class="kpi-label">Cobrado</div><div class="kpi-val green">'+fmt(totalCobrado)+'</div></div>'+
+    '<div class="kpi-card"><div class="kpi-label">Pendiente</div><div class="kpi-val red">'+fmt(totalEsperado-totalCobrado)+'</div></div>'+
+    '<div class="kpi-card"><div class="kpi-label">Propiedades cobradas</div><div class="kpi-val gold">'+cobrados.length+' / '+props.length+'</div></div>';
+
+  cont.innerHTML = '<div class="card"><div class="card-title">Cobro de alquileres — '+mesLabel(m)+'</div>'+
+    '<div class="tw"><table><thead><tr><th>Propiedad</th><th>Inquilino</th><th style="text-align:right">Alquiler</th><th style="text-align:center">Estado</th></tr></thead><tbody>'+
+    props.map(p=>{
+      const pagado = !!(p.pagos && p.pagos[m]);
+      return '<tr>'+
+        '<td style="font-weight:600">'+p.nombre+'</td>'+
+        '<td style="color:#6B7E8F">'+(p.inquilino||'—')+'</td>'+
+        '<td style="text-align:right;font-weight:700">'+fmt(p.alquiler)+'</td>'+
+        '<td style="text-align:center"><span class="badge '+(pagado?'badge-green':'badge-gold')+'" style="cursor:pointer" onclick="togglePagoAlquiler(\''+p.id+'\',\''+m+'\')">'+(pagado?'✓ Cobrado':'Pendiente')+'</span></td>'+
+      '</tr>';
+    }).join('')+
+    '</tbody></table></div></div>';
 }
 
 function renderOficina(){
