@@ -5401,6 +5401,33 @@ function aumentoEstado(proxAumento){
   return {txt:'Próximo aumento: '+fd(proxAumento), color:'#6B7E8F', urgente:false};
 }
 
+// --- Minimizar / expandir propiedades (preferencia de esta computadora, no se sincroniza) ---
+const PROP_MIN_KEY = 'odsa_prop_minimizadas';
+function propMinimizadas(){
+  try{ return JSON.parse(localStorage.getItem(PROP_MIN_KEY)||'{}')||{}; }catch(e){ return {}; }
+}
+function guardarPropMin(obj){ try{ localStorage.setItem(PROP_MIN_KEY, JSON.stringify(obj)); }catch(e){} }
+function togglePropMin(id){
+  const m = propMinimizadas();
+  if(m[id]) delete m[id]; else m[id] = true;
+  guardarPropMin(m); renderPropiedades();
+}
+function setTodasPropMin(min){
+  const m = {};
+  if(min) (D.propiedades||[]).forEach(p=>{ m[p.id] = true; });
+  guardarPropMin(m); renderPropiedades();
+}
+// --- Editar nombre / inquilino desde la tarjeta ---
+function setPropTexto(id, campo, el){
+  const p = (D.propiedades||[]).find(x=>x.id===id);
+  if(!p || !el) return;
+  const valor = (el.value||'').trim();
+  if(campo==='nombre' && !valor){ el.value = p.nombre; toast('El nombre no puede quedar vacío'); return; }
+  if((p[campo]||'') === valor) return;
+  p[campo] = valor;
+  save(); toast('✓ Guardado');
+}
+
 // Recordatorio: propiedades que tienen el aumento programado en el mes elegido
 function avisoAumentosMes(props, m){
   const aumentosMes = (props||[]).filter(p=>p.proxAumento && p.proxAumento.slice(0,7)===m);
@@ -5421,7 +5448,12 @@ function renderPropiedades(){
     return;
   }
 
-  cont.innerHTML = avisoAumentosMes(props, mesSel) + props.map(p=>{
+  const propMin = propMinimizadas();
+  const botonesTodas = props.length>1 ? '<div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:10px">'+
+      '<button class="btn btn-sm" style="background:#fff;color:#1B3A6B;border:1px solid #D8E2EC" onclick="setTodasPropMin(true)">▸ Minimizar todas</button>'+
+      '<button class="btn btn-sm" style="background:#fff;color:#1B3A6B;border:1px solid #D8E2EC" onclick="setTodasPropMin(false)">▾ Expandir todas</button>'+
+    '</div>' : '';
+  cont.innerHTML = avisoAumentosMes(props, mesSel) + botonesTodas + props.map(p=>{
     const est = aumentoEstado(p.proxAumento);
     const serviciosAlDia = p.servicios.filter(s=>s.alDia).length;
     const totalServicios = p.servicios.reduce((t,s)=>t+(parseFloat(s.monto)||0),0);
@@ -5435,12 +5467,31 @@ function renderPropiedades(){
       '</tr>'
     ).join('');
 
+    const min = !!propMin[p.id];
+    const escA = v => String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    const inpTxt = 'border:1px dashed transparent;background:transparent;border-radius:6px;padding:2px 6px;margin-left:-6px;font-family:inherit;width:100%;max-width:420px';
+    const resumenMin = min ? '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;font-size:12.5px">'+
+        '<span style="background:#EAF6EF;color:#1A7A52;padding:3px 10px;border-radius:10px;font-weight:700">Alquiler '+fmt(p.alquiler||0)+'</span>'+
+        '<span style="background:#F0F4F8;color:#1B3A6B;padding:3px 10px;border-radius:10px;font-weight:700">Servicios '+serviciosAlDia+'/'+p.servicios.length+' al día'+(totalServicios>0?' · '+fmt(totalServicios):'')+'</span>'+
+        (est?'<span style="background:'+(est.urgente?'#FBF6E9':'#F5F7FA')+';color:'+est.color+';padding:3px 10px;border-radius:10px;font-weight:700">'+est.txt+'</span>':'')+
+      '</div>' : '';
+
     return '<div class="card" style="margin-bottom:18px'+(est&&est.urgente?';border-left:4px solid '+est.color:'')+'">'+
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:14px">'+
-        '<div><div class="card-title" style="margin-bottom:2px">🏠 '+p.nombre+'</div>'+
-          '<div style="font-size:13px;color:#6B7E8F">Inquilino: '+(p.inquilino||'—')+'</div></div>'+
-        '<button class="del-btn" onclick="delPropiedad(\''+p.id+'\')">🗑 Eliminar</button>'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:'+(min?'0':'14px')+'">'+
+        '<div style="flex:1;min-width:220px">'+
+          '<div style="display:flex;align-items:center;gap:4px"><span class="card-title" style="margin-bottom:0">🏠</span>'+
+            '<input class="card-title" title="Clic para editar el nombre" value="'+escA(p.nombre)+'" onfocus="this.style.borderColor=\'#D8E2EC\'" onblur="this.style.borderColor=\'transparent\';setPropTexto(\''+p.id+'\',\'nombre\',this)" onkeydown="if(event.key===\'Enter\')this.blur()" style="margin-bottom:0;'+inpTxt+'"></div>'+
+          '<div style="display:flex;align-items:center;gap:4px;font-size:13px;color:#6B7E8F">Inquilino:'+
+            '<input title="Clic para editar el inquilino" placeholder="Agregar inquilino" value="'+escA(p.inquilino)+'" onfocus="this.style.borderColor=\'#D8E2EC\'" onblur="this.style.borderColor=\'transparent\';setPropTexto(\''+p.id+'\',\'inquilino\',this)" onkeydown="if(event.key===\'Enter\')this.blur()" style="font-size:13px;color:#1a2332;margin-left:0;'+inpTxt+';max-width:300px"></div>'+
+          resumenMin+
+        '</div>'+
+        '<div style="display:flex;gap:6px;align-items:center">'+
+          '<button class="btn btn-sm" style="background:#fff;color:#1B3A6B;border:1px solid #D8E2EC" onclick="togglePropMin(\''+p.id+'\')">'+(min?'▸ Expandir':'▾ Minimizar')+'</button>'+
+          '<button class="del-btn" onclick="delPropiedad(\''+p.id+'\')">🗑 Eliminar</button>'+
+        '</div>'+
       '</div>'+
+      (min ? '</div>' : '')+
+      (min ? '' : 
       // Alquiler y aumento
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:14px">'+
         '<div class="kpi-card"><div class="kpi-label">Alquiler actual</div>'+
@@ -5457,7 +5508,7 @@ function renderPropiedades(){
       '<div style="font-size:13px;font-weight:800;color:#1a2332;margin-bottom:8px">Servicios ('+serviciosAlDia+'/'+p.servicios.length+' al día'+(totalServicios>0?' · Total: '+fmt(totalServicios):'')+')</div>'+
       '<div class="tw"><table><thead><tr><th>Servicio</th><th style="text-align:right">Monto</th><th style="text-align:center">Estado</th><th style="text-align:center">Vence</th><th></th></tr></thead><tbody>'+filasServ+'</tbody></table></div>'+
       '<button class="btn btn-sm" style="margin-top:8px;background:#fff;color:#1B3A6B;border:1px solid #D8E2EC" onclick="addServicio(\''+p.id+'\')">+ Agregar servicio</button>'+
-    '</div>';
+    '</div>');
   }).join('');
 }
 
