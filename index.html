@@ -1353,6 +1353,8 @@ function renderTodoElPeriodo(){
   _safe(()=>{ const pp=g('page-propiedades'); if(pp && pp.classList.contains('on')){ renderPropiedades(); renderPropMes(); } },'renderPropiedades');
   const pageTr = g('page-transferencias');
   if(pageTr && pageTr.classList.contains('on')) _safe(renderTransferencias,'renderTransferencias');
+  const pageCe = g('page-costoemp');
+  if(pageCe && pageCe.classList.contains('on')) _safe(renderCostoEmpleado,'renderCostoEmpleado');
 }
 function cambiarMesSel(delta){
   mesSel = shiftMes(mesSel, delta);
