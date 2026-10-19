@@ -412,6 +412,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
               <div class="fg"><label>Nombre completo</label><input id="ne-nom" placeholder="Nombre..."></div>
               <div class="fg"><label>Sector</label><select id="ne-sec">
                 <option value="operadoras">Operadoras</option>
+                <option value="nigrum">Nigrum</option>
                 <option value="turnos">Turnos</option>
                 <option value="administracion">Administración</option>
                 <option value="sistemas">Sistemas</option>
@@ -440,6 +441,9 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
               <div class="fg"><label>CUIL</label><input id="ne-cuil" placeholder="20-12345678-9" maxlength="13"></div>
               <div class="fg"><label>CBU / Alias</label><input id="ne-cbu" placeholder="CBU o alias"></div>
               <div class="fg"><label>Nota</label><input id="ne-nota" placeholder="Opcional..."></div>
+            </div>
+            <div class="frow frow-4">
+              <div class="fg"><label>Cobra desde (mes)</label><input id="ne-desde" type="month" title="Dejalo vacío si ya cobra desde antes"></div>
             </div>
             <button class="btn btn-primary" onclick="addEmpleado()">+ Agregar empleado</button>
           </div>
@@ -1375,7 +1379,7 @@ const g   = id => document.getElementById(id);
 const gv  = id => g(id)?g(id).value:'';
 const sv  = (id,v) => { if(g(id)) g(id).value=v; };
 const MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-const SECTORES = {yamaha:'Yamaha',operadoras:'Operadoras',turnos:'Turnos',administracion:'Administración',sistemas:'Sistemas',limpieza:'Limpieza',kinebs:'Kinebs',fichas:'Fichas',publicidad:'Publicidad',simple_speed:'Simple Speed',otro:'Otro'};
+const SECTORES = {yamaha:'Yamaha',operadoras:'Operadoras',nigrum:'Nigrum',turnos:'Turnos',administracion:'Administración',sistemas:'Sistemas',limpieza:'Limpieza',kinebs:'Kinebs',fichas:'Fichas',publicidad:'Publicidad',simple_speed:'Simple Speed',otro:'Otro'};
 const CATS = {alquiler:'Alquiler',servicios:'Servicios',arca:'ARCA/Impuestos',publicidad:'Publicidad',sistemas:'Sistemas',insumos:'Insumos',oficina:'Oficina',otro:'Otro'};
 
 function toast(msg){
@@ -1781,7 +1785,7 @@ async function syncFromCloud(){
 function startSync(){ _syncInterval = setInterval(syncFromCloud, 30000); }
 
 function renderFichaBancaria(){
-  const SECTORES={yamaha:'Yamaha',operadoras:'Operadoras',turnos:'Turnos',administracion:'Administracion',sistemas:'Sistemas',limpieza:'Limpieza',kinebs:'Kinebs',fichas:'Fichas',publicidad:'Publicidad',otro:'Otro'};
+  const SECTORES={yamaha:'Yamaha',operadoras:'Operadoras',nigrum:'Nigrum',turnos:'Turnos',administracion:'Administracion',sistemas:'Sistemas',limpieza:'Limpieza',kinebs:'Kinebs',fichas:'Fichas',publicidad:'Publicidad',otro:'Otro'};
   const empBody=document.getElementById('ficha-emp-body');
   const extBody=document.getElementById('ficha-ext-body');
   if(!empBody||!extBody) return;
@@ -4361,6 +4365,8 @@ function toggleSector(k){ window._secCollapsed[k]=!window._secCollapsed[k]; rend
 // El mes actual sigue usando los campos en vivo del empleado (sin cambios de comportamiento).
 // Meses distintos al actual se guardan/leen de D.nomina.
 function getNominaEmp(emp, m){
+  // Empleado que empieza a cobrar en un mes posterior: antes de ese mes no suma nada
+  if(emp.desde && m < emp.desde) return {sueldo:0, hsExtra:0, pagado:false, semPago:emp.semPago||1};
   if(m===mes()){
     return {sueldo:emp.sueldo||0, hsExtra:emp.hsExtra||0, pagado:!!emp.pagado, semPago:emp.semPago||1};
   }
@@ -4395,6 +4401,13 @@ function setNominaEmp(empId, m, campo, valor){
   const emp = D.empleados.find(e=>e.id===empId);
   if(!emp) return;
   if(mesEstaCerrado(m)){ toast('🔒 ' + mesLabel(m) + ' está cerrado. Reabrilo para editar sueldos.'); return; }
+  if(emp.desde && m < emp.desde){ toast(emp.nombre+' cobra desde '+mesLabel(emp.desde)); return; }
+  // Primer mes de un empleado nuevo (todavía no empezó): el sueldo que se carga ahí
+  // es su sueldo base, así queda fijo para todos los meses siguientes.
+  if(emp.desde && m===emp.desde && m > mes() && campo==='sueldo'){
+    emp.sueldo=valor;
+    return;
+  }
   if(m===mes()){
     emp[campo]=valor;
     return;
@@ -4432,6 +4445,7 @@ function renderEmpleados(){
   const SECTORES_ORDEN = [
     ['yamaha','YAMAHA'],
     ['operadoras','OPERADORAS CALL'],
+    ['nigrum','NIGRUM'],
     ['turnos','TURNOS OSMEDICA'],
     ['kinebs','KINEBS'],
     ['fichas','OSMEDICA FICHAS'],
@@ -4578,8 +4592,11 @@ function addEmpleado(){
   const nom = gv('ne-nom').trim();
   const sueldo = parseFloat(gv('ne-sueldo'))||0;
   if(!nom){ alert('Ingresá el nombre'); return; }
-  D.empleados.push({id:uid(),nombre:nom,sector:gv('ne-sec'),sueldo,mod:gv('ne-mod'),banco:gv('ne-banco'),cuil:gv('ne-cuil'),cbu:gv('ne-cbu'),nota:gv('ne-nota'),pagado:false});
-  save(); fillSelects(); toast('✓ Empleado agregado');
+  const desde = (g('ne-desde') && g('ne-desde').value) || '';
+  const nuevo = {id:uid(),nombre:nom,sector:gv('ne-sec'),sueldo,mod:gv('ne-mod'),banco:gv('ne-banco'),cuil:gv('ne-cuil'),cbu:gv('ne-cbu'),nota:gv('ne-nota'),pagado:false};
+  if(desde) nuevo.desde = desde;
+  D.empleados.push(nuevo);
+  save(); fillSelects(); toast('✓ Empleado agregado'+(desde?' (cobra desde '+mesLabel(desde)+')':''));
   sv('ne-nom',''); sv('ne-sueldo',''); sv('ne-cuil',''); sv('ne-cbu',''); sv('ne-nota','');
 }
 
