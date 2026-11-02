@@ -5424,6 +5424,7 @@ function togglePagoAlquiler(propId, m){
   if(!p.pagos) p.pagos = {};
   p.pagos[m] = !p.pagos[m];
   save(); renderPropiedades(); renderPropMes();
+  toast(p.pagos[m] ? '✓ '+p.nombre+': alquiler de '+mesLabel(m)+' cobrado' : p.nombre+': alquiler de '+mesLabel(m)+' pendiente');
 }
 
 // --- Avisa si un aumento está cerca (dentro de 15 días) o vencido ---
@@ -5491,6 +5492,7 @@ function renderPropiedades(){
     '</div>' : '';
   cont.innerHTML = avisoAumentosMes(props, mesSel) + botonesTodas + props.map(p=>{
     const est = aumentoEstado(p.proxAumento);
+    const pagadoMes = !!(p.pagos && p.pagos[mesSel]);
     const serviciosAlDia = p.servicios.filter(s=>servMes(s,mesSel).alDia).length;
     const totalServicios = p.servicios.reduce((t,s)=>t+(parseFloat(servMes(s,mesSel).monto)||0),0);
     const filasServ = p.servicios.map((s0,idx)=>{ const s = Object.assign({nombre:s0.nombre}, servMes(s0,mesSel)); return (
@@ -5508,6 +5510,7 @@ function renderPropiedades(){
     const inpTxt = 'border:1px dashed transparent;background:transparent;border-radius:6px;padding:2px 6px;margin-left:-6px;font-family:inherit;width:100%;max-width:420px';
     const resumenMin = min ? '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;font-size:12.5px">'+
         '<span style="background:#EAF6EF;color:#1A7A52;padding:3px 10px;border-radius:10px;font-weight:700">Alquiler '+fmt(p.alquiler||0)+'</span>'+
+        '<span title="Clic para cambiar" onclick="togglePagoAlquiler(\''+p.id+'\',\''+mesSel+'\')" style="cursor:pointer;'+(pagadoMes?'background:#EAF6EF;color:#1A7A52':'background:#FBF6E9;color:#B8943E')+';padding:3px 10px;border-radius:10px;font-weight:700">'+(pagadoMes?'✓ Cobrado':'Alquiler pendiente')+'</span>'+
         '<span style="background:#F0F4F8;color:#1B3A6B;padding:3px 10px;border-radius:10px;font-weight:700">Servicios '+serviciosAlDia+'/'+p.servicios.length+' al día'+(totalServicios>0?' · '+fmt(totalServicios):'')+'</span>'+
         (est?'<span style="background:'+(est.urgente?'#FBF6E9':'#F5F7FA')+';color:'+est.color+';padding:3px 10px;border-radius:10px;font-weight:700">'+est.txt+'</span>':'')+
       '</div>' : '';
@@ -5531,7 +5534,8 @@ function renderPropiedades(){
       // Alquiler y aumento
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:14px">'+
         '<div class="kpi-card"><div class="kpi-label">Alquiler actual</div>'+
-          '<input type="number" value="'+(p.alquiler||0)+'" onblur="setPropCampo(\''+p.id+'\',\'alquiler\',this.value)" style="width:100%;font-size:18px;font-weight:800;color:#1A7A52;border:none;background:transparent;border-bottom:1px solid #E4EAF0"></div>'+
+          '<input type="number" value="'+(p.alquiler||0)+'" onblur="setPropCampo(\''+p.id+'\',\'alquiler\',this.value)" style="width:100%;font-size:18px;font-weight:800;color:#1A7A52;border:none;background:transparent;border-bottom:1px solid #E4EAF0">'+
+          '<button class="btn btn-sm" title="Clic para cambiar" onclick="togglePagoAlquiler(\''+p.id+'\',\''+mesSel+'\')" style="margin-top:8px;width:100%;font-weight:700;'+(pagadoMes?'background:#EAF6EF;color:#1A7A52;border:1px solid #B7E0C9':'background:#FBF6E9;color:#B8943E;border:1px solid #E8D9A8')+'">'+(pagadoMes?'✓ Cobrado '+mesLabel(mesSel):'Marcar cobrado ('+mesLabel(mesSel)+')')+'</button></div>'+
         '<div class="kpi-card"'+(est&&est.urgente?' style="background:'+(est.color==='#C0392B'?'#FDECEA':'#FBF6E9')+'"':'')+'>'+
           '<div class="kpi-label">'+(est?est.txt:'Sin aumento programado')+'</div>'+
           '<input type="date" value="'+(p.proxAumento||'')+'" onchange="setPropCampo(\''+p.id+'\',\'proxAumento\',this.value)" style="width:100%;font-size:13px;border:none;background:transparent;border-bottom:1px solid #E4EAF0;margin-top:4px"></div>'+
