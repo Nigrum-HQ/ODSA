@@ -2142,7 +2142,19 @@ function renderPendientes(){
     '</div>';
   }
 
-  if(!alertas.length && aumentosProx.length===0){
+  // Aumentos de sueldo por inflación: este mes, atrasados o el mes que viene
+  const empAum = (D.empleados||[]).filter(e=>e.proxAumento && e.proxAumento <= shiftMes(mes(),1));
+  if(empAum.length>0){
+    avisoAumentos += '<div onclick="navPage(\'empleados\')" style="cursor:pointer;background:#FBF6E9;border:1px solid #E8D9A8;border-radius:12px;padding:14px 18px;margin-top:12px">'+
+      '<div style="font-weight:800;color:#B8943E;font-size:13.5px;margin-bottom:6px">📈 Aumentos de sueldo por inflación</div>'+
+      empAum.map(e=>{
+        const est = empAumentoEstado(e);
+        return '<div style="font-size:13px;color:#7D6608;padding:2px 0">• '+e.nombre+' — '+(est?est.txt:'')+' (sueldo actual '+fmt(e.sueldo||0)+')</div>';
+      }).join('')+
+    '</div>';
+  }
+
+  if(!alertas.length && aumentosProx.length===0 && empAum.length===0){
     cont.innerHTML = '<div style="background:#EAF6EF;border:1px solid #B7E0C9;border-radius:14px;padding:16px 20px;color:#166534;font-weight:700">✅ Todo al día en '+mesLabel(m)+' — no hay pagos pendientes.</div>';
     return;
   }
@@ -4429,6 +4441,60 @@ function setNominaEmp(empId, m, campo, valor){
   }
   rec._ts = Date.now(); // marca de tiempo por registro, para poder fusionar sin perder cambios de otra persona
 }
+// --- Aumentos de sueldo por inflación (cada 3 meses) ---
+// e.proxAumento = 'AAAA-MM' del próximo aumento. El aviso aparece desde el mes anterior.
+function empAumentoEstado(e){
+  if(!e || !e.proxAumento) return null;
+  const hoy = mes(), sig = shiftMes(hoy, 1);
+  if(e.proxAumento < hoy)  return {txt:'Aumento atrasado ('+mesLabel(e.proxAumento)+')', color:'#C0392B', bg:'#FDECEA', toca:true};
+  if(e.proxAumento === hoy) return {txt:'Toca aumento este mes', color:'#B8943E', bg:'#FBF6E9', toca:true};
+  if(e.proxAumento === sig) return {txt:'Aumento en '+mesLabel(sig), color:'#B8943E', bg:'#FBF6E9', toca:false};
+  return {txt:'Próx. aumento: '+mesLabel(e.proxAumento), color:'#6B7E8F', bg:'#F5F7FA', toca:false};
+}
+function empAumentoBadge(e){
+  const est = empAumentoEstado(e);
+  if(!est) return '';
+  return '<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap;align-items:center">'+
+    '<span title="Clic para cambiar el mes del próximo aumento" onclick="setEmpProxAumento(\''+e.id+'\')" style="cursor:pointer;font-size:10.5px;padding:2px 8px;border-radius:5px;font-weight:700;background:'+est.bg+';color:'+est.color+'">📈 '+est.txt+'</span>'+
+    (est.toca ? '<button onclick="aplicarAumentoEmp(\''+e.id+'\')" style="font-size:10.5px;padding:2px 8px;border-radius:5px;border:1px solid #1B3A6B;background:#1B3A6B;color:#fff;cursor:pointer;font-weight:700">Aplicar aumento</button>' : '')+
+  '</div>';
+}
+function setEmpProxAumento(id){
+  const e = (D.empleados||[]).find(x=>x.id===id);
+  if(!e) return;
+  const v = prompt('Mes del próximo aumento de '+e.nombre+' (formato AAAA-MM, por ejemplo 2027-02).\nDejalo vacío para quitar el aumento.', e.proxAumento||'');
+  if(v===null) return;
+  const t = v.trim();
+  if(t && !/^\d{4}-(0[1-9]|1[0-2])$/.test(t)){ toast('Formato inválido. Usá AAAA-MM, por ejemplo 2027-02'); return; }
+  if(t) e.proxAumento = t; else delete e.proxAumento;
+  save(); renderEmpleados(); toast(t ? '✓ Próximo aumento de '+e.nombre+': '+mesLabel(t) : 'Aumento quitado');
+}
+function aplicarAumentoEmp(id){
+  const e = (D.empleados||[]).find(x=>x.id===id);
+  if(!e) return;
+  const v = prompt('Nuevo sueldo de '+e.nombre+'\nSueldo actual: '+fmt(e.sueldo||0)+'\n\nEscribí el nuevo sueldo (solo números):', '');
+  if(v===null) return;
+  const nuevo = Math.round(parseFloat(String(v).replace(/\$/g,'').replace(/\./g,'').replace(',','.').trim())||0);
+  if(nuevo<=0){ toast('Monto inválido'); return; }
+  const hoy = mes();
+  if(!D.nomina) D.nomina = [];
+  // Los meses anteriores sin historial guardado usan el sueldo base: los congelamos con el sueldo viejo
+  // para que el aumento no cambie meses que ya pasaron.
+  const mesesPasados = [...new Set(D.nomina.map(n=>n.mes))].filter(mm=>mm<hoy && (!e.desde || mm>=e.desde));
+  mesesPasados.forEach(mm=>{
+    if(!D.nomina.find(n=>n.emp_id===e.id && n.mes===mm)){
+      D.nomina.push({id:uid(), _ts:Date.now(), mes:mm, emp_id:e.id, sueldo:e.sueldo||0, hsExtra:0, pagado:false, semPago:e.semPago||1});
+    }
+  });
+  const anterior = e.sueldo||0;
+  e.sueldo = nuevo;
+  if(!e.aumentos) e.aumentos = [];
+  e.aumentos.push({mes:hoy, de:anterior, a:nuevo});
+  e.proxAumento = shiftMes(e.proxAumento && e.proxAumento>hoy ? e.proxAumento : (e.proxAumento||hoy), 3);
+  save(); renderEmpleados();
+  toast('✓ Aumento aplicado a '+e.nombre+': '+fmt(anterior)+' → '+fmt(nuevo)+'. Próximo: '+mesLabel(e.proxAumento));
+}
+
 function renderEmpleados(){
   const _wrap = g('emp-periodo-wrap'); if(_wrap && !_wrap.innerHTML) _wrap.innerHTML = periodoSelectorHTML('emp');
   const m = mesSel;
@@ -4490,7 +4556,7 @@ function renderEmpleados(){
         const ac = Math.max(0, n.sueldo+hx-adv);
         const sp = n.semPago||1;
         return '<tr>'
-          +'<td><strong>'+e.nombre+'</strong>'+(e.nota?'<div style="font-size:11px;color:#8A9BAB">'+e.nota+'</div>':'')+'<div style="margin-top:3px"><button data-eid="'+e.id+'" onclick="showBancoEmp(event,this.dataset.eid)" style="font-size:10px;padding:2px 8px;border-radius:5px;border:1px solid #E4EAF0;background:#F5F7FA;color:#1B3A6B;cursor:pointer;font-weight:600">&#127974; Ver datos</button></div>'+'</td>'
+          +'<td><strong>'+e.nombre+'</strong>'+(e.nota?'<div style="font-size:11px;color:#8A9BAB">'+e.nota+'</div>':'')+'<div style="margin-top:3px"><button data-eid="'+e.id+'" onclick="showBancoEmp(event,this.dataset.eid)" style="font-size:10px;padding:2px 8px;border-radius:5px;border:1px solid #E4EAF0;background:#F5F7FA;color:#1B3A6B;cursor:pointer;font-weight:600">&#127974; Ver datos</button></div>'+empAumentoBadge(e)+'</td>'
           +'<td><input type="number" value="'+(n.sueldo||'')+'" placeholder="0" style="width:130px;padding:5px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;font-family:inherit;font-weight:600;color:#C0392B" onblur="updateSueldo(this.dataset.id,this.value)" data-id="'+e.id+'" step="1" min="0"></td>'
           +'<td><input type="number" value="'+(hx)+'" placeholder="0" style="width:110px;padding:5px 8px;border:1.5px solid #E4EAF0;border-radius:7px;font-size:13px;font-family:inherit" onblur="updateHsExtra(this.dataset.id,this.value)" data-id="'+e.id+'"></td>'
           +'<td style="color:#B8943E;font-weight:600">'+(adv>0?fmt(adv):'—')+'</td>'
