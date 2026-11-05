@@ -413,6 +413,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
               <div class="fg"><label>Sector</label><select id="ne-sec">
                 <option value="operadoras">Operadoras</option>
                 <option value="nigrum">Nigrum</option>
+                <option value="operadoras_rodrigo">Operadoras Rodrigo</option>
                 <option value="turnos">Turnos</option>
                 <option value="administracion">Administración</option>
                 <option value="sistemas">Sistemas</option>
@@ -1381,7 +1382,7 @@ const g   = id => document.getElementById(id);
 const gv  = id => g(id)?g(id).value:'';
 const sv  = (id,v) => { if(g(id)) g(id).value=v; };
 const MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-const SECTORES = {yamaha:'Yamaha',operadoras:'Operadoras',nigrum:'Nigrum',turnos:'Turnos',administracion:'Administración',sistemas:'Sistemas',limpieza:'Limpieza',kinebs:'Kinebs',fichas:'Fichas',publicidad:'Publicidad',simple_speed:'Simple Speed',otro:'Otro'};
+const SECTORES = {yamaha:'Yamaha',operadoras:'Operadoras',nigrum:'Nigrum',operadoras_rodrigo:'Operadoras Rodrigo',turnos:'Turnos',administracion:'Administración',sistemas:'Sistemas',limpieza:'Limpieza',kinebs:'Kinebs',fichas:'Fichas',publicidad:'Publicidad',simple_speed:'Simple Speed',otro:'Otro'};
 const CATS = {alquiler:'Alquiler',servicios:'Servicios',arca:'ARCA/Impuestos',publicidad:'Publicidad',sistemas:'Sistemas',insumos:'Insumos',oficina:'Oficina',otro:'Otro'};
 
 function toast(msg){
@@ -1787,7 +1788,7 @@ async function syncFromCloud(){
 function startSync(){ _syncInterval = setInterval(syncFromCloud, 30000); }
 
 function renderFichaBancaria(){
-  const SECTORES={yamaha:'Yamaha',operadoras:'Operadoras',nigrum:'Nigrum',turnos:'Turnos',administracion:'Administracion',sistemas:'Sistemas',limpieza:'Limpieza',kinebs:'Kinebs',fichas:'Fichas',publicidad:'Publicidad',otro:'Otro'};
+  const SECTORES={yamaha:'Yamaha',operadoras:'Operadoras',nigrum:'Nigrum',operadoras_rodrigo:'Operadoras Rodrigo',turnos:'Turnos',administracion:'Administracion',sistemas:'Sistemas',limpieza:'Limpieza',kinebs:'Kinebs',fichas:'Fichas',publicidad:'Publicidad',otro:'Otro'};
   const empBody=document.getElementById('ficha-emp-body');
   const extBody=document.getElementById('ficha-ext-body');
   if(!empBody||!extBody) return;
@@ -4514,6 +4515,7 @@ function renderEmpleados(){
     ['yamaha','YAMAHA'],
     ['operadoras','OPERADORAS CALL'],
     ['nigrum','NIGRUM'],
+    ['operadoras_rodrigo','OPERADORAS RODRIGO'],
     ['turnos','TURNOS OSMEDICA'],
     ['kinebs','KINEBS'],
     ['fichas','OSMEDICA FICHAS'],
