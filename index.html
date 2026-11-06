@@ -1552,6 +1552,62 @@ function salir(){ clearToken(); location.reload(); }
 // ═══════════════════════════════
 // INIT
 // ═══════════════════════════════
+// ═══════════════════════════════
+// NÓMINA: CIERRE AUTOMÁTICO AL CAMBIAR DE MES
+// ═══════════════════════════════
+// El mes en curso se muestra con los datos de la ficha de cada empleado (sueldo, hs.extra,
+// pagado, semana). Cuando empieza un mes nuevo, guardamos esos datos como historial del mes
+// que terminó (una "foto"), así un aumento o un cambio posterior no modifica meses pasados.
+// D.nominaMesActual = mes que estaba en curso la última vez que se guardaron los datos.
+function rolloverNomina(){
+  if(!D || !Array.isArray(D.empleados) || !D.empleados.length) return false;
+  const hoy = mes();
+  if(!D.nominaMesActual){ D.nominaMesActual = hoy; return true; } // primera vez: solo marca desde cuándo
+  if(D.nominaMesActual >= hoy) return false;
+  if(!D.nomina) D.nomina = [];
+  const prev = D.nominaMesActual;
+  const ahora = Date.now();
+  const buscar = (emp, m) => D.nomina.find(n=>n.emp_id===emp.id && n.mes===m);
+  const guardar = (emp, m, vals) => {
+    let rec = buscar(emp, m);
+    if(!rec){ rec = {id:uid(), emp_id:emp.id, mes:m}; D.nomina.push(rec); }
+    Object.assign(rec, vals, {sueldoManual:true, congelado:true, _ts:ahora});
+  };
+  D.empleados.forEach(emp=>{
+    // 1) El mes que terminó: tal cual se veía como mes en curso
+    if(!(emp.desde && prev < emp.desde)){
+      guardar(emp, prev, {sueldo:emp.sueldo||0, hsExtra:emp.hsExtra||0, pagado:!!emp.pagado, semPago:emp.semPago||1});
+    }
+    // 2) Meses intermedios (si nadie entró al sistema durante más de un mes): como se veían a futuro
+    for(let m = shiftMes(prev,1); m < hoy; m = shiftMes(m,1)){
+      if(emp.desde && m < emp.desde) continue;
+      const r = buscar(emp, m);
+      guardar(emp, m, {
+        sueldo: (r && r.sueldoManual) ? (r.sueldo||0) : (emp.sueldo||0),
+        hsExtra: r ? (r.hsExtra||0) : 0,
+        pagado: r ? !!r.pagado : false,
+        semPago: r ? (r.semPago||emp.semPago||1) : (emp.semPago||1)
+      });
+    }
+    // 3) El mes nuevo arranca sin pagar y sin hs.extra, salvo lo que se haya cargado a futuro para él
+    const rn = buscar(emp, hoy);
+    emp.pagado  = rn ? !!rn.pagado : false;
+    emp.hsExtra = rn ? (rn.hsExtra||0) : 0;
+    if(rn && rn.semPago) emp.semPago = rn.semPago;
+  });
+  D.nominaMesActual = hoy;
+  return true;
+}
+function chequearCambioDeMes(){
+  try{
+    const antes = D && D.nominaMesActual;
+    if(rolloverNomina()){
+      save();
+      if(antes) { try{ renderTodoElPeriodo(); }catch(e){} toast('📅 Empezó '+mesLabel(mes())+': la nómina de '+mesLabel(antes)+' quedó guardada'); }
+    }
+  }catch(e){ console.error('rolloverNomina', e); }
+}
+
 async function initApp(){
   initCFMes();
   // Show loading overlay
@@ -1562,6 +1618,7 @@ async function initApp(){
   document.body.appendChild(overlay);
   await load();
   overlay.remove();
+  try{ rolloverNomina(); }catch(e){ console.error('rolloverNomina', e); }
   // Punto de partida para "deshacer": el estado recién cargado es el "antes" del primer cambio
   _ultimoEstadoConocido = JSON.stringify(D);
   _undoStack = [];
@@ -1589,6 +1646,8 @@ async function initApp(){
   sv('tr-fecha', hoy());
   // Backup automático diario (crea una copia por día, en segundo plano)
   hacerBackupAuto();
+  // IPC oficial del INDEC (para sugerir aumentos de sueldos y alquileres)
+  cargarIPC();
   // Resumen del día (una vez por día, al entrar)
   setTimeout(mostrarResumenDelDia, 600);
 }
@@ -1785,7 +1844,7 @@ async function syncFromCloud(){
     }
   }catch(e){}
 }
-function startSync(){ _syncInterval = setInterval(syncFromCloud, 30000); }
+function startSync(){ _syncInterval = setInterval(syncFromCloud, 30000); setInterval(chequearCambioDeMes, 60000); }
 
 function renderFichaBancaria(){
   const SECTORES={yamaha:'Yamaha',operadoras:'Operadoras',nigrum:'Nigrum',operadoras_rodrigo:'Operadoras Rodrigo',turnos:'Turnos',administracion:'Administracion',sistemas:'Sistemas',limpieza:'Limpieza',kinebs:'Kinebs',fichas:'Fichas',publicidad:'Publicidad',otro:'Otro'};
@@ -2155,7 +2214,16 @@ function renderPendientes(){
     '</div>';
   }
 
-  if(!alertas.length && aumentosProx.length===0 && empAum.length===0){
+  // Contratos de alquiler vencidos o por vencer (90 días)
+  const contratosAlerta = (D.propiedades||[]).filter(p=>{ const c = contratoEstado(p); return c && c.alerta; });
+  if(contratosAlerta.length>0){
+    avisoAumentos += '<div onclick="navPage(\'propiedades\')" style="cursor:pointer;background:#FDF3E7;border:1px solid #F0D2A8;border-radius:12px;padding:14px 18px;margin-top:12px">'+
+      '<div style="font-weight:800;color:#B9770E;font-size:13.5px;margin-bottom:6px">📄 Contratos de alquiler por vencer</div>'+
+      contratosAlerta.map(p=>'<div style="font-size:13px;color:#7D6608;padding:2px 0">• '+p.nombre+(p.inquilino?' ('+p.inquilino+')':'')+' — '+contratoEstado(p).txt+'</div>').join('')+
+    '</div>';
+  }
+
+  if(!alertas.length && aumentosProx.length===0 && empAum.length===0 && contratosAlerta.length===0){
     cont.innerHTML = '<div style="background:#EAF6EF;border:1px solid #B7E0C9;border-radius:14px;padding:16px 20px;color:#166534;font-weight:700">✅ Todo al día en '+mesLabel(m)+' — no hay pagos pendientes.</div>';
     return;
   }
@@ -4473,7 +4541,12 @@ function setEmpProxAumento(id){
 function aplicarAumentoEmp(id){
   const e = (D.empleados||[]).find(x=>x.id===id);
   if(!e) return;
-  const v = prompt('Nuevo sueldo de '+e.nombre+'\nSueldo actual: '+fmt(e.sueldo||0)+'\n\nEscribí el nuevo sueldo (solo números):', '');
+  const mesHoyA = mes();
+  const mAumA = (e.proxAumento && e.proxAumento <= mesHoyA) ? e.proxAumento : mesHoyA;
+  const sugA = ipcSugerencia(e.sueldo||0, mAumA);
+  const v = prompt('Nuevo sueldo de '+e.nombre+'\nSueldo actual: '+fmt(e.sueldo||0)+
+    (sugA ? '\n\nSugerido: '+fmt(sugA.monto)+'\n'+ipcTexto(sugA, mAumA) : '')+
+    '\n\nEscribí el nuevo sueldo (solo números):', sugA ? String(sugA.monto) : '');
   if(v===null) return;
   const nuevo = Math.round(parseFloat(String(v).replace(/\$/g,'').replace(/\./g,'').replace(',','.').trim())||0);
   if(nuevo<=0){ toast('Monto inválido'); return; }
@@ -5431,7 +5504,7 @@ function setPropCampo(id, campo, valor){
   if(campo==='alquiler'||campo==='proxAumentoMonto') valor = parseFloat(valor)||0;
   p[campo] = valor;
   save();
-  if(campo==='proxAumento' || campo==='proxAumentoMonto') renderPropiedades();
+  if(campo==='proxAumento' || campo==='proxAumentoMonto' || campo==='contratoFin' || campo==='contratoInicio') renderPropiedades();
 }
 
 // --- Servicios ---
@@ -5496,6 +5569,53 @@ function togglePagoAlquiler(propId, m){
 }
 
 // --- Avisa si un aumento está cerca (dentro de 15 días) o vencido ---
+// ═══════════════════════════════
+// IPC INDEC (aumentos sugeridos)
+// ═══════════════════════════════
+// /api/ipc trae la serie oficial del INDEC (nivel general, nacional).
+// Criterio: el aumento de un mes M cubre los 3 meses anteriores (M-3, M-2, M-1).
+// Si el INDEC todavía no publicó M-1, se usan los últimos 3 publicados y se marca "provisorio".
+let IPC = null;
+async function cargarIPC(){
+  try{
+    const r = await fetch('/api/ipc');
+    const j = await r.json();
+    if(j && j.ok && j.indices){
+      IPC = j;
+      _safe(()=>{ const pp=g('page-propiedades'); if(pp && pp.classList.contains('on')) renderPropiedades(); },'renderPropiedades');
+    }
+  }catch(e){ /* sin IPC no se muestran sugerencias */ }
+}
+function ipcSugerencia(monto, mAum){
+  if(!IPC || !IPC.indices || !monto || !mAum) return null;
+  const I = IPC.indices;
+  let fin = shiftMes(mAum, -1), provisional = false;
+  if(!I[fin]){ fin = IPC.ultimo; provisional = true; }
+  if(!fin || fin > shiftMes(mAum,-1)) fin = shiftMes(mAum,-1);
+  const ini = shiftMes(fin, -3);
+  if(!I[fin] || !I[ini]) return null;
+  const coef = I[fin]/I[ini];
+  return {monto: Math.round(monto*coef), coef, pct:(coef-1)*100, desde:shiftMes(ini,1), hasta:fin, provisional};
+}
+function ipcTexto(s, mAum){
+  if(!s) return '';
+  return 'IPC INDEC '+mesLabel(s.desde)+' a '+mesLabel(s.hasta)+' (+'+s.pct.toFixed(2).replace('.',',')+'%)'+
+    (s.provisional ? ' · provisorio: falta el IPC de '+mesLabel(shiftMes(mAum,-1)) : '');
+}
+
+// ═══════════════════════════════
+// CONTRATOS DE ALQUILER (vencimiento)
+// ═══════════════════════════════
+function contratoEstado(p){
+  if(!p || !p.contratoFin) return null;
+  const hoy2 = new Date(); hoy2.setHours(0,0,0,0);
+  const f = new Date(p.contratoFin+'T00:00:00');
+  const dias = Math.round((f-hoy2)/86400000);
+  if(dias < 0)   return {txt:'Contrato vencido el '+fd(p.contratoFin), color:'#C0392B', bg:'#FDECEA', alerta:true, dias};
+  if(dias <= 90) return {txt:'Contrato vence en '+dias+' día'+(dias!==1?'s':'')+' ('+fd(p.contratoFin)+')', color:'#B8943E', bg:'#FBF6E9', alerta:true, dias};
+  return {txt:'Vigente hasta '+fd(p.contratoFin), color:'#6B7E8F', bg:'#F5F7FA', alerta:false, dias};
+}
+
 function aumentoEstado(proxAumento){
   if(!proxAumento) return null;
   const hoy = new Date(); hoy.setHours(0,0,0,0);
@@ -5561,6 +5681,7 @@ function renderPropiedades(){
   cont.innerHTML = avisoAumentosMes(props, mesSel) + botonesTodas + props.map(p=>{
     const est = aumentoEstado(p.proxAumento);
     const pagadoMes = !!(p.pagos && p.pagos[mesSel]);
+    const ce = contratoEstado(p);
     const serviciosAlDia = p.servicios.filter(s=>servMes(s,mesSel).alDia).length;
     const totalServicios = p.servicios.reduce((t,s)=>t+(parseFloat(servMes(s,mesSel).monto)||0),0);
     const filasServ = p.servicios.map((s0,idx)=>{ const s = Object.assign({nombre:s0.nombre}, servMes(s0,mesSel)); return (
@@ -5581,6 +5702,7 @@ function renderPropiedades(){
         '<span title="Clic para cambiar" onclick="togglePagoAlquiler(\''+p.id+'\',\''+mesSel+'\')" style="cursor:pointer;'+(pagadoMes?'background:#EAF6EF;color:#1A7A52':'background:#FBF6E9;color:#B8943E')+';padding:3px 10px;border-radius:10px;font-weight:700">'+(pagadoMes?'✓ Cobrado':'Alquiler pendiente')+'</span>'+
         '<span style="background:#F0F4F8;color:#1B3A6B;padding:3px 10px;border-radius:10px;font-weight:700">Servicios '+serviciosAlDia+'/'+p.servicios.length+' al día'+(totalServicios>0?' · '+fmt(totalServicios):'')+'</span>'+
         (est?'<span style="background:'+(est.urgente?'#FBF6E9':'#F5F7FA')+';color:'+est.color+';padding:3px 10px;border-radius:10px;font-weight:700">'+est.txt+'</span>':'')+
+        (ce && ce.alerta ? '<span style="background:'+ce.bg+';color:'+ce.color+';padding:3px 10px;border-radius:10px;font-weight:700">📄 '+ce.txt+'</span>' : '')+
       '</div>' : '';
 
     return '<div class="card" style="margin-bottom:18px'+(est&&est.urgente?';border-left:4px solid '+est.color:'')+'">'+
@@ -5610,7 +5732,22 @@ function renderPropiedades(){
         '<div class="kpi-card"><div class="kpi-label">Nuevo monto (aumento)</div>'+
           '<input type="number" placeholder="0" value="'+(p.proxAumentoMonto||'')+'" onblur="setPropCampo(\''+p.id+'\',\'proxAumentoMonto\',this.value)" style="width:100%;font-size:16px;font-weight:700;border:none;background:transparent;border-bottom:1px solid #E4EAF0">'+
           (p.proxAumentoMonto>0?'<button class="btn btn-sm btn-primary" style="margin-top:6px;width:100%" onclick="aplicarAumento(\''+p.id+'\')">Aplicar aumento</button>':'')+
+          (()=>{
+            if(!(est && est.urgente) || p.proxAumentoMonto>0 || !p.proxAumento) return '';
+            const mA = p.proxAumento.slice(0,7), s = ipcSugerencia(p.alquiler||0, mA);
+            if(!s) return '';
+            return '<div style="font-size:11px;color:#6B7E8F;margin-top:6px;line-height:1.35">Sugerido: <b style="color:#1a2332">'+fmt(s.monto)+'</b><br>'+ipcTexto(s, mA)+'</div>'+
+              '<button class="btn btn-sm" style="margin-top:4px;width:100%;background:#fff;color:#1B3A6B;border:1px solid #D8E2EC" onclick="setPropCampo(\''+p.id+'\',\'proxAumentoMonto\','+s.monto+')">Usar sugerido</button>';
+          })()+
         '</div>'+
+      '</div>'+
+      // Contrato
+      '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:-4px 0 16px;font-size:12.5px;color:#6B7E8F">'+
+        '<span style="font-weight:700;color:#1a2332">📄 Contrato</span> desde '+
+        '<input type="date" value="'+(p.contratoInicio||'')+'" onchange="setPropCampo(\''+p.id+'\',\'contratoInicio\',this.value)" style="font-size:12.5px;border:1px solid #E4EAF0;border-radius:6px;padding:3px 6px;background:transparent">'+
+        ' hasta '+
+        '<input type="date" value="'+(p.contratoFin||'')+'" onchange="setPropCampo(\''+p.id+'\',\'contratoFin\',this.value)" style="font-size:12.5px;border:1px solid #E4EAF0;border-radius:6px;padding:3px 6px;background:transparent">'+
+        (ce ? '<span style="padding:3px 10px;border-radius:10px;font-weight:700;background:'+ce.bg+';color:'+ce.color+'">'+ce.txt+'</span>' : '')+
       '</div>'+
       // Servicios
       '<div style="font-size:13px;font-weight:800;color:#1a2332;margin-bottom:8px">Servicios de '+mesLabel(mesSel)+' ('+serviciosAlDia+'/'+p.servicios.length+' al día'+(totalServicios>0?' · Total: '+fmt(totalServicios):'')+')</div>'+
