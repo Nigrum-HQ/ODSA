@@ -1608,6 +1608,39 @@ function chequearCambioDeMes(){
   }catch(e){ console.error('rolloverNomina', e); }
 }
 
+// ═══════════════════════════════
+// AVISO DE VERSIÓN NUEVA
+// ═══════════════════════════════
+// Cada 2 minutos (y al volver a la pestaña) se compara la versión publicada del sistema
+// con la que está abierta. Si cambió, aparece una barra arriba para actualizar, así nadie
+// sigue trabajando (y guardando) con una versión vieja.
+let _versionInicial = null, _avisoVersionMostrado = false;
+async function versionPublicada(){
+  try{
+    const r = await fetch('/?_v='+Date.now(), {method:'HEAD', cache:'no-store'});
+    if(!r.ok) return null;
+    return r.headers.get('etag') || r.headers.get('last-modified') || null;
+  }catch(e){ return null; }
+}
+async function chequearVersion(){
+  const v = await versionPublicada();
+  if(!v) return;
+  if(!_versionInicial){ _versionInicial = v; return; }
+  if(v === _versionInicial || _avisoVersionMostrado) return;
+  _avisoVersionMostrado = true;
+  const b = document.createElement('div');
+  b.id = 'aviso-version';
+  b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#B8943E;color:#fff;font-weight:800;font-size:14px;padding:12px 16px;text-align:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.25)';
+  b.textContent = '🔄 Hay una versión nueva del sistema — tocá acá para actualizar';
+  b.onclick = ()=>{
+    b.textContent = '⏳ Guardando y actualizando...';
+    // Damos tiempo a que termine cualquier guardado pendiente antes de recargar
+    setTimeout(()=>location.reload(), 2500);
+  };
+  document.body.appendChild(b);
+}
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) chequearVersion(); });
+
 async function initApp(){
   initCFMes();
   // Show loading overlay
@@ -1619,6 +1652,7 @@ async function initApp(){
   await load();
   overlay.remove();
   try{ rolloverNomina(); }catch(e){ console.error('rolloverNomina', e); }
+  chequearVersion(); // toma la versión abierta como punto de partida
   // Punto de partida para "deshacer": el estado recién cargado es el "antes" del primer cambio
   _ultimoEstadoConocido = JSON.stringify(D);
   _undoStack = [];
@@ -1844,7 +1878,7 @@ async function syncFromCloud(){
     }
   }catch(e){}
 }
-function startSync(){ _syncInterval = setInterval(syncFromCloud, 30000); setInterval(chequearCambioDeMes, 60000); }
+function startSync(){ _syncInterval = setInterval(syncFromCloud, 30000); setInterval(chequearCambioDeMes, 60000); setInterval(chequearVersion, 120000); }
 
 function renderFichaBancaria(){
   const SECTORES={yamaha:'Yamaha',operadoras:'Operadoras',nigrum:'Nigrum',operadoras_rodrigo:'Operadoras Rodrigo',turnos:'Turnos',administracion:'Administracion',sistemas:'Sistemas',limpieza:'Limpieza',kinebs:'Kinebs',fichas:'Fichas',publicidad:'Publicidad',otro:'Otro'};
