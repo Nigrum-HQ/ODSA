@@ -1,9 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
+import { createHmac as _odsaHmac } from 'crypto';
+// Llave que firma cada pedido a la base de datos: la base solo responde a pedidos que la traen.
+// Se deriva de JWT_SECRET (configurado en Vercel), así nunca aparece en el código.
+const odsaDbKey = () => _odsaHmac('sha256', process.env.JWT_SECRET).update('odsa-db-v1').digest('hex');
 
-const supabase = createClient(
-  process.env.SUPA_URL,
-  process.env.SUPA_KEY
-);
+const supabase = createClient(process.env.SUPA_URL, process.env.SUPA_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  global: { headers: { 'x-odsa-key': odsaDbKey() } }
+});
 
 function verifyServiceToken(req) {
   const token = req.headers['x-service-token'] || '';
