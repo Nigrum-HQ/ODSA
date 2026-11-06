@@ -2448,7 +2448,7 @@ function avisoCopiaHTML(){
   if(d === null || d >= 7){
     return '<div style="background:#EEF3FB;border:1px solid #C9D7EE;border-radius:12px;padding:14px 18px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'+
       '<div><div style="font-weight:800;color:#1B3A6B;font-size:13.5px">💾 Copia de seguridad semanal</div>'+
-      '<div style="font-size:12.5px;color:#4A5D73;margin-top:2px">'+(d===null?'Todavía no descargaste ninguna copia en esta computadora.':'Hace '+d+' días que no descargás una copia.')+' Se descarga cifrada con contraseña. Guardala en Google Drive o en un pendrive.</div></div>'+
+      '<div style="font-size:12.5px;color:#4A5D73;margin-top:2px">'+(d===null?'Todavía no descargaste ninguna copia en esta computadora.':'Hace '+d+' días que no descargás una copia.')+' Se descarga cifrada con contraseña. Guardala en Google Drive o en un pendrive. ¿Ya tenés una? '+linkAbrir+'.</div></div>'+
       '<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();descargarCopia()">🔒 Descargar copia</button>'+
     '</div>';
   }
