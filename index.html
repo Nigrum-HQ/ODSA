@@ -2350,31 +2350,109 @@ const COPIA_KEY = 'odsa_ultima_copia_local';
 function diasDesdeUltimaCopia(){
   try{ const t = parseInt(localStorage.getItem(COPIA_KEY)||'0',10); return t ? Math.floor((Date.now()-t)/86400000) : null; }catch(e){ return null; }
 }
-function descargarCopia(){
+// La copia se descarga CIFRADA (AES-256-GCM, clave derivada de una contraseña con PBKDF2).
+// La contraseña no se guarda en ningún lado: sin ella el archivo no se puede leer.
+function _b64(buf){ const b = new Uint8Array(buf); let s=''; for(let i=0;i<b.length;i+=0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i+0x8000)); return btoa(s); }
+function _unb64(s){ const bin = atob(s); const u = new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i] = bin.charCodeAt(i); return u; }
+async function _claveCopia(pass, salt, iter){
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:iter, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+}
+function _bajarArchivo(texto, nombre){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([texto], {type:'application/json'}));
+  a.download = nombre;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+function _fechaArchivo(){ const f = new Date(); return f.getFullYear()+'-'+String(f.getMonth()+1).padStart(2,'0')+'-'+String(f.getDate()).padStart(2,'0'); }
+function pedirPasswordCopia(titulo, confirmar){
+  return new Promise(resolve=>{
+    const st = 'width:100%;box-sizing:border-box;padding:10px;border:1px solid #D8E2EC;border-radius:8px;margin-bottom:8px;font-size:14px;font-family:inherit';
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,25,35,.6);z-index:99998;display:flex;align-items:center;justify-content:center';
+    ov.innerHTML = '<div style="background:#fff;border-radius:14px;padding:22px;width:min(420px,92vw);box-shadow:0 10px 40px rgba(0,0,0,.3)">'+
+      '<div style="font-weight:800;font-size:16px;color:#1a2332;margin-bottom:6px">🔒 '+titulo+'</div>'+
+      '<div style="font-size:12.5px;color:#6B7E8F;margin-bottom:12px;line-height:1.4">'+(confirmar
+        ? 'La copia se descarga cifrada con esta contraseña. <b>No se guarda en ningún lado:</b> si la olvidás, esa copia no se puede abrir. Anotala en un lugar seguro.'
+        : 'Escribí la contraseña con la que se descargó la copia.')+'</div>'+
+      '<input id="cp-p1" type="password" autocomplete="new-password" placeholder="Contraseña (mínimo 8 caracteres)" style="'+st+'">'+
+      (confirmar ? '<input id="cp-p2" type="password" autocomplete="new-password" placeholder="Repetí la contraseña" style="'+st+'">' : '')+
+      '<div id="cp-err" style="color:#C0392B;font-size:12px;min-height:16px;margin:2px 0 8px"></div>'+
+      '<div style="display:flex;gap:8px;justify-content:flex-end">'+
+        '<button id="cp-no" class="btn btn-sm" style="background:#fff;color:#1B3A6B;border:1px solid #D8E2EC">Cancelar</button>'+
+        '<button id="cp-si" class="btn btn-sm btn-primary">'+(confirmar?'Descargar copia':'Abrir copia')+'</button>'+
+      '</div></div>';
+    document.body.appendChild(ov);
+    const p1 = ov.querySelector('#cp-p1'), p2 = ov.querySelector('#cp-p2'), err = ov.querySelector('#cp-err');
+    const fin = v => { ov.remove(); resolve(v); };
+    const ok = () => {
+      const a = p1.value;
+      if(a.length < 8){ err.textContent = 'La contraseña tiene que tener al menos 8 caracteres'; return; }
+      if(confirmar && a !== p2.value){ err.textContent = 'Las contraseñas no coinciden'; return; }
+      fin(a);
+    };
+    ov.querySelector('#cp-no').onclick = () => fin(null);
+    ov.querySelector('#cp-si').onclick = ok;
+    ov.addEventListener('keydown', e => { if(e.key==='Enter') ok(); if(e.key==='Escape') fin(null); });
+    setTimeout(()=>p1.focus(), 50);
+  });
+}
+async function descargarCopia(){
   try{
-    const json = JSON.stringify(D);
-    const blob = new Blob([json], {type:'application/json'});
-    const a = document.createElement('a');
-    const f = new Date();
-    const nombre = 'ODSA-copia-'+f.getFullYear()+'-'+String(f.getMonth()+1).padStart(2,'0')+'-'+String(f.getDate()).padStart(2,'0')+'.json';
-    a.href = URL.createObjectURL(blob); a.download = nombre;
-    document.body.appendChild(a); a.click();
-    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    const pass = await pedirPasswordCopia('Contraseña para la copia de seguridad', true);
+    if(!pass) return;
+    const iter = 310000;
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await _claveCopia(pass, salt, iter);
+    const cifrado = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, new TextEncoder().encode(JSON.stringify(D)));
+    const archivo = JSON.stringify({
+      formato: 'ODSA copia de seguridad cifrada', version: 1, fecha: new Date().toISOString(),
+      cifrado: 'AES-256-GCM', kdf: 'PBKDF2-SHA256', iteraciones: iter,
+      salt: _b64(salt), iv: _b64(iv), datos: _b64(cifrado)
+    });
+    const nombre = 'ODSA-copia-'+_fechaArchivo()+'-cifrada.json';
+    _bajarArchivo(archivo, nombre);
     try{ localStorage.setItem(COPIA_KEY, String(Date.now())); }catch(e){}
-    toast('💾 Copia descargada: '+nombre+'. Guardala en tu Google Drive o en un pendrive.');
+    toast('🔒 Copia cifrada descargada: '+nombre+'. Guardala en Drive o en un pendrive.');
     _safe(()=>{ const pr=g('page-resumen'); if(pr && pr.classList.contains('on')) renderResumen(); },'renderResumen');
-  }catch(e){ toast('No se pudo descargar la copia'); }
+  }catch(e){ console.error(e); toast('No se pudo descargar la copia'); }
+}
+// Para abrir una copia cifrada: la descifra y descarga el archivo original (no toca los datos del sistema).
+function abrirCopiaCifrada(){
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.json,application/json';
+  inp.onchange = async () => {
+    try{
+      const f = inp.files && inp.files[0]; if(!f) return;
+      const c = JSON.parse(await f.text());
+      if(!c || !c.datos || !c.salt || !c.iv){ toast('Ese archivo no es una copia cifrada de ODSA'); return; }
+      const pass = await pedirPasswordCopia('Abrir copia cifrada', false);
+      if(!pass) return;
+      let texto;
+      try{
+        const key = await _claveCopia(pass, _unb64(c.salt), c.iteraciones || 310000);
+        const plano = await crypto.subtle.decrypt({name:'AES-GCM', iv:_unb64(c.iv)}, key, _unb64(c.datos));
+        texto = new TextDecoder().decode(plano);
+      }catch(e){ toast('Contraseña incorrecta o archivo dañado'); return; }
+      _bajarArchivo(texto, 'ODSA-copia-descifrada-'+String(c.fecha||'').slice(0,10)+'.json');
+      toast('✓ Copia abierta correctamente. Se descargó el archivo descifrado.');
+    }catch(e){ toast('No se pudo leer el archivo'); }
+  };
+  inp.click();
 }
 function avisoCopiaHTML(){
   const d = diasDesdeUltimaCopia();
+  const linkAbrir = '<a href="#" onclick="event.preventDefault();event.stopPropagation();abrirCopiaCifrada()" style="color:#1B3A6B">abrir una copia</a>';
   if(d === null || d >= 7){
     return '<div style="background:#EEF3FB;border:1px solid #C9D7EE;border-radius:12px;padding:14px 18px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'+
       '<div><div style="font-weight:800;color:#1B3A6B;font-size:13.5px">💾 Copia de seguridad semanal</div>'+
-      '<div style="font-size:12.5px;color:#4A5D73;margin-top:2px">'+(d===null?'Todavía no descargaste ninguna copia en esta computadora.':'Hace '+d+' días que no descargás una copia.')+' Guardala en Google Drive o en un pendrive.</div></div>'+
-      '<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();descargarCopia()">Descargar copia</button>'+
+      '<div style="font-size:12.5px;color:#4A5D73;margin-top:2px">'+(d===null?'Todavía no descargaste ninguna copia en esta computadora.':'Hace '+d+' días que no descargás una copia.')+' Se descarga cifrada con contraseña. Guardala en Google Drive o en un pendrive.</div></div>'+
+      '<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();descargarCopia()">🔒 Descargar copia</button>'+
     '</div>';
   }
-  return '<div style="font-size:12px;color:#8A9BAB;margin-top:10px;text-align:right">💾 Última copia descargada hace '+(d===0?'menos de 1 día':d+' día'+(d!==1?'s':''))+' · <a href="#" onclick="event.preventDefault();descargarCopia()" style="color:#1B3A6B">descargar otra</a></div>';
+  return '<div style="font-size:12px;color:#8A9BAB;margin-top:10px;text-align:right">💾 Última copia descargada hace '+(d===0?'menos de 1 día':d+' día'+(d!==1?'s':''))+' · <a href="#" onclick="event.preventDefault();descargarCopia()" style="color:#1B3A6B">descargar otra</a> · '+linkAbrir+'</div>';
 }
 
 function renderResumen(){
