@@ -267,6 +267,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
           <div style="font-size:11px;font-weight:800;letter-spacing:2px;color:#C9A84C;text-transform:uppercase;margin-bottom:8px">Sistema administrativo</div>
           <div style="font-size:28px;font-weight:800;color:#fff;margin-bottom:6px;letter-spacing:-.5px">Bienvenido a ODSA</div>
           <div style="font-size:14px;color:rgba(255,255,255,.5)" id="res-sub"></div>
+          <button onclick="generarResumenMensualPDF()" style="margin-top:10px;background:#C9A84C;color:#0F1923;border:none;border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:800;cursor:pointer">📄 Resumen del mes (PDF)</button>
           <div style="display:flex;gap:24px;margin-top:20px;flex-wrap:wrap">
             <div style="background:rgba(255,255,255,.07);border-radius:10px;padding:12px 20px;min-width:140px">
               <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.4);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Ingresos</div>
@@ -1919,6 +1920,194 @@ async function chequearVersion(){
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) chequearVersion(); });
 
 // ═══════════════════════════════
+// ALERTAS DE MONTOS FUERA DE LO NORMAL
+// ═══════════════════════════════
+// Compara un monto con lo habitual (promedio de meses anteriores) y avisa si es mucho mayor o menor.
+const _MESES_TXT = /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre|ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)\b/gi;
+function _normDesc(s){ return String(s||'').toLowerCase().replace(_MESES_TXT,'').replace(/[0-9\/\-\.]+/g,' ').replace(/[^a-záéíóúñü ]/gi,' ').replace(/\s+/g,' ').trim(); }
+function _mesesAntes(m, n){ const out=[]; for(let i=1;i<=n;i++) out.push(shiftMes(m,-i)); return out; }
+function promedioGastoHabitual(desc, m, excluirId){
+  const k = _normDesc(desc); if(!k) return 0;
+  const previos = new Set(_mesesAntes(m, 6));
+  const vals = (D.gastos||[]).filter(x=>x.id!==excluirId && previos.has(x.mes) && _normDesc(x.desc)===k).map(x=>x.monto||0).filter(v=>v>0);
+  return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+}
+function _fueraDeLoNormal(nuevo, habitual, factor){ return habitual>0 && nuevo>0 && (nuevo > habitual*factor || nuevo < habitual/factor); }
+function _confirmarInusual(que, nuevo, habitual){
+  const veces = nuevo>habitual ? (nuevo/habitual) : (habitual/nuevo);
+  const txt = nuevo>habitual ? Math.round(veces*10)/10+' veces MÁS ALTO' : Math.round(veces*10)/10+' veces MÁS BAJO';
+  return confirm('⚠️ Revisá este monto\n\n'+que+'\nMonto ingresado: '+fmt(nuevo)+'\nLo habitual: '+fmt(Math.round(habitual))+'\n\nEs '+txt+' que lo habitual. ¿Es correcto?\n\n(Aceptar = guardar igual · Cancelar = corregir)');
+}
+// Para el aviso de Resumen: lo ya cargado este mes que está fuera de lo normal
+function montosInusualesDelMes(m){
+  const out = [];
+  (D.gastos||[]).filter(x=>x.mes===m).forEach(x=>{
+    const h = promedioGastoHabitual(x.desc, m, x.id);
+    if(_fueraDeLoNormal(x.monto||0, h, 2.5)) out.push('Gasto "'+x.desc+'": '+fmt(x.monto)+' (lo habitual es '+fmt(Math.round(h))+')');
+  });
+  const ant = shiftMes(m,-1);
+  (D.empleados||[]).forEach(e=>{
+    if(e.desde && ant < e.desde) return;
+    const a = getNominaEmp(e, ant).sueldo||0, b = getNominaEmp(e, m).sueldo||0;
+    if(_fueraDeLoNormal(b, a, 1.4)) out.push('Sueldo de '+e.nombre+': '+fmt(b)+' (el mes anterior fue '+fmt(a)+')');
+  });
+  return out;
+}
+(function activarAlertasInusuales(){
+  // Al agregar un gasto
+  const _addGasto = window.addGasto;
+  if(typeof _addGasto==='function') window.addGasto = function(...args){
+    try{
+      const desc = (gv('g-desc')||'').trim(), monto = parseFloat(gv('g-monto'))||0, fecha = gv('g-fecha');
+      if(desc && monto && fecha){
+        const h = promedioGastoHabitual(desc, fecha.slice(0,7));
+        if(_fueraDeLoNormal(monto, h, 2.5) && !_confirmarInusual('Gasto: '+desc, monto, h)) return;
+      }
+    }catch(e){}
+    return _addGasto.apply(this, args);
+  };
+  // Al cambiar el importe de un gasto o un sueldo base desde Cash Flow
+  const _upd = window.updateCFMonto;
+  if(typeof _upd==='function') window.updateCFMonto = function(tipo, id, monto, ...rest){
+    try{
+      if(tipo==='gasto'){
+        const gx = (D.gastos||[]).find(x=>x.id===id);
+        if(gx){
+          const h = promedioGastoHabitual(gx.desc, gx.mes, gx.id) || gx.monto || 0;
+          if(_fueraDeLoNormal(monto, h, 2.5) && !_confirmarInusual('Gasto: '+gx.desc, monto, h)){ try{ renderCashFlow(); }catch(e){} return; }
+        }
+      }
+    }catch(e){}
+    return _upd.call(this, tipo, id, monto, ...rest);
+  };
+  // Al cambiar el sueldo de un empleado en un mes
+  const _setN = window.setNominaEmp;
+  if(typeof _setN==='function') window.setNominaEmp = function(id, m, campo, valor, ...rest){
+    try{
+      if(campo==='sueldo'){
+        const e = (D.empleados||[]).find(x=>x.id===id);
+        if(e){
+          const actual = getNominaEmp(e, m).sueldo || 0;
+          const ant = getNominaEmp(e, shiftMes(m,-1)).sueldo || 0;
+          const ref = actual || ant;
+          if(_fueraDeLoNormal(valor, ref, 1.4) && !_confirmarInusual('Sueldo de '+e.nombre+' ('+mesLabel(m)+')', valor, ref)) return;
+        }
+      }
+    }catch(e){}
+    return _setN.call(this, id, m, campo, valor, ...rest);
+  };
+  // Al cargar el monto de un servicio de una propiedad
+  const _setS = window.setServicioMonto;
+  if(typeof _setS==='function') window.setServicioMonto = function(propId, idx, valor, ...rest){
+    try{
+      const p = (D.propiedades||[]).find(x=>x.id===propId), s = p && p.servicios[idx], v = parseFloat(valor)||0;
+      if(s && v){
+        const vals = _mesesAntes(mesSel, 6).map(mm=>(s.porMes||{})[mm]).filter(x=>x && x.monto>0).map(x=>x.monto);
+        const h = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+        if(_fueraDeLoNormal(v, h, 2.5) && !_confirmarInusual(p.nombre+' — '+s.nombre, v, h)){ try{ renderPropiedades(); }catch(e){} return; }
+      }
+    }catch(e){}
+    return _setS.call(this, propId, idx, valor, ...rest);
+  };
+  // Al cargar un monto en el calendario de pagos
+  const _calM = window.calSetMonto;
+  if(typeof _calM==='function') window.calSetMonto = function(itemId, sem, valor, ...rest){
+    try{
+      const v = parseFloat(String(valor).replace(/\$/g,'').replace(/\./g,'').replace(',','.')) || 0;
+      if(v){
+        const vals = _mesesAntes(mesSel, 6).map(mm=>(D.calPagos||[]).find(r=>r.id===mm+'|'+itemId+'|'+sem)).filter(r=>r && r.monto>0).map(r=>r.monto);
+        const h = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+        const it = (D.calItems||[]).find(x=>x.id===itemId);
+        if(_fueraDeLoNormal(v, h, 2.5) && !_confirmarInusual((it?it.nombre:'Pago'), v, h)){ try{ renderCalendario(); }catch(e){} return; }
+      }
+    }catch(e){}
+    return _calM.call(this, itemId, sem, valor, ...rest);
+  };
+})();
+
+// ═══════════════════════════════
+// RESUMEN MENSUAL EN PDF
+// ═══════════════════════════════
+const _CAT_GASTO = {alquiler:'Alquiler',servicios:'Servicios',arca:'ARCA / Impuestos',publicidad:'Publicidad',sistemas:'Sistemas / Software',insumos:'Insumos / Oficina',otro:'Otro'};
+function generarResumenMensualPDF(m){
+  m = m || mesSel;
+  const r = calcResumenFor(m), ant = calcResumenFor(shiftMes(m,-1));
+  const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const pct = (a,b) => b ? Math.round(a*100/b) : 0;
+  const varTxt = (a,b) => { if(!b) return '—'; const v = Math.round((a-b)*100/b); return (v>0?'+':'')+v+'%'; };
+  // Sueldos por sector
+  const sec = {};
+  (D.empleados||[]).forEach(e=>{
+    if(e.desde && m < e.desde) return;
+    const n = getNominaEmp(e, m), monto = (n.sueldo||0)+(n.hsExtra||0);
+    if(!monto) return;
+    const k = (typeof SECTORES!=='undefined' && SECTORES[e.sector]) || e.sector || 'Otro';
+    if(!sec[k]) sec[k] = {n:0, pag:0, total:0};
+    sec[k].n++; sec[k].total += monto; if(n.pagado) sec[k].pag++;
+  });
+  const filasSec = Object.entries(sec).sort((a,b)=>b[1].total-a[1].total).map(([k,v])=>'<tr><td>'+esc(k)+'</td><td class="c">'+v.n+'</td><td class="c">'+v.pag+' de '+v.n+'</td><td class="r">'+fmt(v.total)+'</td></tr>').join('');
+  // Gastos por categoría
+  const gas = {};
+  (D.gastos||[]).filter(x=>x.mes===m).forEach(x=>{
+    const k = _CAT_GASTO[x.cat] || x.cat || 'Otro';
+    if(!gas[k]) gas[k] = {n:0, total:0, pend:0};
+    gas[k].n++; gas[k].total += x.monto||0; if(!x.pagado) gas[k].pend++;
+  });
+  const filasGas = Object.entries(gas).sort((a,b)=>b[1].total-a[1].total).map(([k,v])=>'<tr><td>'+esc(k)+'</td><td class="c">'+v.n+'</td><td class="c">'+(v.pend?v.pend+' pendiente'+(v.pend!==1?'s':''):'—')+'</td><td class="r">'+fmt(v.total)+'</td></tr>').join('');
+  // Alquileres
+  const props = (D.propiedades||[]).filter(p=>(p.alquiler||0)>0);
+  let cobrado = 0, aCobrar = 0, servTotal = 0;
+  const filasProp = props.map(p=>{
+    const ok = !!(p.pagos||{})[m]; aCobrar += p.alquiler||0; if(ok) cobrado += p.alquiler||0;
+    const serv = (p.servicios||[]).reduce((t,s)=>t+((s.porMes||{})[m]?.monto||0),0); servTotal += serv;
+    return '<tr><td>'+esc(p.nombre)+'</td><td>'+esc(p.inquilino||'—')+'</td><td class="r">'+fmt(p.alquiler)+'</td><td class="c">'+(ok?'<span class="ok">Cobrado</span>':'<span class="pend">Pendiente</span>')+'</td><td class="r">'+(serv?fmt(serv):'—')+'</td></tr>';
+  }).join('');
+  // Calendario de pagos
+  let calOk = 0, calTot = 0; const calPend = [];
+  try{
+    (D.calItems||[]).forEach(it=>{
+      const auto = calInfoAuto(it, m); if(auto && auto.vacio) return;
+      (it.semana===0 ? [1,2,3,4] : [it.semana]).forEach(s=>{
+        const e = calEstado(it, m, s); if(e==='previo') return;
+        calTot++; if(e==='ok') calOk++; else calPend.push(it.nombre+(it.semana===0?' (sem '+s+')':''));
+      });
+    });
+  }catch(e){}
+  // Alertas
+  let inus = []; try{ inus = montosInusualesDelMes(m); }catch(e){}
+  const egr = [['Sueldos', r.totalSueldos, ant.totalSueldos],['Premios', r.totalPremios, ant.totalPremios],['Comisiones', r.totalComisiones, ant.totalComisiones],['Gastos', r.totalGastos, ant.totalGastos],['Cheques', r.totalCheques, ant.totalCheques]];
+  const filasEgr = egr.map(([k,a,b])=>'<tr><td>'+k+'</td><td class="r">'+fmt(a)+'</td><td class="c">'+pct(a,r.totalEgresos)+'%</td><td class="r muted">'+fmt(b)+'</td><td class="c">'+varTxt(a,b)+'</td></tr>').join('');
+  const quien = (typeof usuarioActual==='function' ? usuarioActual() : '');
+  const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Resumen '+esc(mesLabel(m))+' — ODSA</title><style>'+
+    'body{font-family:Arial,sans-serif;color:#1a2332;padding:28px;max-width:900px;margin:0 auto;font-size:13px}'+
+    'h1{font-size:22px;margin:0}h2{font-size:15px;margin:22px 0 8px;color:#1B3A6B;border-bottom:2px solid #E4EAF0;padding-bottom:4px}'+
+    '.sub{color:#6B7E8F;font-size:12px;margin:4px 0 16px}table{width:100%;border-collapse:collapse}td,th{padding:6px 8px;border-bottom:1px solid #EEF2F6;text-align:left}'+
+    'th{font-size:11px;color:#6B7E8F;text-transform:uppercase}.r{text-align:right}.c{text-align:center}.muted{color:#8A9BAB}'+
+    '.kpis{display:flex;gap:10px;flex-wrap:wrap}.kpi{flex:1;min-width:150px;background:#F5F7FA;border-radius:10px;padding:12px}.kpi b{display:block;font-size:19px;margin-top:4px}'+
+    '.ok{color:#1A7A52;font-weight:700}.pend{color:#B8943E;font-weight:700}.alerta{background:#FDECEA;border-radius:8px;padding:10px;color:#922B21}'+
+    '.print-btn{background:#1B3A6B;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;cursor:pointer;margin-bottom:16px}'+
+    '@media print{.print-btn{display:none}body{padding:0}}'+
+    '</style></head><body>'+
+    '<button class="print-btn" onclick="window.print()">🖨 Imprimir / Guardar como PDF</button>'+
+    '<h1>ODSA — Resumen de '+esc(mesLabel(m))+'</h1>'+
+    '<div class="sub">Generado el '+new Date().toLocaleString('es-AR')+(quien?' por '+esc(quien):'')+'</div>'+
+    '<div class="kpis"><div class="kpi">Ingresos<b style="color:#1A7A52">'+fmt(r.totalIngresos)+'</b></div><div class="kpi">Egresos<b style="color:#C0392B">'+fmt(r.totalEgresos)+'</b></div>'+
+    '<div class="kpi">Resultado<b style="color:'+(r.resultado>=0?'#1A7A52':'#C0392B')+'">'+fmt(r.resultado)+'</b></div><div class="kpi">Egresos vs. mes anterior<b>'+varTxt(r.totalEgresos, ant.totalEgresos)+'</b></div></div>'+
+    '<h2>Egresos</h2><table><tr><th>Concepto</th><th class="r">Este mes</th><th class="c">% del total</th><th class="r">Mes anterior</th><th class="c">Variación</th></tr>'+filasEgr+
+      '<tr><td><b>Total</b></td><td class="r"><b>'+fmt(r.totalEgresos)+'</b></td><td></td><td class="r muted">'+fmt(ant.totalEgresos)+'</td><td class="c">'+varTxt(r.totalEgresos, ant.totalEgresos)+'</td></tr></table>'+
+    '<h2>Sueldos por sector</h2>'+(filasSec?'<table><tr><th>Sector</th><th class="c">Empleados</th><th class="c">Pagados</th><th class="r">Total</th></tr>'+filasSec+'</table>':'<div class="muted">Sin sueldos cargados.</div>')+
+    '<h2>Gastos por categoría</h2>'+(filasGas?'<table><tr><th>Categoría</th><th class="c">Cantidad</th><th class="c">Sin pagar</th><th class="r">Total</th></tr>'+filasGas+'</table>':'<div class="muted">Sin gastos cargados.</div>')+
+    (props.length?'<h2>Alquileres</h2><table><tr><th>Propiedad</th><th>Inquilino</th><th class="r">Alquiler</th><th class="c">Estado</th><th class="r">Servicios</th></tr>'+filasProp+
+      '<tr><td colspan="2"><b>Cobrado '+fmt(cobrado)+' de '+fmt(aCobrar)+'</b></td><td></td><td></td><td class="r"><b>'+fmt(servTotal)+'</b></td></tr></table>':'')+
+    (calTot?'<h2>Calendario de pagos</h2><div>'+calOk+' de '+calTot+' pagos hechos.'+(calPend.length?'<div class="muted" style="margin-top:4px">Pendientes: '+esc(calPend.join(', '))+'</div>':'')+'</div>':'')+
+    (inus.length?'<h2>Montos fuera de lo normal</h2><div class="alerta">'+inus.map(x=>'• '+esc(x)).join('<br>')+'</div>':'')+
+    '</body></html>';
+  const win = window.open('','_blank');
+  if(!win){ toast('Permití las ventanas emergentes para ver el resumen'); return; }
+  win.document.write(html); win.document.close();
+}
+
+// ═══════════════════════════════
 // CALENDARIO DE PAGOS (semanal)
 // ═══════════════════════════════
 // D.calItems: la lista fija de pagos (se edita una vez). D.calPagos: lo tildado de cada mes.
@@ -2918,6 +3107,17 @@ function renderPendientes(){
     '</div>';
   }
 
+  // Montos fuera de lo normal (posibles errores de tipeo) en el mes elegido
+  let inusuales = [];
+  try{ inusuales = montosInusualesDelMes(m); }catch(e){}
+  if(inusuales.length){
+    avisoAumentos += '<div style="background:#FDECEA;border:1px solid #F2B8B5;border-radius:12px;padding:14px 18px;margin-top:12px">'+
+      '<div style="font-weight:800;color:#C0392B;font-size:13.5px;margin-bottom:6px">⚠️ Montos fuera de lo normal en '+mesLabel(m)+'</div>'+
+      inusuales.slice(0,8).map(x=>'<div style="font-size:13px;color:#922B21;padding:2px 0">• '+_escH(x)+'</div>').join('')+
+      '<div style="font-size:11.5px;color:#8A9BAB;margin-top:4px">Revisá que no sea un error de tipeo (por ejemplo, un cero de más).</div>'+
+    '</div>';
+  }
+
   // Calendario de pagos: vencidos y los que vencen esta semana (mes en curso)
   let calAviso = {vencidos:[], pronto:[]};
   try{ calAviso = calPendientesAviso(); }catch(e){}
@@ -2929,7 +3129,7 @@ function renderPendientes(){
     '</div>';
   }
 
-  if(!alertas.length && aumentosProx.length===0 && empAum.length===0 && contratosAlerta.length===0 && !calAviso.vencidos.length && !calAviso.pronto.length){
+  if(!alertas.length && aumentosProx.length===0 && empAum.length===0 && contratosAlerta.length===0 && !calAviso.vencidos.length && !calAviso.pronto.length && !inusuales.length){
     cont.innerHTML = '<div style="background:#EAF6EF;border:1px solid #B7E0C9;border-radius:14px;padding:16px 20px;color:#166534;font-weight:700">✅ Todo al día en '+mesLabel(m)+' — no hay pagos pendientes.</div>' + avisoCopiaHTML();
     return;
   }
