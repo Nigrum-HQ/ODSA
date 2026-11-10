@@ -1085,6 +1085,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
         <div class="card">
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
             <button class="btn btn-primary" id="bk-btn-crear" onclick="hacerBackupManual()">💾 Crear backup ahora</button>
+            <button class="btn" id="bk-btn-archivo" onclick="restaurarDesdeArchivo()" style="display:none;background:#fff;color:#1B3A6B;border:1px solid #D8E2EC">📂 Restaurar desde un archivo</button>
             <span style="font-size:13px;color:#8A9BAB">Se conservan las últimas 30 copias.</span>
           </div>
         </div>
@@ -1209,6 +1210,15 @@ const COLECCIONES_A_FUSIONAR = ['gastos','comisiones','adelantos','externos','pr
 
 let _sbSaveTimeout = null;
 let _sbSaveFails = 0;
+// Al restaurar una copia, el próximo guardado reemplaza todo (sin mezclar con lo que hay en la nube)
+let _forzarReemplazo = false;
+function adoptarRestauracion(raw){
+  if(window._adoptandoRestauracion) return;
+  window._adoptandoRestauracion = true;
+  try{ localStorage.setItem(ODSA_KEY, raw); }catch(e){}
+  try{ toast('♻️ Se restauró una copia de seguridad. Actualizando los datos...'); }catch(e){}
+  setTimeout(()=>location.reload(), 1800);
+}
 function sbSaveDebounced(){
   clearTimeout(_sbSaveTimeout);
   _sbSaveTimeout = setTimeout(async ()=>{
@@ -1219,15 +1229,21 @@ function sbSaveDebounced(){
       const cloudRaw = await sbGet();
       if(cloudRaw){
         const cloudD = JSON.parse(cloudRaw);
-        COLECCIONES_A_FUSIONAR.forEach(campo=>{
-          D[campo] = mergeArrayById(D[campo], cloudD[campo], true); // true = ante conflicto real, prevalece mi edicion reciente
-        });
-        D.nomina = mergeNominaArrays(D.nomina, cloudD.nomina);
-        D.ai_chat = mergeChatArrays(D.ai_chat, cloudD.ai_chat).slice(-100);
+        // Si alguien restauró una copia de seguridad después de que abrimos el sistema,
+        // esa versión manda: no subimos lo nuestro (es anterior a la restauración) y recargamos.
+        if(!_forzarReemplazo && (cloudD._restauradoEn||0) > (D._restauradoEn||0)){ adoptarRestauracion(cloudRaw); return; }
+        if(!_forzarReemplazo){
+          COLECCIONES_A_FUSIONAR.forEach(campo=>{
+            D[campo] = mergeArrayById(D[campo], cloudD[campo], true); // true = ante conflicto real, prevalece mi edicion reciente
+          });
+          D.nomina = mergeNominaArrays(D.nomina, cloudD.nomina);
+          D.ai_chat = mergeChatArrays(D.ai_chat, cloudD.ai_chat).slice(-100);
+        }
       }
     }catch(e){}
     D._ts = Date.now();
     const ok = await sbSet(JSON.stringify(D));
+    if(ok) _forzarReemplazo = false;
     if(!ok){
       _sbSaveFails++;
       console.warn('Supabase save failed, data is in localStorage as backup');
@@ -1705,7 +1721,7 @@ async function salir(){
 function _rolDeLaSesion(){
   try{ const p = JSON.parse(atob(getToken().split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))); return p.rol || ''; }catch(e){ return ''; }
 }
-function mostrarBotonUsuarios(){ const b = g('btn-usuarios'); if(b) b.style.display = _rolDeLaSesion()==='admin' ? '' : 'none'; }
+function mostrarBotonUsuarios(){ const adm = _rolDeLaSesion()==='admin'; ['btn-usuarios','bk-btn-archivo'].forEach(id=>{ const b = g(id); if(b) b.style.display = adm ? '' : 'none'; }); }
 function _esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 async function _apiUsuarios(metodo, body){
   const r = await fetch('/api/usuarios', { method: metodo, headers: {'Content-Type':'application/json','Authorization':'Bearer '+getToken()}, body: body ? JSON.stringify(body) : undefined });
@@ -2103,6 +2119,69 @@ async function renderBackups(){
   }catch(e){ cont.innerHTML = '<div class="empty" style="color:#C0392B;padding:20px">Error: '+e.message+'</div>'; }
 }
 
+// ═══════════════════════════════
+// RESTAURAR UNA COPIA (desde la nube o desde un archivo)
+// ═══════════════════════════════
+// Reemplaza TODOS los datos por los de la copia. Antes guarda un respaldo del estado actual.
+// Marca la restauración (_restauradoEn) para que la otra computadora la adopte y no la mezcle.
+async function aplicarRestauracion(datos, origenTxt, yaRespaldado){
+  if(!yaRespaldado){
+    try{
+      await fetch('/api/backup', { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() },
+        body: JSON.stringify({ data: JSON.stringify(D), auto:false }) });
+    }catch(e){}
+  }
+  const nuevo = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},mesesCerrados:[],gastosFijos:[],propiedades:[],ai_chat:[],historial_cambios:[]}, datos);
+  nuevo._restauradoEn = Date.now();
+  D = nuevo;
+  try{ registrarEvento('restauracion', '', 'Copia de seguridad', 'Se restauró una '+origenTxt+'. Los datos anteriores quedaron en un respaldo.'); }catch(e){}
+  _forzarReemplazo = true;
+  save();
+  toast('♻️ Restaurando... no cierres la página');
+  // Esperamos a que la nube confirme el reemplazo antes de recargar
+  for(let i=0; i<40 && _forzarReemplazo; i++) await new Promise(r=>setTimeout(r, 250));
+  toast(_forzarReemplazo ? '⚠ No se pudo confirmar en la nube. Revisá la conexión.' : '✅ Copia restaurada');
+  setTimeout(()=>location.reload(), 1200);
+}
+function restaurarDesdeArchivo(){
+  if(_rolDeLaSesion() !== 'admin'){ toast('Solo el administrador puede restaurar copias'); return; }
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.json,application/json';
+  inp.onchange = async () => {
+    try{
+      const f = inp.files && inp.files[0]; if(!f) return;
+      const c = JSON.parse(await f.text());
+      let datos, fecha = '';
+      if(c && c.datos && c.salt && c.iv){
+        const pass = await pedirPasswordCopia('Contraseña de la copia a restaurar', false);
+        if(!pass) return;
+        try{
+          const key = await _claveCopia(pass, _unb64(c.salt), c.iteraciones || 310000);
+          const plano = await crypto.subtle.decrypt({name:'AES-GCM', iv:_unb64(c.iv)}, key, _unb64(c.datos));
+          datos = JSON.parse(new TextDecoder().decode(plano));
+        }catch(e){ toast('Contraseña incorrecta o archivo dañado'); return; }
+        fecha = c.fecha ? new Date(c.fecha).toLocaleString('es-AR') : '';
+      } else {
+        datos = c;
+        fecha = c && c._ts ? new Date(c._ts).toLocaleString('es-AR') : '';
+      }
+      if(!datos || !Array.isArray(datos.empleados) || !Array.isArray(datos.gastos)){ toast('Ese archivo no es una copia de ODSA'); return; }
+      const n = (x)=> (x||[]).length;
+      const msg = '⚠️ RESTAURAR COPIA DE SEGURIDAD\n\n'+
+        'Archivo: '+f.name+(fecha?'\nFecha de la copia: '+fecha:'')+'\n\n'+
+        'La copia tiene: '+n(datos.empleados)+' empleados, '+n(datos.propiedades)+' propiedades, '+n(datos.gastos)+' gastos.\n'+
+        'Hoy el sistema tiene: '+n(D.empleados)+' empleados, '+n(D.propiedades)+' propiedades, '+n(D.gastos)+' gastos.\n\n'+
+        'Se van a REEMPLAZAR todos los datos actuales por los de la copia, también en la computadora de los demás usuarios. '+
+        'Antes se guarda un respaldo del estado actual.\n\nPara confirmar, escribí RESTAURAR:';
+      const ok = prompt(msg, '');
+      if(ok === null) return;
+      if(ok.trim().toUpperCase() !== 'RESTAURAR'){ toast('Restauración cancelada'); return; }
+      await aplicarRestauracion(datos, 'copia desde el archivo '+f.name);
+    }catch(e){ toast('No se pudo leer el archivo'); }
+  };
+  inp.click();
+}
+
 async function restaurarBackup(id){
   if(!confirm('⚠️ Restaurar este backup va a REEMPLAZAR todos los datos actuales por los de esa copia. Lo que hayas cargado después de ese backup se va a perder.\n\nSe va a crear un backup del estado actual antes de restaurar, por las dudas.\n\n¿Confirmás?')) return;
   try{
@@ -2120,11 +2199,8 @@ async function restaurarBackup(id){
     });
     const data = await r.json();
     if(!r.ok || !data.ok){ toast('No se pudo restaurar: ' + (data.error||'')); return; }
-    // Cargar los datos restaurados
-    D = Object.assign({empleados:[],adelantos:[],premios:[],externos:[],comisiones:[],gastos:[],ingresos:[],cheques:[],proyecciones:[],cf_ingresos:[],semPagoSectores:{},mesesCerrados:[],gastosFijos:[],propiedades:[],ai_chat:[],historial_cambios:[]}, JSON.parse(data.data));
-    save();
-    toast('✅ Backup restaurado');
-    setTimeout(()=>location.reload(), 1000);
+    // Cargar los datos restaurados (reemplazo completo, sin mezclar)
+    await aplicarRestauracion(JSON.parse(data.data), 'copia de la nube', true);
   }catch(e){ toast('Error: ' + e.message); }
 }
 
@@ -2199,6 +2275,7 @@ async function syncFromCloud(){
     const sbData = await sbGet();
     if(!sbData) return;
     const cloudD = JSON.parse(sbData);
+    if(!_forzarReemplazo && (cloudD._restauradoEn||0) > (D._restauradoEn||0)){ adoptarRestauracion(sbData); return; }
     // La nomina (sueldos por mes) se fusiona SIEMPRE registro por registro,
     // sin importar cual copia es mas nueva en general, para no perder el
     // cambio de un empleado puntual aunque el resto de la nube este mas viejo.
@@ -7368,7 +7445,7 @@ function fdh(isoStr){
   }catch(e){ return '—'; }
 }
 
-const TIPO_LABEL_HIST={gasto:'Gasto',sueldo:'Sueldo',adelanto:'Adelanto',comision:'Comisión',comision_lider:'Comisiones (equipo)',sueldo_mes:'Sueldo del mes',hsextra:'Hs extra',pago:'Pago de sueldo',empleado:'Empleado',alquiler:'Alquiler',propiedad:'Propiedad',servicio:'Servicio',ingreso:'Ingreso',cheque:'Cheque'};
+const TIPO_LABEL_HIST={gasto:'Gasto',sueldo:'Sueldo',adelanto:'Adelanto',comision:'Comisión',comision_lider:'Comisiones (equipo)',sueldo_mes:'Sueldo del mes',hsextra:'Hs extra',pago:'Pago de sueldo',restauracion:'Restauración',empleado:'Empleado',alquiler:'Alquiler',propiedad:'Propiedad',servicio:'Servicio',ingreso:'Ingreso',cheque:'Cheque'};
 const TIPOS_RESTAURABLES = ['gasto','sueldo','adelanto','comision','comision_lider'];
 
 // Detecta comisiones duplicadas (misma persona + mes + semana) y las fusiona
