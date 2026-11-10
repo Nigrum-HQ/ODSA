@@ -105,7 +105,7 @@ function descifrar(s) {
 // ─── Tokens: "paso" (10 min, solo sirve para terminar el login) y "sesion" (8 h) ───
 const emitirPaso = (u, etapa) => new SignJWT({ id: u.id, email: u.email, tv: u.token_version || 1, etapa })
   .setProtectedHeader({ alg: 'HS256' }).setIssuedAt().setExpirationTime('10m').sign(jwtKey());
-const emitirSesion = (u) => new SignJWT({ id: u.id, email: u.email, rol: u.rol || 'usuario', tv: u.token_version || 1, etapa: 'sesion' })
+const emitirSesion = (u) => new SignJWT({ id: u.id, email: u.email, nombre: u.nombre || '', rol: u.rol || 'usuario', tv: u.token_version || 1, etapa: 'sesion' })
   .setProtectedHeader({ alg: 'HS256' }).setIssuedAt().setExpirationTime('8h').sign(jwtKey());
 
 const CAMPOS = 'id, email, nombre, rol, activo, password_hash, totp_secret, totp_activo, totp_ultimo_paso, token_version';
