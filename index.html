@@ -245,6 +245,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
 
       <div class="ssep" style="color:#C9A84C">Cash Flow</div>
       <div class="sitem" data-page="cashflow" onclick="navPage('cashflow')"><span class="ico">💰</span>Cash Flow semanal</div>
+      <div class="sitem" data-page="calendario" onclick="navPage('calendario')"><span class="ico">📅</span>Calendario de pagos</div>
       <div class="ssep">Ventas / Marketing</div>
       <div class="sitem" data-page="ventas" onclick="navPage('ventas')"><span class="ico">⭐</span>Premios semana</div>
       <div class="sitem" data-page="externos" onclick="navPage('externos')"><span class="ico">👥</span>Vendedores ext.</div>
@@ -916,6 +917,15 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
       </div>
 
       <!-- PROPIEDADES -->
+      <div id="page-calendario" class="page">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div class="page-title" style="margin-bottom:0">Calendario de pagos</div>
+          <div id="cal-periodo-wrap"></div>
+        </div>
+        <div class="page-sub">Todo lo que hay que pagar cada mes, ordenado por semana. Tildá lo que vas pagando.</div>
+        <div id="cal-cont"></div>
+      </div>
+
       <div id="page-propiedades" class="page">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
           <div class="page-title" style="margin-bottom:0">Propiedades en alquiler</div>
@@ -1206,7 +1216,7 @@ function mergeArrayById(localArr, cloudArr, preferLocal){
   });
   return out;
 }
-const COLECCIONES_A_FUSIONAR = ['gastos','comisiones','adelantos','externos','premios','ingresos','cheques','empleados','cf_ingresos','historial_cambios','propiedades'];
+const COLECCIONES_A_FUSIONAR = ['gastos','comisiones','adelantos','externos','premios','ingresos','cheques','empleados','cf_ingresos','historial_cambios','propiedades','calItems','calPagos'];
 
 let _sbSaveTimeout = null;
 let _sbSaveFails = 0;
@@ -1417,6 +1427,7 @@ function renderTodoElPeriodo(){
   _safe(renderAdelantos,'renderAdelantos');
   _safe(renderOficina,'renderOficina');
   _safe(()=>{ const pp=g('page-propiedades'); if(pp && pp.classList.contains('on')){ renderPropiedades(); renderPropMes(); } },'renderPropiedades');
+  _safe(()=>{ const pc=g('page-calendario'); if(pc && pc.classList.contains('on')) renderCalendario(); },'renderCalendario');
   const pageTr = g('page-transferencias');
   if(pageTr && pageTr.classList.contains('on')) _safe(renderTransferencias,'renderTransferencias');
   const pageCe = g('page-costoemp');
@@ -1906,6 +1917,215 @@ async function chequearVersion(){
   document.body.appendChild(b);
 }
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) chequearVersion(); });
+
+// ═══════════════════════════════
+// CALENDARIO DE PAGOS (semanal)
+// ═══════════════════════════════
+// D.calItems: la lista fija de pagos (se edita una vez). D.calPagos: lo tildado de cada mes.
+// Los sueldos se tildan solos según lo marcado en Sueldos.
+let _calEditando = false;
+function calSembrar(){
+  if(Array.isArray(D.calItems) && D.calItems.length) return false;
+  const it = [];
+  const add = (id, nombre, semana, venceDia, nota, extra) => it.push(Object.assign({id:'cal-'+id, nombre, semana, venceDia: venceDia||null, nota: nota||'', tipo:'manual', orden: it.length}, extra||{}));
+  const m = mes();
+  const sectores = [...new Set((D.empleados||[]).filter(e=>!(e.desde && m < e.desde)).map(e=>e.sector||'otro'))];
+  sectores.forEach(s => add('sector-'+s, 'Sueldos '+((typeof SECTORES!=='undefined' && SECTORES[s]) || s), 1, null, 'Se tilda solo cuando están todos pagados en Sueldos', {tipo:'sector', sector:s}));
+  const juanma = (D.empleados||[]).find(e=>/juanma/i.test(e.nombre||''));
+  if(juanma) add('emp-'+juanma.id, juanma.nombre, 1, 5, 'Su sueldo se paga hasta el día 5', {tipo:'empleado', empId: juanma.id});
+  [['club-smrh','Club SMRH'],['osmedica','Osmedica'],['moderacion','Moderación'],['seguros-fb','Seguros FB'],['german-hon','Germán (honorarios)'],['ale-q1','Ale Oser (1ª quincena)']].forEach(([id,n])=>add(id, n, 1));
+  if(!sectores.includes('kinebs')) add('kinebs', 'Kinebs', 1);
+  add('german-fact', 'Facturas a Germán', 1, null, 'Dentro de las primeras semanas del mes');
+  add('alquiler', 'Alquiler', 2, 10, 'Antes del 10');
+  add('servicios', 'Servicios', 2, 14, 'Luz, gas, agua');
+  add('astervoip', 'AsterVOIP', 2, 15, 'Antes del 16');
+  [['mono-noelia','Monotributo Noelia'],['mono-micaela','Monotributo Micaela'],['mono-nahuel','Monotributo Nahuel Gómez'],['mono-tomas','Monotributo Tomás Briolotti'],['os-wen','Obra social de Wen']].forEach(([id,n])=>add(id, n, 3, 20, 'Antes del 20'));
+  add('ale-q2', 'Ale Oser (2ª quincena)', 3, 16, 'Mitad de mes');
+  add('luz-alquiler', 'Factura de luz del alquiler', 4, null, 'Llega después del 20');
+  add('anura', 'Anura', 4, null, 'Fin de mes');
+  add('estimativo', 'Estimar sueldos y gastos de la semana 1 siguiente', 4, null, 'Tarea');
+  [['pauta','Pauta'],['viandas','Viandas'],['premios','Premios']].forEach(([id,n])=>add(id, n, 0, null, 'Todas las semanas'));
+  D.calItems = it;
+  if(!Array.isArray(D.calPagos)) D.calPagos = [];
+  // Lo que venció antes de empezar a usar el calendario no se marca como vencido
+  if(!D.calInicio) D.calInicio = new Date().toISOString();
+  return true;
+}
+function _calUltimoDia(m){ const [y,mo]=m.split('-').map(Number); return new Date(y, mo, 0).getDate(); }
+function _calSemanaDeDia(d){ return d<=7 ? 1 : d<=14 ? 2 : d<=21 ? 3 : 4; }
+function calVence(item, m, sem){
+  const [y,mo] = m.split('-').map(Number), ult = _calUltimoDia(m);
+  let dia = (item.semana && item.venceDia) ? item.venceDia : ({1:7,2:14,3:21,4:ult})[sem];
+  return new Date(y, mo-1, Math.min(dia, ult), 23, 59, 59);
+}
+function _calEmpleadosSector(sector, m){ return (D.empleados||[]).filter(e=>(e.sector||'otro')===sector && !(e.desde && m < e.desde) && (getNominaEmp(e,m).sueldo||0) > 0); }
+function calInfoAuto(item, m){
+  if(item.tipo==='sector'){
+    const emps = _calEmpleadosSector(item.sector, m);
+    const pag = emps.filter(e=>getNominaEmp(e,m).pagado).length;
+    const total = emps.reduce((t,e)=>{ const n=getNominaEmp(e,m); return t+(n.sueldo||0)+(n.hsExtra||0); }, 0);
+    return {pagado: emps.length>0 && pag===emps.length, detalle: pag+' de '+emps.length+' pagados', monto: total, vacio: emps.length===0};
+  }
+  if(item.tipo==='empleado'){
+    const e = (D.empleados||[]).find(x=>x.id===item.empId);
+    if(!e) return {pagado:false, detalle:'empleado no encontrado', monto:0, vacio:true};
+    const n = getNominaEmp(e,m);
+    return {pagado: !!n.pagado, detalle: n.pagado ? 'pagado' : 'pendiente en Sueldos', monto:(n.sueldo||0)+(n.hsExtra||0), vacio:false};
+  }
+  return null;
+}
+function _calPagoId(m, itemId, sem){ return m+'|'+itemId+'|'+sem; }
+function calRegistro(m, item, sem){ return (D.calPagos||[]).find(p=>p.id===_calPagoId(m,item.id,sem)); }
+function calEstado(item, m, sem){
+  const auto = calInfoAuto(item, m);
+  const pagado = auto ? auto.pagado : !!(calRegistro(m,item,sem)||{}).pagado;
+  if(pagado) return 'ok';
+  const hoy = new Date(), v = calVence(item, m, sem);
+  if(!auto && D.calInicio && v < new Date(D.calInicio)) return 'previo';
+  if(hoy > v) return 'vencido';
+  const enSemanaActual = (m===mes() && _calSemanaDeDia(hoy.getDate())===sem);
+  if(enSemanaActual || (v - hoy) <= 3*86400000) return 'pronto';
+  return 'futuro';
+}
+function calTogglePago(itemId, sem){
+  const m = mesSel, item = (D.calItems||[]).find(x=>x.id===itemId);
+  if(!item) return;
+  if(item.tipo!=='manual'){ toast('Este pago se marca desde Sueldos'); return; }
+  if(!Array.isArray(D.calPagos)) D.calPagos = [];
+  const id = _calPagoId(m, itemId, sem);
+  let r = D.calPagos.find(p=>p.id===id);
+  if(!r){ r = {id, mes:m, item:itemId, sem, pagado:false, monto:null}; D.calPagos.push(r); }
+  r.pagado = !r.pagado; r.usuario = usuarioActual(); r.fecha = new Date().toISOString();
+  try{ registrarEvento('calendario', itemId, item.nombre, (r.pagado?'Marcó pagado':'Marcó pendiente')+' — '+mesLabel(m)+(item.semana===0?' (semana '+sem+')':'')); }catch(e){}
+  save(); renderCalendario();
+}
+function calSetMonto(itemId, sem, valor){
+  const m = mesSel, item = (D.calItems||[]).find(x=>x.id===itemId);
+  if(!item || item.tipo!=='manual') return;
+  if(!Array.isArray(D.calPagos)) D.calPagos = [];
+  const id = _calPagoId(m, itemId, sem);
+  let r = D.calPagos.find(p=>p.id===id);
+  if(!r){ r = {id, mes:m, item:itemId, sem, pagado:false, monto:null}; D.calPagos.push(r); }
+  const v = parseFloat(String(valor).replace(/\$/g,'').replace(/\./g,'').replace(',','.')) || null;
+  if(r.monto === v) return;
+  const antes = r.monto || 0;
+  r.monto = v;
+  try{ registrarCambio('calendario', itemId, item.nombre+' ('+mesLabel(m)+')', antes, v||0); }catch(e){}
+  save(); renderCalendario();
+}
+function calToggleEditar(){ _calEditando = !_calEditando; renderCalendario(); }
+function calAgregarItem(){
+  const nombre = (g('cal-n-nombre')?.value||'').trim();
+  if(!nombre){ toast('Escribí el nombre del pago'); return; }
+  const semana = parseInt(g('cal-n-semana')?.value||'1',10);
+  const dia = parseInt(g('cal-n-dia')?.value||'',10);
+  const nota = (g('cal-n-nota')?.value||'').trim();
+  if(!Array.isArray(D.calItems)) D.calItems = [];
+  const it = {id:'cal-'+uid(), nombre, semana, venceDia: (dia>=1 && dia<=31) ? dia : null, nota, tipo:'manual', orden: D.calItems.length};
+  D.calItems.push(it);
+  try{ registrarEvento('calendario', it.id, nombre, 'Agregó el pago a la lista (semana '+(semana||'todas')+')'); }catch(e){}
+  save(); renderCalendario(); toast('✓ Pago agregado');
+}
+function calEliminarItem(itemId){
+  const it = (D.calItems||[]).find(x=>x.id===itemId);
+  if(!it || !confirm('¿Sacar "'+it.nombre+'" de la lista de pagos? Lo ya tildado en meses anteriores queda guardado.')) return;
+  D.calItems = D.calItems.filter(x=>x.id!==itemId);
+  marcarComoBorrados([itemId]);
+  try{ registrarEvento('calendario', itemId, it.nombre, 'Sacó el pago de la lista'); }catch(e){}
+  save(); renderCalendario();
+}
+function calEditarItem(itemId){
+  const it = (D.calItems||[]).find(x=>x.id===itemId);
+  if(!it) return;
+  const dia = prompt('Día límite de "'+it.nombre+'" (1 a 31). Dejalo vacío para usar el fin de su semana:', it.venceDia||'');
+  if(dia===null) return;
+  const d = parseInt(dia,10);
+  it.venceDia = (d>=1 && d<=31) ? d : null;
+  if(it.venceDia && it.semana) it.semana = _calSemanaDeDia(it.venceDia);
+  save(); renderCalendario();
+}
+// Para el aviso de Resumen (siempre sobre el mes en curso)
+function calPendientesAviso(){
+  const out = {vencidos:[], pronto:[]};
+  if(!Array.isArray(D.calItems) || !D.calItems.length) return out;
+  const m = mes(), semHoy = _calSemanaDeDia(new Date().getDate());
+  D.calItems.forEach(it=>{
+    const auto = calInfoAuto(it, m); if(auto && auto.vacio) return;
+    const sems = it.semana===0 ? [1,2,3,4].filter(s=>s<=semHoy) : [it.semana];
+    sems.forEach(s=>{
+      const e = calEstado(it, m, s);
+      const n = it.nombre + (it.semana===0 ? ' (sem '+s+')' : '');
+      if(e==='vencido') out.vencidos.push(n); else if(e==='pronto') out.pronto.push(n);
+    });
+  });
+  return out;
+}
+function renderCalendario(){
+  const wrap = g('cal-periodo-wrap'); if(wrap) wrap.innerHTML = periodoSelectorHTML('cal');
+  const cont = g('cal-cont'); if(!cont) return;
+  if(calSembrar()) save();
+  const m = mesSel, items = (D.calItems||[]).slice().sort((a,b)=>(a.orden||0)-(b.orden||0));
+  const colores = {
+    ok:['#EAF6EF','#1A7A52','✓ Pagado'], vencido:['#FDECEA','#C0392B','Vencido'],
+    pronto:['#FBF6E9','#B8943E','Vence pronto'], futuro:['#F5F7FA','#6B7E8F',''], previo:['#F5F7FA','#8A9BAB','Sin registrar']
+  };
+  let totalItems = 0, totalOk = 0, nVenc = 0, nPronto = 0, falta = 0;
+  const fila = (it, sem) => {
+    const auto = calInfoAuto(it, m);
+    if(auto && auto.vacio && !_calEditando) return '';
+    const est = calEstado(it, m, sem), c = colores[est];
+    const reg = calRegistro(m, it, sem) || {};
+    if(est!=='previo') totalItems++; if(est==='ok') totalOk++; if(est==='vencido') nVenc++; if(est==='pronto') nPronto++;
+    const monto = auto ? auto.monto : (reg.monto||0);
+    if(est!=='ok' && est!=='previo') falta += monto||0;
+    const v = calVence(it, m, sem);
+    const venceTxt = (it.semana && it.venceDia) ? 'hasta el '+v.getDate() : (it.nota || 'semana '+sem);
+    const tag = est==='ok' ? c[2] : (est==='futuro' ? venceTxt : c[2]+' · '+venceTxt);
+    const check = auto
+      ? '<span title="Se marca desde Sueldos" style="width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;'+(est==='ok'?'background:#1A7A52;color:#fff':'border:1.5px dashed #B0BCC8;color:#B0BCC8')+';font-size:13px">'+(est==='ok'?'✓':'')+'</span>'
+      : '<button onclick="calTogglePago(\''+it.id+'\','+sem+')" title="Tocá para marcar" style="width:22px;height:22px;min-height:22px;padding:0;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;'+(est==='ok'?'background:#1A7A52;border:none;color:#fff':'background:#fff;border:1.5px solid #9AAABB;color:#fff')+';font-size:13px">'+(est==='ok'?'✓':'')+'</button>';
+    const montoHTML = auto
+      ? '<span style="font-size:12.5px;font-weight:700;color:#1a2332;white-space:nowrap">'+fmt(monto)+'</span>'
+      : '<input type="number" inputmode="decimal" placeholder="Monto" value="'+(reg.monto||'')+'" onchange="calSetMonto(\''+it.id+'\','+sem+',this.value)" style="width:100px;padding:4px 6px;border:1px solid #E4EAF0;border-radius:6px;font-size:12.5px;text-align:right">';
+    const sub = auto ? '<div style="font-size:11px;color:#8A9BAB">'+_escH(auto.detalle)+' · <a href="#" onclick="event.preventDefault();navPage(\'empleados\')" style="color:#1B3A6B">ir a Sueldos</a></div>'
+      : (it.nota && !(it.semana && it.venceDia && it.nota.toLowerCase().startsWith('antes')) ? '<div style="font-size:11px;color:#8A9BAB">'+_escH(it.nota)+'</div>' : '');
+    const editar = _calEditando ? '<button onclick="calEditarItem(\''+it.id+'\')" title="Cambiar día límite" style="border:none;background:none;cursor:pointer;font-size:14px;min-height:0">✏️</button><button onclick="calEliminarItem(\''+it.id+'\')" title="Sacar de la lista" style="border:none;background:none;cursor:pointer;font-size:14px;min-height:0">🗑</button>' : '';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid #EEF2F6">'+check+
+      '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:'+(est==='ok'?'#6B7E8F':'#1a2332')+(est==='ok'?';text-decoration:line-through':'')+'">'+_escH(it.nombre)+'</div>'+sub+'</div>'+
+      '<span style="font-size:11px;padding:2px 8px;border-radius:6px;white-space:nowrap;background:'+c[0]+';color:'+c[1]+';font-weight:700">'+_escH(tag)+'</span>'+
+      montoHTML+editar+'</div>';
+  };
+  const ult = _calUltimoDia(m), rangos = {1:'del 1 al 7',2:'del 8 al 14',3:'del 15 al 21',4:'del 22 al '+ult};
+  const semHoy = (m===mes()) ? _calSemanaDeDia(new Date().getDate()) : 0;
+  let tarjetas = '';
+  [1,2,3,4].forEach(sem=>{
+    const filas = items.filter(it=>it.semana===sem).map(it=>fila(it, sem)).join('') + items.filter(it=>it.semana===0).map(it=>fila(it, sem)).join('');
+    tarjetas += '<div class="card" style="margin-bottom:0'+(sem===semHoy?';border:2px solid #E8D9A8':'')+'">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div style="font-weight:800;color:#1a2332;font-size:14px">Semana '+sem+' <span style="font-weight:500;color:#8A9BAB;font-size:12.5px">· '+rangos[sem]+'</span></div>'+
+      (sem===semHoy?'<span style="font-size:11px;background:#FBF6E9;color:#B8943E;padding:2px 8px;border-radius:6px;font-weight:700">Semana actual</span>':'')+'</div>'+
+      (filas || '<div style="font-size:12.5px;color:#8A9BAB;padding:8px 0">Sin pagos en esta semana</div>')+'</div>';
+  });
+  const pct = totalItems ? Math.round(totalOk*100/totalItems) : 0;
+  const form = _calEditando ? '<div class="card" style="margin-top:14px"><div style="font-weight:700;color:#1a2332;margin-bottom:8px">➕ Agregar un pago a la lista</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+      '<input id="cal-n-nombre" placeholder="Nombre (ej: Internet)" style="flex:2;min-width:160px;padding:8px;border:1px solid #D8E2EC;border-radius:8px">'+
+      '<select id="cal-n-semana" style="padding:8px;border:1px solid #D8E2EC;border-radius:8px"><option value="1">Semana 1</option><option value="2">Semana 2</option><option value="3">Semana 3</option><option value="4">Semana 4</option><option value="0">Todas las semanas</option></select>'+
+      '<input id="cal-n-dia" type="number" min="1" max="31" placeholder="Día límite (opcional)" style="width:150px;padding:8px;border:1px solid #D8E2EC;border-radius:8px">'+
+      '<input id="cal-n-nota" placeholder="Nota (opcional)" style="flex:1;min-width:140px;padding:8px;border:1px solid #D8E2EC;border-radius:8px">'+
+      '<button class="btn btn-sm btn-primary" onclick="calAgregarItem()">Agregar</button></div>'+
+    '<div style="font-size:12px;color:#8A9BAB;margin-top:6px">Con ✏️ cambiás el día límite de un pago y con 🗑 lo sacás de la lista. Los sueldos se agregan solos por sector.</div></div>' : '';
+  cont.innerHTML =
+    '<div class="card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">'+
+      '<div><div style="font-size:15px;font-weight:800;color:#1a2332">'+totalOk+' de '+totalItems+' pagos hechos en '+mesLabel(m)+'</div>'+
+      '<div style="font-size:12.5px;color:#6B7E8F">Falta pagar (con monto cargado): '+fmt(falta)+'</div>'+
+      '<div style="height:6px;background:#EEF2F6;border-radius:6px;margin-top:8px;width:260px;max-width:100%"><div style="width:'+pct+'%;height:6px;background:#1A7A52;border-radius:6px"></div></div></div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+
+        (nVenc?'<span style="font-size:12px;background:#FDECEA;color:#C0392B;padding:4px 10px;border-radius:8px;font-weight:700">'+nVenc+' vencido'+(nVenc!==1?'s':'')+'</span>':'')+
+        (nPronto?'<span style="font-size:12px;background:#FBF6E9;color:#B8943E;padding:4px 10px;border-radius:8px;font-weight:700">'+nPronto+' vence'+(nPronto!==1?'n':'')+' pronto</span>':'')+
+        '<button class="btn btn-sm" style="background:#fff;color:#1B3A6B;border:1px solid #D8E2EC" onclick="calToggleEditar()">'+(_calEditando?'✓ Listo':'✏️ Editar lista')+'</button>'+
+      '</div></div>'+
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;margin-top:4px">'+tarjetas+'</div>'+form;
+}
 
 // ═══════════════════════════════
 // REGISTRO DE QUIÉN HIZO CADA CAMBIO
@@ -2407,6 +2627,7 @@ function navPage(name){
   if(name==='fichabancaria'){ const tryR=(n)=>{ if(D.empleados.length>0||n>=20){renderFichaBancaria();}else{setTimeout(()=>tryR(n+1),300);} }; tryR(0); }
   if(name==='oficina'){ renderOficina(); if(!gv('of-fecha')) sv('of-fecha', hoy()); }
   if(name==='propiedades') renderPropiedades();
+  if(name==='calendario') renderCalendario();
   if(name==='gastos'){ renderGastos(); if(!gv('gpdf-desde')) sv('gpdf-desde', mesSel); if(!gv('gpdf-hasta')) sv('gpdf-hasta', mesSel); }
   if(name==='ingresos') renderIngresos();
   if(name==='cheques') renderCheques();
@@ -2697,7 +2918,18 @@ function renderPendientes(){
     '</div>';
   }
 
-  if(!alertas.length && aumentosProx.length===0 && empAum.length===0 && contratosAlerta.length===0){
+  // Calendario de pagos: vencidos y los que vencen esta semana (mes en curso)
+  let calAviso = {vencidos:[], pronto:[]};
+  try{ calAviso = calPendientesAviso(); }catch(e){}
+  if(calAviso.vencidos.length || calAviso.pronto.length){
+    avisoAumentos += '<div onclick="navPage(\'calendario\')" style="cursor:pointer;background:'+(calAviso.vencidos.length?'#FDECEA':'#FBF6E9')+';border:1px solid '+(calAviso.vencidos.length?'#F2B8B5':'#E8D9A8')+';border-radius:12px;padding:14px 18px;margin-top:12px">'+
+      '<div style="font-weight:800;color:'+(calAviso.vencidos.length?'#C0392B':'#B8943E')+';font-size:13.5px;margin-bottom:6px">📅 Calendario de pagos</div>'+
+      (calAviso.vencidos.length?'<div style="font-size:13px;color:#922B21;padding:2px 0"><b>Vencidos sin pagar:</b> '+calAviso.vencidos.map(x=>_escH(x)).join(', ')+'</div>':'')+
+      (calAviso.pronto.length?'<div style="font-size:13px;color:#7D6608;padding:2px 0"><b>Vencen esta semana:</b> '+calAviso.pronto.map(x=>_escH(x)).join(', ')+'</div>':'')+
+    '</div>';
+  }
+
+  if(!alertas.length && aumentosProx.length===0 && empAum.length===0 && contratosAlerta.length===0 && !calAviso.vencidos.length && !calAviso.pronto.length){
     cont.innerHTML = '<div style="background:#EAF6EF;border:1px solid #B7E0C9;border-radius:14px;padding:16px 20px;color:#166534;font-weight:700">✅ Todo al día en '+mesLabel(m)+' — no hay pagos pendientes.</div>' + avisoCopiaHTML();
     return;
   }
@@ -7445,7 +7677,7 @@ function fdh(isoStr){
   }catch(e){ return '—'; }
 }
 
-const TIPO_LABEL_HIST={gasto:'Gasto',sueldo:'Sueldo',adelanto:'Adelanto',comision:'Comisión',comision_lider:'Comisiones (equipo)',sueldo_mes:'Sueldo del mes',hsextra:'Hs extra',pago:'Pago de sueldo',restauracion:'Restauración',empleado:'Empleado',alquiler:'Alquiler',propiedad:'Propiedad',servicio:'Servicio',ingreso:'Ingreso',cheque:'Cheque'};
+const TIPO_LABEL_HIST={gasto:'Gasto',sueldo:'Sueldo',adelanto:'Adelanto',comision:'Comisión',comision_lider:'Comisiones (equipo)',sueldo_mes:'Sueldo del mes',hsextra:'Hs extra',pago:'Pago de sueldo',restauracion:'Restauración',calendario:'Calendario de pagos',empleado:'Empleado',alquiler:'Alquiler',propiedad:'Propiedad',servicio:'Servicio',ingreso:'Ingreso',cheque:'Cheque'};
 const TIPOS_RESTAURABLES = ['gasto','sueldo','adelanto','comision','comision_lider'];
 
 // Detecta comisiones duplicadas (misma persona + mes + semana) y las fusiona
