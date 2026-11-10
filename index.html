@@ -1891,6 +1891,108 @@ async function chequearVersion(){
 }
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) chequearVersion(); });
 
+// ═══════════════════════════════
+// REGISTRO DE QUIÉN HIZO CADA CAMBIO
+// ═══════════════════════════════
+function usuarioActual(){
+  try{
+    const p = JSON.parse(atob(getToken().split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    return p.nombre || (p.email ? String(p.email).split('@')[0] : '');
+  }catch(e){ return ''; }
+}
+function _escH(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+// Eventos sin importe (pagos marcados, altas, bajas...)
+function registrarEvento(tipo, refId, nombre, texto){
+  if(!D.historial_cambios) D.historial_cambios = [];
+  D.historial_cambios.unshift({ id: uid(), fecha: new Date().toISOString(), tipo, refId, nombre, texto, usuario: usuarioActual() });
+  if(D.historial_cambios.length>1000) D.historial_cambios = D.historial_cambios.slice(0,1000);
+}
+// Guarda el historial sin crear un paso extra de "Deshacer"
+function _guardarHistorial(){
+  const prev = _suspenderUndo; _suspenderUndo = true;
+  try{ save(); } finally { _suspenderUndo = prev; }
+}
+function filtrarHistorial(){
+  const q = (g('hist-buscar')?.value||'').toLowerCase().trim(), u = g('hist-usuario')?.value||'';
+  document.querySelectorAll('#hist-overlay .hist-fila').forEach(tr=>{
+    const ok = (!q || tr.dataset.buscar.includes(q)) && (!u || tr.dataset.usuario===u);
+    tr.style.display = ok ? '' : 'none';
+  });
+}
+// Envuelve una función existente para registrar qué cambió, sin tocar su lógica
+function _envolver(nombreFn, antes, luego){
+  const orig = window[nombreFn];
+  if(typeof orig !== 'function' || orig._conHistorial) return;
+  const nueva = function(...args){
+    let a; try{ a = antes ? antes(...args) : null; }catch(e){}
+    const r = orig.apply(this, args);
+    const fin = res => { try{ if(luego(a, ...args)) _guardarHistorial(); }catch(e){ console.error('historial', e); } return res; };
+    return (r && typeof r.then === 'function') ? r.then(fin) : fin(r);
+  };
+  nueva._conHistorial = true;
+  window[nombreFn] = nueva;
+}
+const _emp = id => (D.empleados||[]).find(e=>e.id===id);
+const _prop = id => (D.propiedades||[]).find(p=>p.id===id);
+(function activarHistorial(){
+  // Sueldos del mes: importe, hs extra, pagado y semana
+  _envolver('setNominaEmp',
+    (id, m, campo) => { const e=_emp(id); return e ? getNominaEmp(e, m)[campo] : undefined; },
+    (antes, id, m, campo) => {
+      const e=_emp(id); if(!e) return false;
+      const desp = getNominaEmp(e, m)[campo];
+      if(antes === desp) return false;
+      const n = e.nombre+' ('+mesLabel(m)+')';
+      if(campo==='sueldo') registrarCambio('sueldo_mes', id, n, antes, desp);
+      else if(campo==='hsExtra') registrarCambio('hsextra', id, n, antes, desp);
+      else if(campo==='pagado') registrarEvento('pago', id, e.nombre, (desp?'Marcó pagado':'Marcó pendiente')+' el sueldo de '+mesLabel(m));
+      else if(campo==='semPago') registrarEvento('pago', id, e.nombre, 'Cambió la semana de pago de '+mesLabel(m)+' a Sem '+desp);
+      else return false;
+      return true;
+    });
+  _envolver('aplicarAumentoEmp',
+    id => (_emp(id)||{}).sueldo,
+    (antes, id) => { const e=_emp(id); if(!e || e.sueldo===antes) return false; registrarCambio('sueldo', id, e.nombre+' (aumento por inflación)', antes, e.sueldo); return true; });
+  _envolver('addEmpleado',
+    () => (D.empleados||[]).length,
+    (antes) => { if((D.empleados||[]).length<=antes) return false; const e=D.empleados[D.empleados.length-1]; registrarEvento('empleado', e.id, e.nombre, 'Alta de empleado — sueldo '+fmt(e.sueldo||0)+(e.desde?' desde '+mesLabel(e.desde):'')); return true; });
+  _envolver('delEmpleado',
+    id => { const e=_emp(id); return e ? {nombre:e.nombre, sueldo:e.sueldo} : null; },
+    (a, id) => { if(!a || _emp(id)) return false; registrarEvento('empleado', id, a.nombre, 'Empleado eliminado (sueldo '+fmt(a.sueldo||0)+')'); return true; });
+  // Alquileres y propiedades
+  _envolver('togglePagoAlquiler',
+    (id, m) => { const p=_prop(id); return p ? !!(p.pagos||{})[m] : undefined; },
+    (antes, id, m) => { const p=_prop(id); if(!p) return false; const d=!!(p.pagos||{})[m]; if(d===antes) return false; registrarEvento('alquiler', id, p.nombre, 'Alquiler de '+mesLabel(m)+': '+(d?'marcado cobrado':'marcado pendiente')+' ('+fmt(p.alquiler||0)+')'); return true; });
+  _envolver('aplicarAumento',
+    id => (_prop(id)||{}).alquiler,
+    (antes, id) => { const p=_prop(id); if(!p || p.alquiler===antes) return false; registrarCambio('alquiler', id, p.nombre+' (aumento)', antes, p.alquiler); return true; });
+  _envolver('addPropiedad',
+    () => (D.propiedades||[]).length,
+    (antes) => { if((D.propiedades||[]).length<=antes) return false; const p=D.propiedades[D.propiedades.length-1]; registrarEvento('propiedad', p.id, p.nombre, 'Propiedad agregada — alquiler '+fmt(p.alquiler||0)); return true; });
+  _envolver('delPropiedad',
+    id => { const p=_prop(id); return p ? p.nombre : null; },
+    (nombre, id) => { if(!nombre || _prop(id)) return false; registrarEvento('propiedad', id, nombre, 'Propiedad eliminada'); return true; });
+  _envolver('toggleServicio',
+    (id, idx) => { const p=_prop(id); return p && p.servicios[idx] ? !!servMes(p.servicios[idx], mesSel).alDia : undefined; },
+    (antes, id, idx) => { const p=_prop(id); if(!p || !p.servicios[idx]) return false; const d=!!servMes(p.servicios[idx], mesSel).alDia; if(d===antes) return false; registrarEvento('servicio', id, p.nombre+' — '+p.servicios[idx].nombre, (d?'Marcado al día':'Marcado pendiente')+' ('+mesLabel(mesSel)+')'); return true; });
+  _envolver('setServicioMonto',
+    (id, idx) => { const p=_prop(id); return p && p.servicios[idx] ? (servMes(p.servicios[idx], mesSel).monto||0) : undefined; },
+    (antes, id, idx) => { const p=_prop(id); if(!p || !p.servicios[idx]) return false; const d=servMes(p.servicios[idx], mesSel).monto||0; if(d===antes) return false; registrarCambio('servicio', id, p.nombre+' — '+p.servicios[idx].nombre+' ('+mesLabel(mesSel)+')', antes, d); return true; });
+  // Altas y bajas de gastos, adelantos, ingresos y cheques
+  const altaBaja = (coleccion, tipo, fnAlta, fnBaja, nombreDe) => {
+    _envolver(fnAlta,
+      () => (D[coleccion]||[]).length,
+      (antes) => { if((D[coleccion]||[]).length<=antes) return false; const x=D[coleccion][D[coleccion].length-1]; registrarEvento(tipo, x.id, nombreDe(x), 'Agregado: '+fmt(x.monto||0)+(x.fecha?' ('+x.fecha.split('-').reverse().join('/')+')':'')); return true; });
+    _envolver(fnBaja,
+      id => { const x=(D[coleccion]||[]).find(y=>y.id===id); return x ? {n:nombreDe(x), monto:x.monto} : null; },
+      (a, id) => { if(!a || (D[coleccion]||[]).some(y=>y.id===id)) return false; registrarEvento(tipo, id, a.n, 'Eliminado ('+fmt(a.monto||0)+')'); return true; });
+  };
+  altaBaja('gastos', 'gasto', 'addGasto', 'delGasto', x => x.desc||'Gasto');
+  altaBaja('adelantos', 'adelanto', 'addAdelanto', 'delAdelanto', x => 'Adelanto — '+((_emp(x.emp_id)||{}).nombre||'—'));
+  altaBaja('ingresos', 'ingreso', 'addIngreso', 'delIngreso', x => x.desc||'Ingreso');
+  altaBaja('cheques', 'cheque', 'addCheque', 'delCheque', x => 'Cheque — '+(x.dest||''));
+})();
+
 // Menú lateral en el celular: se abre con ☰ y se cierra al elegir una sección
 function toggleMenu(abrir){
   const b = document.body;
@@ -7253,9 +7355,10 @@ function registrarCambio(tipo,refId,nombre,valorAnterior,valorNuevo){
     fecha: new Date().toISOString(),
     tipo, refId, nombre,
     valorAnterior: valorAnterior||0,
-    valorNuevo: valorNuevo||0
+    valorNuevo: valorNuevo||0,
+    usuario: usuarioActual()
   });
-  if(D.historial_cambios.length>500) D.historial_cambios=D.historial_cambios.slice(0,500);
+  if(D.historial_cambios.length>1000) D.historial_cambios=D.historial_cambios.slice(0,1000);
 }
 
 function fdh(isoStr){
@@ -7265,7 +7368,8 @@ function fdh(isoStr){
   }catch(e){ return '—'; }
 }
 
-const TIPO_LABEL_HIST={gasto:'Gasto',sueldo:'Sueldo',adelanto:'Adelanto',comision:'Comisión',comision_lider:'Comisiones (equipo)'};
+const TIPO_LABEL_HIST={gasto:'Gasto',sueldo:'Sueldo',adelanto:'Adelanto',comision:'Comisión',comision_lider:'Comisiones (equipo)',sueldo_mes:'Sueldo del mes',hsextra:'Hs extra',pago:'Pago de sueldo',empleado:'Empleado',alquiler:'Alquiler',propiedad:'Propiedad',servicio:'Servicio',ingreso:'Ingreso',cheque:'Cheque'};
+const TIPOS_RESTAURABLES = ['gasto','sueldo','adelanto','comision','comision_lider'];
 
 // Detecta comisiones duplicadas (misma persona + mes + semana) y las fusiona
 // en un unico registro, sumando los montos. Esto arregla el caso donde varias
@@ -7361,30 +7465,48 @@ function abrirHistorialCambios(){
   overlay.onclick=(e)=>{ if(e.target===overlay) overlay.remove(); };
 
   const hist=(D.historial_cambios||[]);
-  const filas = hist.length ? hist.map(h=>`
-    <tr>
+  const filas = hist.length ? hist.map(h=>{
+    const quien = h.usuario ? `<span style="background:#F5F0E1;color:#7D6608;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700">${_escH(h.usuario)}</span>` : '<span style="color:#B0BCC8;font-size:11px">—</span>';
+    const valores = h.texto
+      ? `<td colspan="2" style="padding:8px 10px;font-size:12px;color:#1a2332">${_escH(h.texto)}</td>`
+      : `<td style="padding:8px 10px;font-size:12px;color:#C0392B;text-decoration:line-through">${fmt(h.valorAnterior)}</td>
+         <td style="padding:8px 10px;font-size:12px;font-weight:700;color:#1A7A52">${fmt(h.valorNuevo)}</td>`;
+    const restaurar = (!h.texto && TIPOS_RESTAURABLES.includes(h.tipo))
+      ? `<button onclick="restaurarValorHistorico('${h.id}')" style="background:none;border:1px solid #1B3A6B;color:#1B3A6B;border-radius:6px;font-size:11px;padding:4px 10px;cursor:pointer;white-space:nowrap">↩ Restaurar</button>` : '';
+    const buscar = ((h.usuario||'')+' '+(h.nombre||'')+' '+(h.texto||'')+' '+(TIPO_LABEL_HIST[h.tipo]||h.tipo)).toLowerCase();
+    return `
+    <tr class="hist-fila" data-buscar="${_escH(buscar)}" data-usuario="${_escH(h.usuario||'')}">
       <td style="padding:8px 10px;font-size:11px;color:#8A9BAB;white-space:nowrap">${fdh(h.fecha)}</td>
+      <td style="padding:8px 10px">${quien}</td>
       <td style="padding:8px 10px;font-size:12px"><span style="background:#EEF2F7;color:#1B3A6B;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700">${TIPO_LABEL_HIST[h.tipo]||h.tipo}</span></td>
-      <td style="padding:8px 10px;font-size:12px;font-weight:600">${h.nombre||'—'}</td>
-      <td style="padding:8px 10px;font-size:12px;color:#C0392B;text-decoration:line-through">${fmt(h.valorAnterior)}</td>
-      <td style="padding:8px 10px;font-size:12px;font-weight:700;color:#1A7A52">${fmt(h.valorNuevo)}</td>
-      <td style="padding:8px 10px"><button onclick="restaurarValorHistorico('${h.id}')" style="background:none;border:1px solid #1B3A6B;color:#1B3A6B;border-radius:6px;font-size:11px;padding:4px 10px;cursor:pointer;white-space:nowrap">↩ Restaurar</button></td>
-    </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;color:#8A9BAB;padding:2rem">Todavía no hay cambios registrados.</td></tr>`;
+      <td style="padding:8px 10px;font-size:12px;font-weight:600">${_escH(h.nombre||'—')}</td>
+      ${valores}
+      <td style="padding:8px 10px">${restaurar}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="7" style="text-align:center;color:#8A9BAB;padding:2rem">Todavía no hay cambios registrados.</td></tr>`;
+  const usuarios = [...new Set(hist.map(h=>h.usuario).filter(Boolean))];
 
   overlay.innerHTML=`
     <div style="background:#fff;border-radius:14px;padding:0;width:840px;max-width:94vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.35)">
       <div style="padding:20px 24px;border-bottom:1px solid #EDF1F5;display:flex;align-items:center;justify-content:space-between">
         <div>
-          <div style="font-size:16px;font-weight:800;color:#1B3A6B">🕘 Historial de cambios de montos</div>
-          <div style="font-size:11px;color:#8A9BAB;margin-top:2px">Cada vez que se edita un importe (gasto, sueldo, comisión, adelanto) queda registrado acá con el valor anterior y el nuevo.</div>
+          <div style="font-size:16px;font-weight:800;color:#1B3A6B">🕘 Historial de cambios</div>
+          <div style="font-size:11px;color:#8A9BAB;margin-top:2px">Quién cambió qué y cuándo: importes, sueldos, pagos, alquileres, servicios, altas y bajas.</div>
         </div>
         <button onclick="document.getElementById('hist-overlay').remove()" style="background:#F2F5F8;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;color:#5A6B7C">✕ Cerrar</button>
       </div>
-      <div style="overflow-y:auto;flex:1">
+      <div style="padding:10px 24px;border-bottom:1px solid #EDF1F5;display:flex;gap:8px;flex-wrap:wrap">
+        <input id="hist-buscar" placeholder="Buscar (nombre, concepto…)" oninput="filtrarHistorial()" style="flex:1;min-width:180px;padding:7px 10px;border:1px solid #D8E2EC;border-radius:8px;font-size:13px">
+        <select id="hist-usuario" onchange="filtrarHistorial()" style="padding:7px 10px;border:1px solid #D8E2EC;border-radius:8px;font-size:13px">
+          <option value="">Todos los usuarios</option>${usuarios.map(u=>`<option value="${_escH(u)}">${_escH(u)}</option>`).join('')}
+        </select>
+      </div>
+      <div style="overflow:auto;flex:1">
         <table style="width:100%;border-collapse:collapse">
           <thead style="position:sticky;top:0;background:#fff">
             <tr style="border-bottom:2px solid #EDF1F5">
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:#8A9BAB;text-transform:uppercase">Fecha</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:#8A9BAB;text-transform:uppercase">Quién</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:#8A9BAB;text-transform:uppercase">Tipo</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:#8A9BAB;text-transform:uppercase">Concepto</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:#8A9BAB;text-transform:uppercase">Antes</th>
