@@ -15,7 +15,8 @@ export default async function handler(req, res) {
   if (!token) return res.status(401).json({ error: 'No token' });
   try {
     const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-    await jwtVerify(token, secret);
+    const { payload: _p } = await jwtVerify(token, secret);
+    if (_p.etapa !== 'sesion') throw new Error('sesión incompleta'); // exige haber completado la verificación en dos pasos
   } catch {
     return res.status(401).json({ error: 'Token inválido o expirado' });
   }
