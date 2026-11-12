@@ -267,7 +267,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
           <div style="font-size:11px;font-weight:800;letter-spacing:2px;color:#C9A84C;text-transform:uppercase;margin-bottom:8px">Sistema administrativo</div>
           <div style="font-size:28px;font-weight:800;color:#fff;margin-bottom:6px;letter-spacing:-.5px">Bienvenido a ODSA</div>
           <div style="font-size:14px;color:rgba(255,255,255,.5)" id="res-sub"></div>
-          <button onclick="generarResumenMensualPDF()" style="margin-top:10px;background:#C9A84C;color:#0F1923;border:none;border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:800;cursor:pointer">📄 Pendientes del mes (PDF)</button>
+          <button onclick="elegirPendientesPDF()" style="margin-top:10px;background:#C9A84C;color:#0F1923;border:none;border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:800;cursor:pointer">📄 Pendientes de pago (PDF)</button>
           <div style="display:flex;gap:24px;margin-top:20px;flex-wrap:wrap">
             <div style="background:rgba(255,255,255,.07);border-radius:10px;padding:12px 20px;min-width:140px">
               <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.4);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Ingresos</div>
@@ -2029,57 +2029,99 @@ function montosInusualesDelMes(m){
 // RESUMEN MENSUAL EN PDF
 // ═══════════════════════════════
 const _CAT_GASTO = {alquiler:'Alquiler',servicios:'Servicios',arca:'ARCA / Impuestos',publicidad:'Publicidad',sistemas:'Sistemas / Software',insumos:'Insumos / Oficina',otro:'Otro'};
-function generarResumenMensualPDF(m){
-  // Informe de lo PENDIENTE del mes: solo lo que falta pagar (y los alquileres por cobrar). Lo pagado no se incluye.
-  m = m || mesSel;
+// Elegir de qué semana (o el mes completo) se arma el informe de pendientes
+function elegirPendientesPDF(){
+  const m = mesSel, ult = _calUltimoDia(m);
+  const rangos = {1:'1 al 7',2:'8 al 14',3:'15 al 21',4:'22 al 28',5:'29 al '+ult};
+  const semHoy = (m===mes()) ? estimarSemana(new Date().toISOString().slice(0,10)) : 0;
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,25,35,.6);z-index:99998;display:flex;align-items:center;justify-content:center;padding:12px';
+  ov.addEventListener('click', e=>{ if(e.target===ov) ov.remove(); });
+  const btn = (txt, sub, sem, dest) => '<button onclick="this.closest(\'div[style*=fixed]\').remove();generarResumenMensualPDF(\''+m+'\','+sem+')" style="display:flex;justify-content:space-between;align-items:center;width:100%;padding:11px 14px;margin-bottom:6px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:700;'+(dest?'background:#1B3A6B;color:#fff;border:none':'background:#fff;color:#1a2332;border:1px solid #D8E2EC')+'"><span>'+txt+'</span><span style="font-weight:500;font-size:12.5px;opacity:.8">'+sub+'</span></button>';
+  let h = '<div style="background:#fff;border-radius:14px;padding:20px;width:min(380px,100%);box-shadow:0 10px 40px rgba(0,0,0,.3)">'+
+    '<div style="font-weight:800;font-size:16px;color:#1a2332;margin-bottom:4px">📄 Pendientes de pago</div>'+
+    '<div style="font-size:12.5px;color:#6B7E8F;margin-bottom:12px">'+mesLabel(m)+' · ¿De qué período?</div>';
+  for(let s=1; s<=5; s++){ if(s===5 && ult<29) continue; h += btn('Semana '+s+(s===semHoy?' (actual)':''), 'del '+rangos[s], s, s===semHoy); }
+  h += btn('Todo el mes', mesLabel(m), 0, false) + '</div>';
+  ov.innerHTML = h; document.body.appendChild(ov);
+}
+function generarResumenMensualPDF(m, sem){
+  // Informe de lo PENDIENTE: solo lo que falta pagar. Lo pagado no se incluye.
+  // sem = 1..5 → solo esa semana (mismas semanas que el Cash Flow semanal); sem = 0 → todo el mes.
+  m = m || mesSel; sem = sem || 0;
+  const enSem = s => !sem || s === sem;
+  const ult = _calUltimoDia(m);
+  const rangos = {1:'del 1 al 7',2:'del 8 al 14',3:'del 15 al 21',4:'del 22 al 28',5:'del 29 al '+ult};
+  const periodo = sem ? 'Semana '+sem+' de '+mesLabel(m)+' ('+rangos[sem]+')' : mesLabel(m);
   const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
   const fFecha = f => f ? String(f).slice(0,10).split('-').reverse().join('/') : '—';
   const nomEmp = id => ((D.empleados||[]).find(e=>e.id===id)||{}).nombre || '—';
   const nomExt = id => ((D.externos||[]).find(e=>e.id===id)||{}).nombre || '—';
   const tabla = (titulo, cols, filas, total) => filas.length ? '<h2>'+titulo+' <span class="cant">('+filas.length+')</span></h2><table><tr>'+cols.map(c=>'<th'+(c.r?' class="r"':'')+'>'+c.t+'</th>').join('')+'</tr>'+filas.join('')+
     (total!=null?'<tr class="tot"><td colspan="'+(cols.length-1)+'">Subtotal</td><td class="r">'+fmt(total)+'</td></tr>':'')+'</table>' : '';
+  const colSem = sem ? [] : [{t:'Semana'}];
+  const tdSem = s => sem ? '' : '<td class="c">Sem '+s+'</td>';
   let totalPagar = 0;
 
-  // 1) Sueldos sin pagar
+  // 1) Sueldos sin pagar (neto de adelantos del mes, igual que el Cash Flow)
   const sueldos = [];
   (D.empleados||[]).forEach(e=>{
     if(e.desde && m < e.desde) return;
-    const n = getNominaEmp(e, m), monto = (n.sueldo||0)+(n.hsExtra||0);
-    if(monto>0 && !n.pagado) sueldos.push({e, monto, sem:n.semPago||e.semPago||1, sector:(typeof SECTORES!=='undefined' && SECTORES[e.sector]) || e.sector || 'Otro'});
+    const n = getNominaEmp(e, m), bruto = (n.sueldo||0)+(n.hsExtra||0);
+    if(bruto<=0 || n.pagado) return;
+    const s = n.semPago || (D.semPagoSectores||{})[e.sector] || 1;
+    if(!enSem(s)) return;
+    const ade = (D.adelantos||[]).filter(a=>a.emp_id===e.id && a.mes===m).reduce((t,a)=>t+(a.monto||0),0);
+    const neto = Math.max(0, bruto - ade);
+    if(neto<=0) return;
+    sueldos.push({e, monto:neto, ade, sem:s, sector:(typeof SECTORES!=='undefined' && SECTORES[e.sector]) || e.sector || 'Otro'});
   });
   sueldos.sort((a,b)=>a.sem-b.sem || a.sector.localeCompare(b.sector) || a.e.nombre.localeCompare(b.e.nombre));
   const totSue = sueldos.reduce((t,x)=>t+x.monto,0); totalPagar += totSue;
-  const filasSue = sueldos.map(x=>'<tr><td>'+esc(x.e.nombre)+'</td><td>'+esc(x.sector)+'</td><td class="c">Sem '+x.sem+'</td><td class="r">'+fmt(x.monto)+'</td></tr>');
+  const filasSue = sueldos.map(x=>'<tr><td>'+esc(x.e.nombre)+(x.ade?' <span class="muted">(descontado adelanto '+fmt(x.ade)+')</span>':'')+'</td><td>'+esc(x.sector)+'</td>'+tdSem(x.sem)+'<td class="r">'+fmt(x.monto)+'</td></tr>');
 
-  // 2) Comisiones sin pagar
-  const com = (D.comisiones||[]).filter(c=>c.mes===m && !c.pagado).sort((a,b)=>(a.sem||0)-(b.sem||0));
+  // 2) Premios sin pagar
+  const pre = (D.premios||[]).filter(p=>p.mes===m && !p.pagado && enSem(p.semPago||p.sem||1));
+  const totPre = pre.reduce((t,p)=>t+(p.monto||0),0); totalPagar += totPre;
+  const filasPre = pre.map(p=>'<tr><td>'+esc(nomEmp(p.emp_id))+'</td><td>'+esc(p.concepto||'Premio')+'</td>'+tdSem(p.semPago||p.sem||1)+'<td class="r">'+fmt(p.monto||0)+'</td></tr>');
+
+  // 3) Comisiones sin pagar
+  const com = (D.comisiones||[]).filter(c=>c.mes===m && !c.pagado && enSem(c.semPago||c.sem||1)).sort((a,b)=>(a.semPago||a.sem||1)-(b.semPago||b.sem||1));
   const totCom = com.reduce((t,c)=>t+(c.total||0),0); totalPagar += totCom;
-  const filasCom = com.map(c=>'<tr><td>'+esc(nomExt(c.quien_id))+'</td><td class="c">Sem '+(c.sem||'—')+'</td><td class="r">'+fmt(c.total||0)+'</td></tr>');
+  const filasCom = com.map(c=>'<tr><td>'+esc(nomExt(c.quien_id))+'</td>'+tdSem(c.semPago||c.sem||1)+'<td class="r">'+fmt(c.total||0)+'</td></tr>');
 
-  // 3) Adelantos sin pagar
-  const ade = (D.adelantos||[]).filter(a=>a.mes===m && !a.pagado);
+  // 4) Adelantos sin pagar
+  const ade = (D.adelantos||[]).filter(a=>a.mes===m && !a.pagado && enSem(estimarSemana(a.fecha)));
   const totAde = ade.reduce((t,a)=>t+(a.monto||0),0); totalPagar += totAde;
   const filasAde = ade.map(a=>'<tr><td>'+esc(nomEmp(a.emp_id))+'</td><td>'+fFecha(a.fecha)+'</td><td class="r">'+fmt(a.monto||0)+'</td></tr>');
 
-  // 4) Gastos sin pagar
-  const gas = (D.gastos||[]).filter(x=>x.mes===m && !x.pagado).sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||'')));
+  // 5) Gastos sin pagar
+  const semGasto = x => x.semPago || x.sem || estimarSemana(x.fecha);
+  const gas = (D.gastos||[]).filter(x=>x.mes===m && !x.pagado && enSem(semGasto(x))).sort((a,b)=>semGasto(a)-semGasto(b) || String(a.fecha||'').localeCompare(String(b.fecha||'')));
   const totGas = gas.reduce((t,x)=>t+(x.monto||0),0); totalPagar += totGas;
-  const filasGas = gas.map(x=>'<tr><td>'+fFecha(x.fecha)+'</td><td>'+esc(x.desc||'—')+'</td><td>'+esc(_CAT_GASTO[x.cat]||x.cat||'—')+'</td><td class="r">'+fmt(x.monto||0)+'</td></tr>');
+  const filasGas = gas.map(x=>'<tr><td>'+fFecha(x.fecha)+'</td><td>'+esc(x.desc||'—')+'</td><td>'+esc(_CAT_GASTO[x.cat]||x.cat||'—')+'</td>'+tdSem(semGasto(x))+'<td class="r">'+fmt(x.monto||0)+'</td></tr>');
 
-  // 5) Cheques sin acreditar
-  const che = (D.cheques||[]).filter(c=>c.mes===m && !c.cobrado);
+  // 6) Gastos proyectados (cargados a futuro en el Cash Flow)
+  const pro = (D.proyecciones||[]).filter(p=>p.mes===m && enSem(p.sem||1));
+  const totPro = pro.reduce((t,p)=>t+(p.monto||0),0); totalPagar += totPro;
+  const filasPro = pro.map(p=>'<tr><td>'+esc(p.desc||'—')+'</td><td>'+esc(_CAT_GASTO[p.cat]||p.cat||'—')+'</td>'+tdSem(p.sem||1)+'<td class="r">'+fmt(p.monto||0)+'</td></tr>');
+
+  // 7) Cheques sin acreditar
+  const che = (D.cheques||[]).filter(c=>c.mes===m && !c.cobrado && enSem(estimarSemana(c.fecha)));
   const totChe = che.reduce((t,c)=>t+(c.monto||0),0); totalPagar += totChe;
-  const filasChe = che.map(c=>'<tr><td>'+fFecha(c.fecha)+'</td><td>'+esc(c.dest||'—')+'</td><td>'+esc(c.num||c.nro||'—')+'</td><td class="r">'+fmt(c.monto||0)+'</td></tr>');
+  const filasChe = che.map(c=>'<tr><td>'+fFecha(c.fecha)+'</td><td>'+esc(c.dest||'—')+'</td><td>'+esc(c.nro||c.num||'—')+'</td><td class="r">'+fmt(c.monto||0)+'</td></tr>');
 
-  // 6) Calendario de pagos: lo que falta tildar (los sueldos ya están arriba)
+  // 8) Calendario de pagos: lo que falta tildar (los sueldos ya están arriba)
   const cal = [];
   try{
     (D.calItems||[]).filter(it=>it.tipo==='manual').forEach(it=>{
       (it.semana===0 ? [1,2,3,4] : [it.semana]).forEach(s=>{
+        const v = calVence(it, m, s);
+        const semCF = it.semana===0 ? s : estimarSemana(v.toISOString().slice(0,10));
+        if(!enSem(semCF)) return;
         const e = calEstado(it, m, s); if(e==='ok' || e==='previo') return;
         const reg = calRegistro(m, it, s) || {};
-        const v = calVence(it, m, s);
-        cal.push({nombre: it.nombre+(it.semana===0?' (semana '+s+')':''), vence: v, estado: e, monto: reg.monto||0, sem: s});
+        cal.push({nombre: it.nombre+(it.semana===0?' (semana '+s+')':''), vence: v, estado: e, monto: reg.monto||0});
       });
     });
   }catch(e){}
@@ -2087,37 +2129,40 @@ function generarResumenMensualPDF(m){
   const totCal = cal.reduce((t,x)=>t+(x.monto||0),0); totalPagar += totCal;
   const filasCal = cal.map(x=>'<tr><td>'+esc(x.nombre)+'</td><td class="c">'+x.vence.toLocaleDateString('es-AR')+'</td><td class="c">'+(x.estado==='vencido'?'<span class="venc">Vencido</span>':(x.estado==='pronto'?'<span class="pend">Vence pronto</span>':'Por vencer'))+'</td><td class="r">'+(x.monto?fmt(x.monto):'—')+'</td></tr>');
 
-  // 7) Alquileres por cobrar
-  const alq = (D.propiedades||[]).filter(p=>(p.alquiler||0)>0 && !(p.pagos||{})[m]);
+  // 9) Alquileres por cobrar (solo en el informe del mes completo)
+  const alq = sem ? [] : (D.propiedades||[]).filter(p=>(p.alquiler||0)>0 && !(p.pagos||{})[m]);
   const totAlq = alq.reduce((t,p)=>t+(p.alquiler||0),0);
   const filasAlq = alq.map(p=>'<tr><td>'+esc(p.nombre)+'</td><td>'+esc(p.inquilino||'—')+'</td><td class="r">'+fmt(p.alquiler)+'</td></tr>');
 
-  const hayAlgo = filasSue.length+filasCom.length+filasAde.length+filasGas.length+filasChe.length+filasCal.length+filasAlq.length > 0;
+  const hayAlgo = filasSue.length+filasPre.length+filasCom.length+filasAde.length+filasGas.length+filasPro.length+filasChe.length+filasCal.length+filasAlq.length > 0;
   const quien = (typeof usuarioActual==='function' ? usuarioActual() : '');
-  const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Pendientes '+esc(mesLabel(m))+' — ODSA</title><style>'+
+  const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Pendientes '+esc(periodo)+' — ODSA</title><style>'+
     'body{font-family:Arial,sans-serif;color:#1a2332;padding:28px;max-width:900px;margin:0 auto;font-size:13px}'+
     'h1{font-size:22px;margin:0}h2{font-size:15px;margin:22px 0 8px;color:#1B3A6B;border-bottom:2px solid #E4EAF0;padding-bottom:4px}.cant{color:#8A9BAB;font-weight:400;font-size:13px}'+
     '.sub{color:#6B7E8F;font-size:12px;margin:4px 0 16px}table{width:100%;border-collapse:collapse}td,th{padding:6px 8px;border-bottom:1px solid #EEF2F6;text-align:left}'+
-    'th{font-size:11px;color:#6B7E8F;text-transform:uppercase}.r{text-align:right}.c{text-align:center}.tot td{font-weight:700;background:#F5F7FA}'+
+    'th{font-size:11px;color:#6B7E8F;text-transform:uppercase}.r{text-align:right}.c{text-align:center}.muted{color:#8A9BAB;font-size:11.5px}.tot td{font-weight:700;background:#F5F7FA}'+
     '.kpis{display:flex;gap:10px;flex-wrap:wrap}.kpi{flex:1;min-width:200px;background:#F5F7FA;border-radius:10px;padding:12px}.kpi b{display:block;font-size:20px;margin-top:4px}'+
     '.pend{color:#B8943E;font-weight:700}.venc{color:#C0392B;font-weight:700}.ok{background:#EAF6EF;color:#1A7A52;border-radius:10px;padding:16px;font-weight:700;margin-top:16px}'+
     '.print-btn{background:#1B3A6B;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;cursor:pointer;margin-bottom:16px}'+
     '@media print{.print-btn{display:none}body{padding:0}}'+
     '</style></head><body>'+
     '<button class="print-btn" onclick="window.print()">🖨 Imprimir / Guardar como PDF</button>'+
-    '<h1>ODSA — Pendientes de '+esc(mesLabel(m))+'</h1>'+
+    '<h1>ODSA — Pendientes de pago</h1>'+
+    '<div style="font-size:16px;font-weight:700;margin-top:4px">'+esc(periodo)+'</div>'+
     '<div class="sub">Solo lo que falta pagar (lo ya pagado no se incluye). Generado el '+new Date().toLocaleString('es-AR')+(quien?' por '+esc(quien):'')+'</div>'+
     (hayAlgo
       ? '<div class="kpis"><div class="kpi">Total pendiente de pago<b style="color:#C0392B">'+fmt(totalPagar)+'</b></div>'+
           (filasAlq.length?'<div class="kpi">Alquileres por cobrar<b style="color:#1A7A52">'+fmt(totAlq)+'</b></div>':'')+'</div>'+
-        tabla('Sueldos sin pagar', [{t:'Empleado'},{t:'Sector'},{t:'Semana'},{t:'Monto',r:1}], filasSue, totSue)+
-        tabla('Comisiones sin pagar', [{t:'Vendedor'},{t:'Semana'},{t:'Monto',r:1}], filasCom, totCom)+
+        tabla('Sueldos sin pagar', [{t:'Empleado'},{t:'Sector'}].concat(colSem,[{t:'Monto',r:1}]), filasSue, totSue)+
+        tabla('Premios sin pagar', [{t:'Empleado'},{t:'Concepto'}].concat(colSem,[{t:'Monto',r:1}]), filasPre, totPre)+
+        tabla('Comisiones sin pagar', [{t:'Vendedor'}].concat(colSem,[{t:'Monto',r:1}]), filasCom, totCom)+
         tabla('Adelantos sin pagar', [{t:'Empleado'},{t:'Fecha'},{t:'Monto',r:1}], filasAde, totAde)+
-        tabla('Gastos sin pagar', [{t:'Fecha'},{t:'Concepto'},{t:'Categoría'},{t:'Monto',r:1}], filasGas, totGas)+
+        tabla('Gastos sin pagar', [{t:'Fecha'},{t:'Concepto'},{t:'Categoría'}].concat(colSem,[{t:'Monto',r:1}]), filasGas, totGas)+
+        tabla('Gastos proyectados', [{t:'Concepto'},{t:'Categoría'}].concat(colSem,[{t:'Monto',r:1}]), filasPro, totPro)+
         tabla('Cheques sin acreditar', [{t:'Fecha'},{t:'Destinatario'},{t:'Nº / Banco'},{t:'Monto',r:1}], filasChe, totChe)+
         tabla('Calendario de pagos — sin tildar', [{t:'Pago'},{t:'Vence'},{t:'Estado'},{t:'Monto',r:1}], filasCal, totCal||null)+
         tabla('Alquileres por cobrar', [{t:'Propiedad'},{t:'Inquilino'},{t:'Alquiler',r:1}], filasAlq, totAlq)
-      : '<div class="ok">✅ No hay nada pendiente en '+esc(mesLabel(m))+'. Todo está pagado y cobrado.</div>')+
+      : '<div class="ok">✅ No hay nada pendiente de pago en '+esc(periodo)+'.</div>')+
     '</body></html>';
   const win = window.open('','_blank');
   if(!win){ toast('Permití las ventanas emergentes para ver el informe'); return; }
