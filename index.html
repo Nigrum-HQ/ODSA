@@ -205,9 +205,9 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
       <button class="topbar-tab on" onclick="navTab('resumen')">Resumen</button>
       <button class="topbar-tab" onclick="navTab('cashflow')" style="background:rgba(201,168,76,.15);color:#C9A84C;font-weight:700">💰 Cash Flow</button>
       <button class="topbar-tab" onclick="navTab('empleados')">Sueldos</button>
-      <button class="topbar-tab" onclick="navTab('ventas')">Ventas</button>
-      <button class="topbar-tab" onclick="navTab('externos')">Externos</button>
-      <button class="topbar-tab" onclick="navTab('fichabancaria')">&#127974; Fichas</button>
+      <button class="topbar-tab" onclick="navTab('ventas')">Premios</button>
+      <button class="topbar-tab" onclick="navTab('externos')">Vendedores</button>
+      <button class="topbar-tab" onclick="navTab('fichabancaria')">Fichas bancarias</button>
       <button class="topbar-tab" onclick="navTab('gastos')">Gastos</button>
       <button class="topbar-tab" onclick="navTab('ingresos')">Ingresos</button>
       <button class="topbar-tab" onclick="navTab('cheques')">Cheques</button>
@@ -232,25 +232,25 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
       <div class="sitem" data-page="asistente" onclick="navPage('asistente')"><span class="ico">🤖</span>Asistente IA</div>
 
       <div class="ssep">Administración</div>
-      <div class="sitem" data-page="empleados" onclick="navPage('empleados')"><span class="ico">💰</span>Sueldos</div>
-      <div class="sitem" data-page="costoemp" onclick="navPage('costoemp')"><span class="ico">📊</span>Costo por empleado</div>
+      <div class="sitem" data-page="empleados" onclick="navPage('empleados')"><span class="ico">💼</span>Sueldos</div>
+      <div class="sitem" data-page="costoemp" onclick="navPage('costoemp')"><span class="ico">🧮</span>Costo por empleado</div>
       <div class="sitem" data-page="arca" onclick="navPage('arca')"><span class="ico">🧾</span>IVA / ARCA</div>
       <div class="sitem" data-page="adelantos" onclick="navPage('adelantos')"><span class="ico">💵</span>Adelantos</div>
       <div class="sitem" data-page="gastos" onclick="navPage('gastos')"><span class="ico">💳</span>Gastos</div>
       <div class="sitem" data-page="oficina" onclick="navPage('oficina')"><span class="ico">🧴</span>Oficina</div>
       <div class="sitem" data-page="propiedades" onclick="navPage('propiedades')"><span class="ico">🏠</span>Propiedades</div>
       <div class="sitem" data-page="ingresos" onclick="navPage('ingresos')"><span class="ico">📥</span>Ingresos</div>
-      <div class="sitem" data-page="cheques" onclick="navPage('cheques')"><span class="ico">🏦</span>Cheques</div>
-      <div class="sitem" data-page="transferencias" onclick="navPage('transferencias')"><span class="ico">🧾</span>Transferencias</div>
+      <div class="sitem" data-page="cheques" onclick="navPage('cheques')"><span class="ico">📝</span>Cheques</div>
+      <div class="sitem" data-page="transferencias" onclick="navPage('transferencias')"><span class="ico">💸</span>Transferencias</div>
 
       <div class="ssep" style="color:#C9A84C">Cash Flow</div>
       <div class="sitem" data-page="cashflow" onclick="navPage('cashflow')"><span class="ico">💰</span>Cash Flow semanal</div>
       <div class="sitem" data-page="calendario" onclick="navPage('calendario')"><span class="ico">📅</span>Calendario de pagos</div>
       <div class="ssep">Ventas / Marketing</div>
-      <div class="sitem" data-page="ventas" onclick="navPage('ventas')"><span class="ico">⭐</span>Premios semana</div>
-      <div class="sitem" data-page="externos" onclick="navPage('externos')"><span class="ico">👥</span>Vendedores ext.</div>
+      <div class="sitem" data-page="ventas" onclick="navPage('ventas')"><span class="ico">⭐</span>Premios semanales</div>
+      <div class="sitem" data-page="externos" onclick="navPage('externos')"><span class="ico">👥</span>Vendedores externos</div>
       <div class="sitem" data-page="ranking" onclick="navPage('ranking')"><span class="ico">🏆</span>Ranking vendedores</div>
-      <div class="sitem" data-page="fichabancaria" onclick="navPage('fichabancaria')"><span class="ico">🏦</span>Ficha bancaria</div>
+      <div class="sitem" data-page="fichabancaria" onclick="navPage('fichabancaria')"><span class="ico">🏦</span>Fichas bancarias</div>
 
       <div class="ssep">Sistema</div>
       <div class="sitem" data-page="backups" onclick="navPage('backups')"><span class="ico">🛡️</span>Copias de seguridad</div>
@@ -278,7 +278,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
               <div style="font-size:22px;font-weight:800;color:#F87171" id="res-eg-top">$0</div>
             </div>
             <div style="background:rgba(255,255,255,.07);border-radius:10px;padding:12px 20px;min-width:140px">
-              <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.4);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Patrimonio</div>
+              <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.4);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Resultado del mes</div>
               <div style="font-size:22px;font-weight:800;color:#C9A84C" id="res-res-top">$0</div>
             </div>
           </div>
@@ -300,7 +300,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
           </div>
           <!-- PATRIMONIO -->
           <div class="card">
-            <div class="card-title">Patrimonio del mes</div>
+            <div class="card-title">Resultado del mes</div>
             <table class="res-table" id="res-tabla" style="margin-bottom:16px"></table>
             <div style="background:#F8FAFB;border-radius:10px;padding:14px 16px">
               <div style="font-size:10px;font-weight:700;color:#8A9BAB;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Barra de egresos vs ingresos</div>
@@ -435,7 +435,7 @@ tfoot td{padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid #
       <!-- EMPLEADOS -->
       <div id="page-empleados" class="page">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-          <div class="page-title" style="margin-bottom:0">Empleados</div>
+          <div class="page-title" style="margin-bottom:0">Sueldos</div>
           <div id="emp-periodo-wrap"></div>
         </div>
         <div class="page-sub">Nómina mensual — sueldos fijos</div>
@@ -1452,7 +1452,7 @@ function setMesGlobal(nuevoMes){
   actualizarLabelsMes();
   renderTodoElPeriodo();
 }
-const fmt = n => n==null?'—':'$'+Math.round(n).toLocaleString('es-AR');
+const fmt = n => n==null?'—':(Math.round(n)<0?'-':'')+'$'+Math.abs(Math.round(n)).toLocaleString('es-AR');
 const fd  = d => { if(!d)return'—'; const p=d.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; };
 const hoy = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const g   = id => document.getElementById(id);
@@ -1999,7 +1999,7 @@ function promedioGastoHabitual(desc, m, excluirId){
   const vals = (D.gastos||[]).filter(x=>x.id!==excluirId && previos.has(x.mes) && _normDesc(x.desc)===k).map(x=>x.monto||0).filter(v=>v>0);
   return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
 }
-function _fueraDeLoNormal(nuevo, habitual, factor){ return habitual>0 && nuevo>0 && (nuevo > habitual*factor || nuevo < habitual/factor); }
+function _fueraDeLoNormal(nuevo, habitual, factor){ return habitual>0 && nuevo>0 && (nuevo > habitual*factor || nuevo < habitual/Math.max(factor*1.25, 3)); }
 function _confirmarInusual(que, nuevo, habitual){
   const veces = nuevo>habitual ? (nuevo/habitual) : (habitual/nuevo);
   const txt = nuevo>habitual ? Math.round(veces*10)/10+' veces MÁS ALTO' : Math.round(veces*10)/10+' veces MÁS BAJO';
@@ -2010,13 +2010,13 @@ function montosInusualesDelMes(m){
   const out = [];
   (D.gastos||[]).filter(x=>x.mes===m).forEach(x=>{
     const h = promedioGastoHabitual(x.desc, m, x.id);
-    if(_fueraDeLoNormal(x.monto||0, h, 2.5)) out.push('Gasto "'+x.desc+'": '+fmt(x.monto)+' (lo habitual es '+fmt(Math.round(h))+')');
+    if(_fueraDeLoNormal(x.monto||0, h, 4)) out.push('Gasto "'+x.desc+'": '+fmt(x.monto)+' (lo habitual es '+fmt(Math.round(h))+')');
   });
   const ant = shiftMes(m,-1);
   (D.empleados||[]).forEach(e=>{
     if(e.desde && ant < e.desde) return;
     const a = getNominaEmp(e, ant).sueldo||0, b = getNominaEmp(e, m).sueldo||0;
-    if(_fueraDeLoNormal(b, a, 1.4)) out.push('Sueldo de '+e.nombre+': '+fmt(b)+' (el mes anterior fue '+fmt(a)+')');
+    if(_fueraDeLoNormal(b, a, 1.5)) out.push('Sueldo de '+e.nombre+': '+fmt(b)+' (el mes anterior fue '+fmt(a)+')');
   });
   return out;
 }
@@ -2028,7 +2028,7 @@ function montosInusualesDelMes(m){
       const desc = (gv('g-desc')||'').trim(), monto = parseFloat(gv('g-monto'))||0, fecha = gv('g-fecha');
       if(desc && monto && fecha){
         const h = promedioGastoHabitual(desc, fecha.slice(0,7));
-        if(_fueraDeLoNormal(monto, h, 2.5) && !_confirmarInusual('Gasto: '+desc, monto, h)) return;
+        if(_fueraDeLoNormal(monto, h, 4) && !_confirmarInusual('Gasto: '+desc, monto, h)) return;
       }
     }catch(e){}
     return _addGasto.apply(this, args);
@@ -2041,7 +2041,7 @@ function montosInusualesDelMes(m){
         const gx = (D.gastos||[]).find(x=>x.id===id);
         if(gx){
           const h = promedioGastoHabitual(gx.desc, gx.mes, gx.id) || gx.monto || 0;
-          if(_fueraDeLoNormal(monto, h, 2.5) && !_confirmarInusual('Gasto: '+gx.desc, monto, h)){ try{ renderCashFlow(); }catch(e){} return; }
+          if(_fueraDeLoNormal(monto, h, 4) && !_confirmarInusual('Gasto: '+gx.desc, monto, h)){ try{ renderCashFlow(); }catch(e){} return; }
         }
       }
     }catch(e){}
@@ -2057,7 +2057,7 @@ function montosInusualesDelMes(m){
           const actual = getNominaEmp(e, m).sueldo || 0;
           const ant = getNominaEmp(e, shiftMes(m,-1)).sueldo || 0;
           const ref = actual || ant;
-          if(_fueraDeLoNormal(valor, ref, 1.4) && !_confirmarInusual('Sueldo de '+e.nombre+' ('+mesLabel(m)+')', valor, ref)) return;
+          if(_fueraDeLoNormal(valor, ref, 1.5) && !_confirmarInusual('Sueldo de '+e.nombre+' ('+mesLabel(m)+')', valor, ref)) return;
         }
       }
     }catch(e){}
@@ -2071,7 +2071,7 @@ function montosInusualesDelMes(m){
       if(s && v){
         const vals = _mesesAntes(mesSel, 6).map(mm=>(s.porMes||{})[mm]).filter(x=>x && x.monto>0).map(x=>x.monto);
         const h = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
-        if(_fueraDeLoNormal(v, h, 2.5) && !_confirmarInusual(p.nombre+' — '+s.nombre, v, h)){ try{ renderPropiedades(); }catch(e){} return; }
+        if(_fueraDeLoNormal(v, h, 4) && !_confirmarInusual(p.nombre+' — '+s.nombre, v, h)){ try{ renderPropiedades(); }catch(e){} return; }
       }
     }catch(e){}
     return _setS.call(this, propId, idx, valor, ...rest);
@@ -2085,7 +2085,7 @@ function montosInusualesDelMes(m){
         const vals = _mesesAntes(mesSel, 6).map(mm=>(D.calPagos||[]).find(r=>r.id===mm+'|'+itemId+'|'+sem)).filter(r=>r && r.monto>0).map(r=>r.monto);
         const h = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
         const it = (D.calItems||[]).find(x=>x.id===itemId);
-        if(_fueraDeLoNormal(v, h, 2.5) && !_confirmarInusual((it?it.nombre:'Pago'), v, h)){ try{ renderCalendario(); }catch(e){} return; }
+        if(_fueraDeLoNormal(v, h, 4) && !_confirmarInusual((it?it.nombre:'Pago'), v, h)){ try{ renderCalendario(); }catch(e){} return; }
       }
     }catch(e){}
     return _calM.call(this, itemId, sem, valor, ...rest);
@@ -3167,7 +3167,7 @@ function renderPendientes(){
   const comPend = (D.comisiones||[]).filter(c=>c.mes===m && !c.pagado);
   if(comPend.length>0) alertas.push({
     icono:'🤝', color:'#B8943E', bg:'#FBF6E9',
-    texto: comPend.length+' comisión'+(comPend.length!==1?'es':'')+' sin pagar',
+    texto: comPend.length+(comPend.length!==1?' comisiones':' comisión')+' sin pagar',
     monto: comPend.reduce((s,c)=>s+(c.total||0),0), pagina:'cashflow'
   });
 
@@ -3289,7 +3289,7 @@ function calcularPendientesResumen(m){
   D.empleados.forEach(e=>{ const n = getNominaEmp(e, m); if((n.sueldo+(n.hsExtra||0))>0 && !n.pagado){ sueldosPend++; sueldosPendMonto += (n.sueldo+(n.hsExtra||0)); } });
   if(sueldosPend>0) alertas.push({icono:'💼', txt:sueldosPend+' sueldo'+(sueldosPend!==1?'s':'')+' sin pagar', monto:sueldosPendMonto});
   const comPend = (D.comisiones||[]).filter(c=>c.mes===m && !c.pagado);
-  if(comPend.length) alertas.push({icono:'🤝', txt:comPend.length+' comisión'+(comPend.length!==1?'es':'')+' sin pagar', monto:comPend.reduce((s,c)=>s+(c.total||0),0)});
+  if(comPend.length) alertas.push({icono:'🤝', txt:comPend.length+(comPend.length!==1?' comisiones':' comisión')+' sin pagar', monto:comPend.reduce((s,c)=>s+(c.total||0),0)});
   const adPend = (D.adelantos||[]).filter(a=>a.mes===m && !a.pagado);
   if(adPend.length) alertas.push({icono:'💵', txt:adPend.length+' adelanto'+(adPend.length!==1?'s':'')+' sin pagar', monto:adPend.reduce((s,a)=>s+(a.monto||0),0)});
   const gasPend = (D.gastos||[]).filter(gg=>gg.mes===m && !gg.pagado);
@@ -3486,14 +3486,14 @@ function renderResumen(){
   g('res-tabla').innerHTML = `
     <tr><td style="color:#6B7E8F;padding:7px 0;border-bottom:1px solid #F0F4F8">Total ingresos</td><td style="text-align:right;color:#1A7A52;font-weight:700;padding:7px 0;border-bottom:1px solid #F0F4F8">${fmt(r.totalIngresos)}</td></tr>
     <tr><td style="color:#6B7E8F;padding:7px 0;border-bottom:1px solid #F0F4F8">Total egresos</td><td style="text-align:right;color:#C0392B;font-weight:700;padding:7px 0;border-bottom:1px solid #F0F4F8">${fmt(r.totalEgresos)}</td></tr>
-    <tr><td style="padding:10px 0;font-weight:800;font-size:15px">Patrimonio del mes</td><td style="text-align:right;padding:10px 0;font-weight:800;font-size:15px;color:${r.resultado>=0?'#1A7A52':'#C0392B'}">${fmt(r.resultado)}</td></tr>
+    <tr><td style="padding:10px 0;font-weight:800;font-size:15px">Resultado del mes</td><td style="text-align:right;padding:10px 0;font-weight:800;font-size:15px;color:${r.resultado>=0?'#1A7A52':'#C0392B'}">${fmt(r.resultado)}</td></tr>
   `;
 
   // Barra
   const pct = r.totalIngresos > 0 ? Math.min(100, Math.round(r.totalEgresos/r.totalIngresos*100)) : 0;
   g('res-barra').style.width = pct+'%';
   g('res-barra').style.background = pct > 100 ? 'linear-gradient(90deg,#C0392B,#E74C3C)' : 'linear-gradient(90deg,#1A7A52,#4ADE80)';
-  g('res-pct').textContent = 'Egresos = '+pct+'% de los ingresos';
+  g('res-pct').textContent = r.totalIngresos>0 ? 'Egresos = '+pct+'% de los ingresos' : 'Sin ingresos cargados en el mes';
 
   // Desglose tabla con barras
   const items = [
@@ -6442,7 +6442,7 @@ function renderRanking(){
         '<div style="font-size:36px;margin-bottom:4px">'+medallas[i]+'</div>'+
         '<div style="font-weight:800;font-size:16px;color:#1a2332">'+r.nombre+'</div>'+
         '<div style="font-weight:900;font-size:22px;color:'+colores[i]+';margin:6px 0">'+fmt(r.total)+'</div>'+
-        '<div style="font-size:12px;color:#8A9BAB">'+r.cant+' comisión'+(r.cant!==1?'es':'')+(r.meses>1?' · '+r.meses+' meses':'')+'</div>'+
+        '<div style="font-size:12px;color:#8A9BAB">'+r.cant+(r.cant!==1?' comisiones':' comisión')+(r.meses>1?' · '+r.meses+' meses':'')+'</div>'+
       '</div>'
     ).join('') + '</div>';
 
@@ -7812,7 +7812,7 @@ function getCFData(mes_sel){
         return a;
       },0);
       const totalTransf = total - totalEfec;
-      let subcat = cant+' comisión'+(cant!==1?'es':'')+' · equipo '+lid.nombre;
+      let subcat = cant+(cant!==1?' comisiones':' comisión')+' · equipo '+lid.nombre;
       if(totalEfec>0 && totalTransf>0) subcat += ' · 💵 Ef: '+fmt(totalEfec)+' / 🏦 Transf: '+fmt(totalTransf);
       else if(totalEfec>0) subcat += ' · 💵 Todo en efectivo';
       if(!eg_sem[s]) eg_sem[s] = {items:[]};
@@ -7863,7 +7863,7 @@ function getCFData(mes_sel){
       if(!eg_sem[s]) eg_sem[s] = {items:[]};
       eg_sem[s].items.push({
         concepto: 'Comisiones — '+nombre,
-        cat: cs.length+' comisión'+(cs.length!==1?'es':'')+' · sin equipo asignado',
+        cat: cs.length+(cs.length!==1?' comisiones':' comisión')+' · sin equipo asignado',
         monto: total,
         color: '#B8943E',
         pagado: todoPagado,
@@ -8503,7 +8503,7 @@ function renderCashFlow(){
       <div class="kpi-val red">${fmt(totalEg)}</div>
     </div>
     <div class="kpi-card" style="border-left:4px solid ${resultado>=0?'#1A7A52':'#C0392B'}">
-      <div class="kpi-label">Patrimonio</div>
+      <div class="kpi-label">Resultado del mes</div>
       <div class="kpi-val ${resultado>=0?'green':'red'}">${fmt(resultado)}</div>
     </div>
     <div class="kpi-card" style="border-left:4px solid #1B3A6B">
