@@ -2547,6 +2547,74 @@ const _prop = id => (D.propiedades||[]).find(p=>p.id===id);
   altaBaja('cheques', 'cheque', 'addCheque', 'delCheque', x => 'Cheque — '+(x.dest||''));
 })();
 
+// ═══════════════════════════════
+// AYUDA DENTRO DEL SISTEMA (botón "?")
+// ═══════════════════════════════
+const AYUDA = {
+  resumen: {t:'📊 Resumen', d:'La pantalla principal: muestra cómo viene el mes elegido y avisa todo lo que necesita atención.',
+    p:['Arriba elegís el mes; los números de todo el sistema cambian según ese mes.','Ingresos, egresos y resultado del mes de un vistazo.','Avisos de pendientes: sueldos, comisiones y gastos sin pagar, aumentos de alquiler y de sueldo, contratos por vencer, pagos del calendario y montos fuera de lo normal.','"📄 Pendientes de pago (PDF)": informe de lo que falta pagar de una semana o del mes completo.','"💾 Copia de seguridad semanal": descarga cifrada de todos los datos.']},
+  buscador: {t:'🔍 Buscar persona', d:'Muestra todo lo que se le pagó a una persona.', p:['Escribí el nombre (o parte del nombre).','Vas a ver sus sueldos, adelantos, comisiones y transferencias, mes por mes.']},
+  analisis: {t:'📈 Análisis financiero', d:'Gráficos y comparaciones para ver la evolución del negocio.', p:['Compará ingresos y egresos entre meses.','Mirá en qué se va el dinero (sueldos, gastos, comisiones).']},
+  asistente: {t:'🤖 Asistente IA', d:'Un asistente que responde preguntas sobre los datos del sistema.', p:['Escribí tu pregunta en palabras normales, por ejemplo: "¿cuánto gastamos en servicios este mes?".','Las respuestas son orientativas: verificá los números importantes en su sección.']},
+  empleados: {t:'💼 Sueldos', d:'La nómina del mes: sueldo de cada empleado, horas extra, semana de pago y si ya se pagó.',
+    p:['Los empleados se agrupan por sector; tocá un sector para desplegarlo.','Para cargar a alguien nuevo: "+ Agregar". Si empieza más adelante, completá "Cobra desde (mes)".','Marcá "Pagado" cuando se le paga. El 1° de cada mes la nómina del mes anterior queda guardada tal cual.','📈 Aumentos por inflación: cuando le toca a alguien aparece "Aplicar aumento", que ya propone el monto según el IPC del INDEC.','Si un sueldo cambia mucho de golpe, el sistema pregunta antes de guardar (para evitar errores de tipeo).']},
+  costoemp: {t:'🧮 Costo por empleado', d:'Lo que cuesta de verdad cada persona en el mes: sueldo + horas extra + adelantos + premios.', p:['Ordenado de mayor a menor costo.','Cambiá el mes arriba para ver otros meses.']},
+  arca: {t:'🧾 IVA / ARCA', d:'Calcula facturación, IVA y saldo a partir de los comprobantes de ARCA.', p:['Descargá de ARCA "Mis Comprobantes" (emitidos y recibidos) en Excel o CSV.','Subilos acá y el sistema calcula el IVA del período.']},
+  adelantos: {t:'💵 Adelantos', d:'Adelantos de sueldo dados al personal.', p:['Cargá el empleado, la fecha y el monto.','Los adelantos se descuentan solos del sueldo a pagar en el Cash Flow.']},
+  ventas: {t:'⭐ Premios semanales', d:'Premios por metas de ventas para operadoras y personal de ventas.', p:['Cargá el premio a la persona y la semana.','Se suman al costo del empleado y al Cash Flow de esa semana.']},
+  externos: {t:'👥 Vendedores externos', d:'Equipos de vendedores externos y sus comisiones semanales.', p:['Cada vendedor puede pertenecer al equipo de un líder.','Cargá las comisiones por semana; en el Cash Flow se agrupan por equipo.']},
+  ranking: {t:'🏆 Ranking de vendedores', d:'Quién generó más comisiones, para premiar o analizar.', p:['Elegí el período y mirá el orden de los vendedores.']},
+  gastos: {t:'💳 Gastos', d:'Gastos operativos del mes (servicios, alquiler, impuestos, publicidad, etc.).', p:['Cargá descripción, categoría, fecha, monto y si se paga en efectivo o transferencia.','Marcá "Pagado" cuando se paga.','Si un gasto es mucho más alto que lo habitual (por ejemplo, un cero de más), el sistema pregunta antes de guardar.']},
+  oficina: {t:'🧴 Oficina', d:'Gastos chicos del día a día: limpieza, desayunos, varios.', p:['Se cargan acá y cuentan como gasto en el total del mes.']},
+  propiedades: {t:'🏠 Propiedades', d:'Alquileres, servicios, aumentos y contratos de las propiedades.',
+    p:['Cada tarjeta muestra alquiler, inquilino, próximo aumento y contrato. Con "Minimizar" queda una sola línea.','"Marcar cobrado" registra el cobro del alquiler del mes.','Servicios: cada mes arranca en cero para cargar el importe actualizado.','Aumentos: 30 días antes aparece el aviso y el monto sugerido según el IPC; "Aplicar aumento" actualiza el alquiler y programa el siguiente.','Contratos: 90 días antes del vencimiento avisa para renovar.']},
+  ingresos: {t:'📥 Ingresos', d:'Ingresos del mes (transferencias de la obra social).', p:['Cargá cada ingreso con su fecha y monto.','Se usan para el resultado del mes en Resumen y Cash Flow.']},
+  cheques: {t:'📝 Cheques', d:'Registro de cheques emitidos.', p:['Cargá destinatario, número, fecha y monto.','Marcá cuando el cheque se acredita.']},
+  transferencias: {t:'💸 Transferencias', d:'Registro de transferencias con su comprobante.', p:['Cargá la transferencia y subí la foto o el PDF del comprobante.','Quedan agrupadas por persona para consultarlas después.']},
+  cashflow: {t:'💰 Cash Flow semanal', d:'Ingresos y egresos de cada semana del mes, con lo pagado y lo pendiente.',
+    p:['Cada semana muestra sus pagos: sueldos por sector, premios, comisiones, gastos y cheques.','"📋 Preparar": la transferencia está armada pero todavía no salió; sigue sumando en "Pendiente por transferir".','"✓ Pagar los preparados": cuando enviás todas las transferencias juntas, las pasa a pagado de una vez.','Abajo de cada semana: total, efectivo, transferencia, pendiente por transferir y cuánto está preparado.']},
+  calendario: {t:'📅 Calendario de pagos', d:'Lista fija de todo lo que hay que pagar cada mes, ordenada por semana.',
+    p:['Tocá el cuadradito para marcar un pago como hecho; podés anotar el monto.','Los sueldos se tildan solos cuando están pagados en Sueldos.','Colores: rojo = vencido, amarillo = vence pronto, verde = pagado.','"✏️ Editar lista" para agregar, sacar o cambiar el día límite de un pago.']},
+  fichabancaria: {t:'🏦 Fichas bancarias', d:'Datos bancarios (CBU, alias, CUIL) del personal y de los vendedores externos.', p:['Consultalos al momento de transferir.','Son datos sensibles: el sistema solo los muestra a usuarios con sesión iniciada.']},
+  backups: {t:'🛡️ Copias de seguridad', d:'Respaldos de todos los datos y bloqueo de meses cerrados.',
+    p:['El sistema hace copias automáticas en la nube; con "💾 Crear backup ahora" hacés una en el momento.','Desde la lista podés restaurar una copia: antes se guarda un respaldo del estado actual.','El administrador puede "📂 Restaurar desde un archivo" (por ejemplo, la copia cifrada guardada en Drive).','Cerrar un mes evita que se modifique por error.']}
+};
+function _paginaActual(){ const p = document.querySelector('.page.on'); return p ? p.id.replace('page-','') : 'resumen'; }
+function mostrarAyuda(pid){
+  pid = pid || _paginaActual();
+  const a = AYUDA[pid] || {t:'Ayuda', d:'Esta sección todavía no tiene ayuda cargada.', p:[]};
+  let ov = g('modal-ayuda'); if(ov) ov.remove();
+  ov = document.createElement('div'); ov.id = 'modal-ayuda';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,25,35,.55);z-index:99997;display:flex;align-items:center;justify-content:center;padding:14px';
+  ov.addEventListener('click', e=>{ if(e.target===ov) ov.remove(); });
+  ov.innerHTML = '<div style="background:#fff;border-radius:14px;padding:22px;width:min(520px,100%);max-height:85vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.3)">'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px"><div style="font-weight:800;font-size:17px;color:#1a2332">'+a.t+'</div>'+
+    '<button onclick="document.getElementById(\'modal-ayuda\').remove()" style="border:none;background:none;font-size:20px;cursor:pointer;color:#8A9BAB;min-height:0;line-height:1">×</button></div>'+
+    '<div style="font-size:13.5px;color:#4A5D73;margin:6px 0 12px;line-height:1.5">'+a.d+'</div>'+
+    (a.p.length ? '<ul style="margin:0;padding-left:18px;font-size:13px;color:#1a2332;line-height:1.55">'+a.p.map(x=>'<li style="margin-bottom:6px">'+x+'</li>').join('')+'</ul>' : '')+
+    '<div style="margin-top:14px;font-size:11.5px;color:#8A9BAB">Todo lo que se modifica queda registrado en 🕘 Historial con el nombre de quien lo hizo.</div>'+
+  '</div>';
+  document.body.appendChild(ov);
+}
+function _ponerBotonesAyuda(){
+  document.querySelectorAll('.page').forEach(p=>{
+    const pid = p.id.replace('page-',''); const t = p.querySelector('.page-title');
+    if(!t || t.querySelector('.btn-ayuda')) return;
+    const b = document.createElement('button');
+    b.className = 'btn-ayuda'; b.type = 'button'; b.title = 'Ayuda de esta sección'; b.textContent = '?';
+    b.style.cssText = 'margin-left:8px;width:24px;height:24px;min-height:0;border-radius:50%;border:1.5px solid #C9D7EE;background:#EEF3FB;color:#1B3A6B;font-weight:800;font-size:13px;cursor:pointer;vertical-align:middle;padding:0;line-height:1';
+    b.onclick = e=>{ e.stopPropagation(); mostrarAyuda(pid); };
+    t.appendChild(b);
+  });
+  if(!g('btn-ayuda-flotante')){
+    const f = document.createElement('button');
+    f.id = 'btn-ayuda-flotante'; f.type = 'button'; f.title = 'Ayuda de esta pantalla'; f.textContent = '?';
+    f.style.cssText = 'position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:900;width:42px;height:42px;min-height:0;border-radius:50%;border:none;background:#1B3A6B;color:#fff;font-size:20px;font-weight:800;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)';
+    f.onclick = ()=>mostrarAyuda();
+    document.body.appendChild(f);
+  }
+}
+
 // Menú lateral en el celular: se abre con ☰ y se cierra al elegir una sección
 function toggleMenu(abrir){
   const b = document.body;
@@ -2559,6 +2627,7 @@ document.addEventListener('click', e=>{
 
 async function initApp(){
   try{ mostrarBotonUsuarios(); }catch(e){}
+  try{ _ponerBotonesAyuda(); }catch(e){}
   initCFMes();
   // Show loading overlay
   const overlay = document.createElement('div');
