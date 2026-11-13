@@ -1953,6 +1953,22 @@ function cfPrepararVarios(tok){
   try{ registrarEvento('preparado', '', 'Cash Flow', 'Marcó '+lista.length+' pagos como preparados — '+mesLabel(mesSel)); }catch(e){}
   save(); renderCashFlow(); toast('📋 '+lista.length+' pagos marcados como preparados');
 }
+// Pagar de una vez todo lo que está preparado (cuando se envían todas las transferencias juntas)
+function cfPagarPreparados(tok){
+  const lista = (window._cfPend||{})[tok] || [];
+  if(!lista.length) return;
+  if(!confirm('¿Marcar como PAGADOS los '+lista.length+' pagos preparados de esta semana?\n\nHacelo cuando ya enviaste todas las transferencias.')) return;
+  let n = 0;
+  lista.forEach(([tipo,id])=>{
+    // Se vuelve a leer el estado justo antes, para no revertir algo que ya estuviera pagado
+    let sigue = false;
+    try{ const d = getCFData(mesSel); for(let s=1;s<=5;s++){ const it = (d.eg_sem[s]||{items:[]}).items.find(x=>x.tipo===tipo && x.id===id); if(it){ sigue = !it.pagado; break; } } }catch(e){}
+    if(!sigue) return;
+    try{ toggleCFPago(tipo, id); n++; }catch(e){ console.error(e); }
+  });
+  try{ registrarEvento('preparado', '', 'Cash Flow', 'Pagó juntos '+n+' pagos preparados — '+mesLabel(mesSel)); }catch(e){}
+  save(); renderCashFlow(); toast('✅ '+n+' pagos marcados como pagados');
+}
 (function activarPreparado(){
   // Cada concepto del Cash Flow sabe si está preparado
   const _get = window.getCFData;
@@ -8429,9 +8445,17 @@ function renderEgresosSem(items,egTotal){
             +'<span style="font-size:10px;color:rgba(255,255,255,.6)">falta preparar:</span>'
             +'<span style="font-size:11.5px;font-weight:800;color:#FCD34D;background:rgba(252,211,77,.12);padding:2px 10px;border-radius:4px">'+fmt(Math.max(0,pendTr-prepTr))+'</span>'
           +'</div>'; })():'')
-      +(()=>{ const pend = items.filter(x=>!x.pagado && !x.preparado && !x.proyectado && x.tipo && x.id); if(!pend.length) return '';
-          const tok = 'p'+Math.random().toString(36).slice(2); window._cfPend = window._cfPend||{}; window._cfPend[tok] = pend.map(x=>[x.tipo,x.id]);
-          return '<div style="margin-top:8px;text-align:right"><button onclick="cfPrepararVarios(\''+tok+'\')" style="background:#2563EB;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;padding:5px 12px;cursor:pointer">&#128203; Marcar los '+pend.length+' pendientes como preparados</button></div>'; })()
+      +(()=>{ const pend = items.filter(x=>!x.pagado && !x.preparado && !x.proyectado && x.tipo && x.id);
+          const prep = items.filter(x=>!x.pagado && x.preparado && x.tipo && x.id);
+          if(!pend.length && !prep.length) return '';
+          window._cfPend = window._cfPend||{};
+          let b = '<div style="margin-top:8px;display:flex;justify-content:flex-end;gap:6px;flex-wrap:wrap">';
+          if(pend.length){ const tok = 'p'+Math.random().toString(36).slice(2); window._cfPend[tok] = pend.map(x=>[x.tipo,x.id]);
+            b += '<button onclick="cfPrepararVarios(\''+tok+'\')" style="background:#2563EB;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;padding:5px 12px;cursor:pointer">&#128203; Marcar los '+pend.length+' pendientes como preparados</button>'; }
+          if(prep.length){ const tok2 = 'q'+Math.random().toString(36).slice(2); window._cfPend[tok2] = prep.map(x=>[x.tipo,x.id]);
+            const tot = prep.reduce((a,x)=>a+x.monto,0);
+            b += '<button onclick="cfPagarPreparados(\''+tok2+'\')" style="background:#1A7A52;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;padding:5px 12px;cursor:pointer">&#10003; Pagar los '+prep.length+' preparados ('+fmt(tot)+')</button>'; }
+          return b+'</div>'; })()
       +'</div>';
   } else {
     out+='<div style="font-size:12px;color:#9AAABB;padding:8px 0">Sin egresos cargados</div>';
